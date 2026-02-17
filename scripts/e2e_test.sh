@@ -549,7 +549,7 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-banner "Milestone 8: Causal Candidates (Phase 3B)"
+banner "Milestone 8: Causal Candidates (2-hop BFS Neighborhood)"
 # ══════════════════════════════════════════════════════════════════════
 
 TESTDIR8="$TESTDATA/m8"
@@ -560,7 +560,8 @@ OUT=$($M --data-dir "$TESTDIR8" remember "Causal test baseline insight about cac
 assert_contains "has causal_candidates" "$OUT" '"causal_candidates"'
 ID_CC1=$(extract_id "$OUT")
 
-step "causal candidates — causal signal triggers candidates"
+step "causal candidates — BFS finds neighbors via edges"
+sleep 1
 OUT=$($M --data-dir "$TESTDIR8" remember "Chose Redis because of latency requirements in caching" --cat decision --imp 4)
 assert_contains "has causal_candidates" "$OUT" '"causal_candidates"'
 ID_CC2=$(extract_id "$OUT")
@@ -568,18 +569,33 @@ CC_COUNT=$(echo "$OUT" | jq '.causal_candidates | length')
 TOTAL=$((TOTAL + 1))
 if [ "$CC_COUNT" -ge 1 ]; then
   PASS=$((PASS + 1))
-  echo -e "    ${GREEN}✔${RESET} Found $CC_COUNT causal candidate(s)"
+  echo -e "    ${GREEN}✔${RESET} Found $CC_COUNT causal candidate(s) via BFS"
 else
   FAIL=$((FAIL + 1))
   echo -e "    ${RED}✘${RESET} Expected >= 1 causal candidates, got $CC_COUNT"
 fi
 
-step "causal candidates — candidate has expected fields"
+step "causal candidates — candidate has hop and via_edge fields"
 if [ "$CC_COUNT" -ge 1 ]; then
   FIRST_CC=$(echo "$OUT" | jq '.causal_candidates[0]')
+  assert_contains "has hop" "$FIRST_CC" '"hop"'
+  assert_contains "has via_edge" "$FIRST_CC" '"via_edge"'
   assert_contains "has causal_signal" "$FIRST_CC" '"causal_signal"'
-  assert_contains "has token_overlap" "$FIRST_CC" '"token_overlap"'
   assert_contains "has suggested_sub_type" "$FIRST_CC" '"suggested_sub_type"'
+fi
+
+step "causal candidates — hop-2 discovery via graph"
+sleep 1
+OUT=$($M --data-dir "$TESTDIR8" remember "Edge caching reduces Redis load significantly" --cat fact --imp 3)
+ID_CC3=$(extract_id "$OUT")
+CC_COUNT2=$(echo "$OUT" | jq '.causal_candidates | length')
+TOTAL=$((TOTAL + 1))
+if [ "$CC_COUNT2" -ge 2 ]; then
+  PASS=$((PASS + 1))
+  echo -e "    ${GREEN}✔${RESET} Found $CC_COUNT2 candidates (includes hop-2 via BFS)"
+else
+  FAIL=$((FAIL + 1))
+  echo -e "    ${RED}✘${RESET} Expected >= 2 causal candidates (hop-1 + hop-2), got $CC_COUNT2"
 fi
 
 step "entity extraction — dictionary-based (tech terms)"
