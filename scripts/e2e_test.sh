@@ -289,26 +289,26 @@ assert_jq_gte "Z has causal edge to Y" "$OUT_Z" '.edges_created.causal' '1'
 
 step "multi-level traversal — smart recall finds depth-2 node"
 OUT=$($M --data-dir "$TESTDIR3" recall "why Alpha service routing" --smart)
-echo -e "    ${DIM}intent: $(echo "$OUT" | jq -r '.[0].intent // "N/A"')  results: $(echo "$OUT" | jq 'length')${RESET}"
-echo "$OUT" | jq -r '.[] | "    \(.via)\t\(.score | tostring | .[:6])\t\(.insight.content[:50])"' 2>/dev/null
+echo -e "    ${DIM}intent: $(echo "$OUT" | jq -r '.results[0].intent // "N/A"')  results: $(echo "$OUT" | jq '.results | length')${RESET}"
+echo "$OUT" | jq -r '.results[] | "    \(.via)\t\(.score | tostring | .[:6])\t\(.insight.content[:50])"' 2>/dev/null
 assert_contains "finds anchor X (Alpha)" "$OUT" "$ID_X"
 assert_contains "finds depth-1 Y (routing)" "$OUT" "$ID_Y"
 assert_contains "finds depth-2 Z (caching)" "$OUT" "$ID_Z"
 
 step "smart recall — WHY intent"
 OUT=$($M --data-dir "$TESTDIR2" recall "why did we choose Qdrant" --smart)
-echo -e "    ${DIM}intent: $(echo "$OUT" | jq -r '.[0].intent // "N/A"')  results: $(echo "$OUT" | jq 'length')${RESET}"
+echo -e "    ${DIM}intent: $(echo "$OUT" | jq -r '.results[0].intent // "N/A"')  results: $(echo "$OUT" | jq '.results | length')${RESET}"
 assert_contains "intent is WHY" "$OUT" '"WHY"'
 assert_contains "finds Qdrant insight" "$OUT" "Qdrant"
 
 step "smart recall — WHEN intent"
 OUT=$($M --data-dir "$TESTDIR2" recall "when did we choose vector db" --smart)
-echo -e "    ${DIM}intent: $(echo "$OUT" | jq -r '.[0].intent // "N/A"')  results: $(echo "$OUT" | jq 'length')${RESET}"
+echo -e "    ${DIM}intent: $(echo "$OUT" | jq -r '.results[0].intent // "N/A"')  results: $(echo "$OUT" | jq '.results | length')${RESET}"
 assert_contains "intent is WHEN" "$OUT" '"WHEN"'
 
 step "smart recall — graph augments results"
 OUT=$($M --data-dir "$TESTDIR2" recall "why Qdrant performance" --smart)
-COUNT=$(echo "$OUT" | jq 'length')
+COUNT=$(echo "$OUT" | jq '.results | length')
 TOTAL=$((TOTAL + 1))
 if [ "$COUNT" -ge 2 ]; then
   PASS=$((PASS + 1))
@@ -377,7 +377,7 @@ assert_contains "rejects missing insight" "$OUT" "not found"
 
 step "smart recall — semantic edges participate in traversal"
 OUT=$($M --data-dir "$TESTDIR5" recall "Go CLI" --smart)
-COUNT=$(echo "$OUT" | jq 'length')
+COUNT=$(echo "$OUT" | jq '.results | length')
 TOTAL=$((TOTAL + 1))
 if [ "$COUNT" -ge 2 ]; then
   PASS=$((PASS + 1))
@@ -530,7 +530,7 @@ if [ "$OLLAMA_OK" = "true" ]; then
 
   step "recall --smart — uses hybrid search with embeddings"
   OUT=$($M --data-dir "$TESTDIR7" recall "embedding test" --smart)
-  COUNT=$(echo "$OUT" | jq 'length')
+  COUNT=$(echo "$OUT" | jq '.results | length')
   TOTAL=$((TOTAL + 1))
   if [ "$COUNT" -ge 1 ]; then
     PASS=$((PASS + 1))
@@ -701,6 +701,35 @@ else
   echo -e "    ${RED}✘${RESET} Expected imp=5 EI > imp=1 EI (got $EI_CONTEXT vs $EI_LOW)"
 fi
 
+
+# ══════════════════════════════════════════════════════════════════════
+banner "Milestone 11: Smart Recall Reranking + Signals"
+# ══════════════════════════════════════════════════════════════════════
+
+step "smart recall — --intent override"
+OUT=$($M --data-dir "$TESTDIR3" recall "Alpha service" --smart --intent WHY)
+assert_jq "intent is WHY" "$OUT" '.meta.intent' 'WHY'
+assert_jq "intent_source is override" "$OUT" '.meta.intent_source' 'override'
+
+step "smart recall — auto-detected intent source"
+OUT=$($M --data-dir "$TESTDIR3" recall "why Alpha service routing" --smart)
+assert_jq "intent_source is auto" "$OUT" '.meta.intent_source' 'auto'
+
+step "smart recall — signals metadata present"
+OUT=$($M --data-dir "$TESTDIR3" recall "Alpha service routing" --smart)
+FIRST=$(echo "$OUT" | jq '.results[0]')
+assert_contains "has signals" "$FIRST" '"signals"'
+assert_contains "has keyword signal" "$FIRST" '"keyword"'
+assert_contains "has graph signal" "$FIRST" '"graph"'
+
+step "smart recall — meta fields present"
+assert_contains "has anchor_count" "$OUT" '"anchor_count"'
+assert_contains "has traversed" "$OUT" '"traversed"'
+assert_jq_gte "anchor_count >= 1" "$OUT" '.meta.anchor_count' '1'
+
+step "smart recall — invalid intent rejected"
+OUT=$($M --data-dir "$TESTDIR3" recall "test" --smart --intent INVALID 2>&1 || true)
+assert_contains "rejects invalid intent" "$OUT" "unknown intent"
 
 # ── Report ────────────────────────────────────────────────────────────
 echo ""

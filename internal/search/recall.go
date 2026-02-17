@@ -2,7 +2,9 @@ package search
 
 import (
 	"container/heap"
+	"math"
 	"sort"
+	"strings"
 
 	"github.com/Grivn/mnemon/internal/embed"
 	"github.com/Grivn/mnemon/internal/model"
@@ -29,22 +31,22 @@ var intentTraversalParams = map[Intent]TraversalParams{
 	IntentWhy: {
 		BeamWidth:  15,
 		MaxDepth:   5,
-		MaxVisited: 200,
+		MaxVisited: 500,
 	},
 	IntentWhen: {
 		BeamWidth:  10,
 		MaxDepth:   5,
-		MaxVisited: 150,
+		MaxVisited: 400,
 	},
 	IntentEntity: {
 		BeamWidth:  10,
 		MaxDepth:   4,
-		MaxVisited: 150,
+		MaxVisited: 400,
 	},
 	IntentGeneral: {
 		BeamWidth:  10,
 		MaxDepth:   4,
-		MaxVisited: 200,
+		MaxVisited: 500,
 	},
 }
 
@@ -59,28 +61,79 @@ func getTraversalParams(intent Intent) TraversalParams {
 // RRF constant (standard value from Cormack et al. 2009).
 const rrfK = 60
 
+// Reranking weight constants.
+const (
+	// Weights when embeddings are available.
+	rerankKeywordWithEmbed    = 0.30
+	rerankEntityWithEmbed     = 0.15
+	rerankSimilarityWithEmbed = 0.35
+	rerankGraphWithEmbed      = 0.20
+
+	// Weights when embeddings are NOT available (similarity share redistributed).
+	rerankKeywordNoEmbed = 0.45
+	rerankEntityNoEmbed  = 0.25
+	rerankGraphNoEmbed   = 0.30
+)
+
+// SignalScores holds the individual reranking signal scores for a result.
+type SignalScores struct {
+	Keyword    float64 `json:"keyword"`
+	Entity     float64 `json:"entity"`
+	Similarity float64 `json:"similarity"`
+	Graph      float64 `json:"graph"`
+}
+
+// RecallMeta holds metadata about a smart recall operation.
+type RecallMeta struct {
+	Intent       Intent `json:"intent"`
+	IntentSource string `json:"intent_source"` // "auto" or "override"
+	AnchorCount  int    `json:"anchor_count"`
+	Traversed    int    `json:"traversed"`
+	Hint         string `json:"hint,omitempty"`
+}
+
+// RecallResponse wraps recall results with metadata.
+type RecallResponse struct {
+	Results []RecallResult `json:"results"`
+	Meta    RecallMeta     `json:"meta"`
+}
+
 // RecallResult represents a recalled insight with its relevance score.
 type RecallResult struct {
 	Insight *model.Insight `json:"insight"`
 	Score   float64        `json:"score"`
 	Intent  Intent         `json:"intent"`
 	Via     string         `json:"via,omitempty"`
+	Signals SignalScores   `json:"signals"`
 }
 
 // IntentAwareRecall performs MAGMA-aligned intent-aware retrieval:
-// 1. Detect query intent
+// 1. Detect query intent (or use override)
 // 2. Multi-signal anchor selection via RRF (keyword + vector + time)
 // 3. Beam search from anchors with additive transition scoring
-// 4. Merge and rank results
-func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int) ([]RecallResult, error) {
-	intent := DetectIntent(query)
+// 4. Multi-factor reranking (keyword + entity + similarity + graph)
+// 5. WHY intent → causal topological sort
+// 6. Sparse hint detection
+func IntentAwareRecall(db *store.DB, query string, queryVec []float64,
+	queryEntities []string, limit int, intentOverride *Intent) (RecallResponse, error) {
+
+	// Step 1: Intent determination
+	var intent Intent
+	intentSource := "auto"
+	if intentOverride != nil {
+		intent = *intentOverride
+		intentSource = "override"
+	} else {
+		intent = DetectIntent(query)
+	}
+
 	weights := GetWeights(intent)
 	params := getTraversalParams(intent)
 
-	// Step 1: Get all active insights
+	// Get all active insights
 	all, err := db.GetAllActiveInsights()
 	if err != nil {
-		return nil, err
+		return RecallResponse{}, err
 	}
 
 	// Step 2: Multi-signal anchor selection via RRF
@@ -102,7 +155,8 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 	}
 
 	// Signal 2: Vector search (when available)
-	if queryVec != nil {
+	hasEmbeddings := queryVec != nil
+	if hasEmbeddings {
 		vectorHits := vectorSearch(db, queryVec, anchorTopK)
 		for rank, vh := range vectorHits {
 			rrfScore := 1.0 / float64(rrfK+rank+1)
@@ -123,8 +177,7 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		}
 	}
 
-	// Signal 3: Time-based ranking (P5: MAGMA third RRF signal)
-	// Sort all insights by recency, fuse via RRF
+	// Signal 3: Time-based ranking (MAGMA third RRF signal)
 	timeSorted := make([]*model.Insight, len(all))
 	copy(timeSorted, all)
 	sort.Slice(timeSorted, func(i, j int) bool {
@@ -164,6 +217,8 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		}
 	}
 
+	anchorCount := len(anchorMap)
+
 	// Initialize score map with anchors
 	scoreMap := make(map[string]float64)
 	viaMap := make(map[string]string)
@@ -175,24 +230,134 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		insightMap[id] = a.insight
 	}
 
-	// Step 3: Beam search from each anchor (P0: replaces BFS)
-	// MAGMA transition score: score_v = score_u + λ₁·φ(edgeType, intent) + λ₂·sim(v_neighbor, v_query)
+	// Step 3: Beam search from each anchor
 	for id, a := range anchorMap {
 		beamSearchFromAnchor(db, id, a.score, queryVec, weights, params, scoreMap, viaMap, insightMap)
 	}
 
-	// Step 4: Collect and sort results
-	results := make([]RecallResult, 0, len(scoreMap))
-	for id, score := range scoreMap {
+	traversedCount := len(scoreMap)
+
+	// Step 4: Multi-factor reranking
+	queryTokens := Tokenize(query)
+	queryEntitySet := make(map[string]bool, len(queryEntities))
+	for _, e := range queryEntities {
+		queryEntitySet[strings.ToLower(e)] = true
+	}
+
+	// Compute raw graph scores and find min/max for normalization
+	type candidate struct {
+		id         string
+		ins        *model.Insight
+		via        string
+		graphRaw   float64
+		kwScore    float64
+		entScore   float64
+		simScore   float64
+		graphScore float64
+	}
+
+	candidates := make([]candidate, 0, len(scoreMap))
+	var graphMin, graphMax float64
+	first := true
+	for id, graphRaw := range scoreMap {
 		ins, ok := insightMap[id]
 		if !ok {
 			continue
 		}
+		if first {
+			graphMin = graphRaw
+			graphMax = graphRaw
+			first = false
+		} else {
+			if graphRaw < graphMin {
+				graphMin = graphRaw
+			}
+			if graphRaw > graphMax {
+				graphMax = graphRaw
+			}
+		}
+		candidates = append(candidates, candidate{
+			id: id, ins: ins, via: viaMap[id], graphRaw: graphRaw,
+		})
+	}
+
+	graphRange := graphMax - graphMin
+	if graphRange == 0 {
+		graphRange = 1.0 // prevent division by zero
+	}
+
+	// Compute per-candidate signal scores
+	for i := range candidates {
+		c := &candidates[i]
+
+		// keyword_score: token overlap
+		if len(queryTokens) > 0 {
+			contentTokens := Tokenize(c.ins.Content)
+			for _, tag := range c.ins.Tags {
+				for t := range Tokenize(tag) {
+					contentTokens[t] = true
+				}
+			}
+			for _, ent := range c.ins.Entities {
+				for t := range Tokenize(ent) {
+					contentTokens[t] = true
+				}
+			}
+			intersection := 0
+			for t := range queryTokens {
+				if contentTokens[t] {
+					intersection++
+				}
+			}
+			c.kwScore = float64(intersection) / float64(len(queryTokens))
+		}
+
+		// entity_score: entity overlap
+		if len(queryEntitySet) > 0 {
+			matched := 0
+			for _, ent := range c.ins.Entities {
+				if queryEntitySet[strings.ToLower(ent)] {
+					matched++
+				}
+			}
+			c.entScore = float64(matched) / math.Max(1, float64(len(queryEntitySet)))
+		}
+
+		// similarity: cosine similarity with query vector
+		if hasEmbeddings {
+			if blob, err := db.GetEmbedding(c.id); err == nil && len(blob) > 0 {
+				nVec := embed.DeserializeVector(blob)
+				sim := embed.CosineSimilarity(queryVec, nVec)
+				if sim > 0 {
+					c.simScore = sim
+				}
+			}
+		}
+
+		// graph_score: min-max normalized beam search score
+		c.graphScore = (c.graphRaw - graphMin) / graphRange
+	}
+
+	// Compute final weighted score
+	wKw, wEnt, wSim, wGr := rerankKeywordWithEmbed, rerankEntityWithEmbed, rerankSimilarityWithEmbed, rerankGraphWithEmbed
+	if !hasEmbeddings {
+		wKw, wEnt, wSim, wGr = rerankKeywordNoEmbed, rerankEntityNoEmbed, 0, rerankGraphNoEmbed
+	}
+
+	results := make([]RecallResult, 0, len(candidates))
+	for _, c := range candidates {
+		finalScore := wKw*c.kwScore + wEnt*c.entScore + wSim*c.simScore + wGr*c.graphScore
 		results = append(results, RecallResult{
-			Insight: ins,
-			Score:   score,
+			Insight: c.ins,
+			Score:   finalScore,
 			Intent:  intent,
-			Via:     viaMap[id],
+			Via:     c.via,
+			Signals: SignalScores{
+				Keyword:    c.kwScore,
+				Entity:     c.entScore,
+				Similarity: c.simScore,
+				Graph:      c.graphScore,
+			},
 		})
 	}
 
@@ -207,13 +372,27 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		results = results[:limit]
 	}
 
-	// P14: For WHY intent, apply topological sort on causal edges
-	// so causes appear before effects (MAGMA §4.3 linearization).
+	// Step 5: WHY intent → causal topological sort
 	if intent == IntentWhy {
 		results = causalTopologicalSort(db, results)
 	}
 
-	return results, nil
+	// Step 6: Sparse hint
+	hint := ""
+	if len(results) == 0 || (limit > 0 && len(results) < limit/2) {
+		hint = "sparse_results"
+	}
+
+	return RecallResponse{
+		Results: results,
+		Meta: RecallMeta{
+			Intent:       intent,
+			IntentSource: intentSource,
+			AnchorCount:  anchorCount,
+			Traversed:    traversedCount,
+			Hint:         hint,
+		},
+	}, nil
 }
 
 // causalTopologicalSort reorders results so that causes appear before effects.

@@ -1,6 +1,7 @@
 package search
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -58,6 +59,22 @@ var whenPatterns = regexp.MustCompile(
 var entityPatterns = regexp.MustCompile(
 	`(?i)\b(what is|who is|tell me about|describe|about)\b|` +
 		`(是什么|谁是|关于|介绍)`)
+
+// IntentFromString parses a user-provided intent string into an Intent value.
+func IntentFromString(s string) (Intent, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "WHY":
+		return IntentWhy, nil
+	case "WHEN":
+		return IntentWhen, nil
+	case "ENTITY":
+		return IntentEntity, nil
+	case "GENERAL":
+		return IntentGeneral, nil
+	default:
+		return "", fmt.Errorf("unknown intent %q; valid: WHY, WHEN, ENTITY, GENERAL", s)
+	}
+}
 
 // DetectIntent analyzes a query string and returns the detected intent.
 func DetectIntent(query string) Intent {

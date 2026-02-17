@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Grivn/mnemon/internal/embed"
+	"github.com/Grivn/mnemon/internal/graph"
 	"github.com/Grivn/mnemon/internal/search"
 	"github.com/Grivn/mnemon/internal/store"
 	"github.com/spf13/cobra"
@@ -17,6 +18,7 @@ var (
 	recLimit    int
 	recSource   string
 	recSmart    bool
+	recIntent   string
 )
 
 var recallCmd = &cobra.Command{
@@ -37,6 +39,16 @@ var recallCmd = &cobra.Command{
 		enc.SetIndent("", "  ")
 
 		if recSmart {
+			// Parse intent override
+			var intentOverride *search.Intent
+			if recIntent != "" {
+				parsed, err := search.IntentFromString(recIntent)
+				if err != nil {
+					return err
+				}
+				intentOverride = &parsed
+			}
+
 			// Try to get query embedding for hybrid search
 			var queryVec []float64
 			ec := embed.NewClient()
@@ -44,16 +56,19 @@ var recallCmd = &cobra.Command{
 				queryVec, _ = ec.Embed(keyword)
 			}
 
+			// Extract query entities at cmd layer (avoid graph→search circular dep)
+			queryEntities := graph.ExtractEntities(keyword)
+
 			// Intent-aware recall with graph traversal (+ optional vector search)
-			results, err := search.IntentAwareRecall(db, keyword, queryVec, recLimit)
+			resp, err := search.IntentAwareRecall(db, keyword, queryVec, queryEntities, recLimit, intentOverride)
 			if err != nil {
 				return fmt.Errorf("smart recall: %w", err)
 			}
-			for _, r := range results {
+			for _, r := range resp.Results {
 				_ = db.IncrementAccessCount(r.Insight.ID)
 			}
-			db.LogOp("recall:smart", "", fmt.Sprintf("q=%s hits=%d", keyword, len(results)))
-			return enc.Encode(results)
+			db.LogOp("recall:smart", "", fmt.Sprintf("q=%s hits=%d", keyword, len(resp.Results)))
+			return enc.Encode(resp)
 		}
 
 		// Basic SQL LIKE recall
@@ -80,5 +95,6 @@ func init() {
 	recallCmd.Flags().IntVar(&recLimit, "limit", 10, "max results")
 	recallCmd.Flags().StringVar(&recSource, "source", "", "filter by source")
 	recallCmd.Flags().BoolVar(&recSmart, "smart", false, "use intent-aware graph-enhanced recall")
+	recallCmd.Flags().StringVar(&recIntent, "intent", "", "override intent (WHY|WHEN|ENTITY|GENERAL)")
 	rootCmd.AddCommand(recallCmd)
 }
