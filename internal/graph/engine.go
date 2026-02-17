@@ -7,11 +7,10 @@ import (
 
 // EdgeStats tracks how many edges of each type were created.
 type EdgeStats struct {
-	Temporal        int `json:"temporal"`
-	ContextNeighbor int `json:"context_neighbor"`
-	Entity          int `json:"entity"`
-	Causal          int `json:"causal"`
-	Semantic        int `json:"semantic"`
+	Temporal int `json:"temporal"`
+	Entity   int `json:"entity"`
+	Causal   int `json:"causal"`
+	Semantic int `json:"semantic"`
 }
 
 // Engine orchestrates automatic edge creation when insights are stored.
@@ -36,13 +35,8 @@ func (e *Engine) OnInsightCreated(insight *model.Insight) EdgeStats {
 	}
 	insight.Entities = entities
 
-	// 2. Temporal backbone edge
+	// 2. Temporal backbone + proximity edges
 	stats.Temporal = CreateTemporalEdge(e.db, insight)
-
-	// 2.5. Context neighbor edges (MAGMA §3.1)
-	seqIdx, _ := e.db.GetNextSequenceIndex()
-	_ = e.db.UpdateSequenceIndex(insight.ID, seqIdx)
-	stats.ContextNeighbor = CreateContextNeighborEdges(e.db, insight, seqIdx)
 
 	// 3. Entity co-occurrence edges
 	stats.Entity = CreateEntityEdges(e.db, insight)

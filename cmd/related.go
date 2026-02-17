@@ -39,7 +39,7 @@ var relatedCmd = &cobra.Command{
 		if relEdgeType != "" {
 			et := model.EdgeType(relEdgeType)
 			if !model.ValidEdgeTypes[et] {
-				return fmt.Errorf("invalid edge type %q; valid: temporal, semantic, causal, entity, narrative", relEdgeType)
+				return fmt.Errorf("invalid edge type %q; valid: temporal, semantic, causal, entity", relEdgeType)
 			}
 			edgeFilter = et
 		}
@@ -132,7 +132,7 @@ func bfsTraverse(db *store.DB, startID string, edgeFilter model.EdgeType, maxDep
 }
 
 func init() {
-	relatedCmd.Flags().StringVar(&relEdgeType, "edge", "", "filter by edge type (temporal|semantic|causal|entity|narrative)")
+	relatedCmd.Flags().StringVar(&relEdgeType, "edge", "", "filter by edge type (temporal|semantic|causal|entity)")
 	relatedCmd.Flags().IntVar(&relDepth, "depth", 2, "max traversal depth")
 	rootCmd.AddCommand(relatedCmd)
 }

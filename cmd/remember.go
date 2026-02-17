@@ -31,7 +31,7 @@ var rememberCmd = &cobra.Command{
 
 		cat := model.Category(remCategory)
 		if !model.ValidCategories[cat] {
-			return fmt.Errorf("invalid category %q; valid: preference, decision, fact, insight, context, general, narrative", remCategory)
+			return fmt.Errorf("invalid category %q; valid: preference, decision, fact, insight, context, general", remCategory)
 		}
 		if remImportance < 1 || remImportance > 5 {
 			return fmt.Errorf("importance must be 1-5, got %d", remImportance)

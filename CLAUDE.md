@@ -1,7 +1,7 @@
 # Mnemon — Project Guidelines
 
 ## What is this project
-Mnemon is a standalone memory daemon for LLM agents, built in Go with SQLite storage and a MAGMA-inspired five-graph architecture (temporal, entity, causal, semantic, narrative edges).
+Mnemon is a standalone memory daemon for LLM agents, built in Go with SQLite storage and a MAGMA-aligned four-graph architecture (temporal, entity, causal, semantic edges).
 
 ## Persistent Memory (mnemon CLI)
 
@@ -52,12 +52,6 @@ After `mnemon remember`, check `causal_candidates` and `entity_hints` in the out
 ```bash
 mnemon link <src> <tgt> --type causal --weight 0.8 --meta '{"sub_type":"causes"}'
 mnemon enrich <id> --entities "X,Y" --rebuild-edges  # supplement entities
-```
-
-### Narrative consolidation
-```bash
-mnemon consolidate [--window 72h] [--min-cluster 3]  # find narrative clusters
-mnemon consolidate --create --title "..." --members "id1,id2,id3"  # create narrative
 ```
 
 ### Retention review

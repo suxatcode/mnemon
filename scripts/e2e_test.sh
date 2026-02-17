@@ -537,46 +537,11 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-banner "Milestone 8: Context Neighbor Edges (Phase 3A)"
+banner "Milestone 8: Causal Candidates (Phase 3B)"
 # ══════════════════════════════════════════════════════════════════════
 
 TESTDIR8="$TESTDATA/m8"
 mkdir -p "$TESTDIR8"
-
-step "context neighbor — first insight has no context neighbors"
-OUT=$($M --data-dir "$TESTDIR8" remember "Context neighbor test: insight 1" --cat fact --imp 3)
-assert_jq "first: context_neighbor is 0" "$OUT" '.edges_created.context_neighbor' '0'
-ID_CN1=$(extract_id "$OUT")
-
-step "context neighbor — second insight gets context neighbor edges"
-OUT=$($M --data-dir "$TESTDIR8" remember "Context neighbor test: insight 2" --cat fact --imp 3)
-assert_jq_gte "second: context_neighbor >= 2" "$OUT" '.edges_created.context_neighbor' '2'
-ID_CN2=$(extract_id "$OUT")
-
-step "context neighbor — third insight links to both neighbors"
-OUT=$($M --data-dir "$TESTDIR8" remember "Context neighbor test: insight 3" --cat fact --imp 3)
-assert_jq_gte "third: context_neighbor >= 4" "$OUT" '.edges_created.context_neighbor' '4'
-ID_CN3=$(extract_id "$OUT")
-
-step "context neighbor — fourth insight"
-OUT=$($M --data-dir "$TESTDIR8" remember "Context neighbor test: insight 4" --cat fact --imp 3)
-assert_jq_gte "fourth: context_neighbor >= 4" "$OUT" '.edges_created.context_neighbor' '4'
-ID_CN4=$(extract_id "$OUT")
-
-step "context neighbor — visible in temporal related"
-OUT=$($M --data-dir "$TESTDIR8" related "$ID_CN2" --edge temporal)
-assert_contains "CN2 → CN1 via temporal" "$OUT" "$ID_CN1"
-assert_contains "CN2 → CN3 via temporal" "$OUT" "$ID_CN3"
-
-step "context neighbor — edge count confirms neighbors exist"
-# Context neighbor edges are stored as temporal type with sub_type metadata.
-# Verify total temporal edge count is higher than backbone alone (2 backbone = 4 edges per pair).
-OUT_STATUS=$($M --data-dir "$TESTDIR8" status)
-assert_jq_gte "many temporal edges from context neighbors" "$OUT_STATUS" '.edge_count' '20'
-
-# ══════════════════════════════════════════════════════════════════════
-banner "Milestone 9: Causal Candidates (Phase 3B)"
-# ══════════════════════════════════════════════════════════════════════
 
 step "causal candidates — output includes causal_candidates field"
 OUT=$($M --data-dir "$TESTDIR8" remember "Causal test baseline insight about caching" --cat fact --imp 3)
@@ -667,81 +632,6 @@ step "enrich — missing --entities flag"
 OUT=$($M --data-dir "$TESTDIR10" enrich "$ID_EN1" 2>&1 || true)
 assert_contains "requires entities" "$OUT" "required"
 
-# ══════════════════════════════════════════════════════════════════════
-banner "Milestone 11: Narrative Consolidation (Phase 3D)"
-# ══════════════════════════════════════════════════════════════════════
-
-TESTDIR11="$TESTDATA/m11"
-mkdir -p "$TESTDIR11"
-
-step "consolidate — setup: create cluster of related insights"
-OUT=$($M --data-dir "$TESTDIR11" remember "Set up React project with TypeScript" --cat context --imp 3)
-ID_N1=$(extract_id "$OUT")
-OUT=$($M --data-dir "$TESTDIR11" remember "Chose TypeScript for type safety in React" --cat decision --imp 4)
-ID_N2=$(extract_id "$OUT")
-OUT=$($M --data-dir "$TESTDIR11" remember "Added ESLint config for TypeScript React project" --cat context --imp 3)
-ID_N3=$(extract_id "$OUT")
-
-step "consolidate suggest — finds clusters"
-OUT=$($M --data-dir "$TESTDIR11" consolidate --window 72h --min-cluster 2)
-show_json "$OUT" 30
-assert_contains "has clusters field" "$OUT" '"clusters"'
-assert_contains "has actions field"  "$OUT" '"actions"'
-
-CLUSTER_COUNT=$(echo "$OUT" | jq '.clusters | length')
-TOTAL=$((TOTAL + 1))
-if [ "$CLUSTER_COUNT" -ge 1 ]; then
-  PASS=$((PASS + 1))
-  echo -e "    ${GREEN}✔${RESET} Found $CLUSTER_COUNT cluster(s)"
-else
-  FAIL=$((FAIL + 1))
-  echo -e "    ${RED}✘${RESET} Expected >= 1 clusters, got $CLUSTER_COUNT"
-fi
-
-step "consolidate suggest — cluster has expected fields"
-if [ "$CLUSTER_COUNT" -ge 1 ]; then
-  FIRST_CL=$(echo "$OUT" | jq '.clusters[0]')
-  assert_contains "has time_range" "$FIRST_CL" '"time_range"'
-  assert_contains "has suggested_title" "$FIRST_CL" '"suggested_title"'
-  assert_contains "has insights" "$FIRST_CL" '"insights"'
-fi
-
-step "consolidate create — creates narrative node"
-OUT=$($M --data-dir "$TESTDIR11" consolidate --create --title "Project setup phase" --members "$ID_N1,$ID_N2,$ID_N3")
-show_json "$OUT" 15
-assert_jq "status is created" "$OUT" '.status' 'created'
-assert_contains "has narrative_id" "$OUT" '"narrative_id"'
-ID_NARR=$(echo "$OUT" | jq -r '.narrative_id')
-assert_jq_gte "narrative edges created" "$OUT" '.edges_created' '4'
-
-step "consolidate create — narrative visible in related"
-OUT=$($M --data-dir "$TESTDIR11" related "$ID_N1" --edge narrative)
-assert_contains "N1 → narrative via PART_OF" "$OUT" "$ID_NARR"
-
-OUT=$($M --data-dir "$TESTDIR11" related "$ID_NARR" --edge narrative)
-assert_contains "narrative → N1 (contains)" "$OUT" "$ID_N1"
-assert_contains "narrative → N2 (contains)" "$OUT" "$ID_N2"
-
-step "consolidate create — requires title"
-OUT=$($M --data-dir "$TESTDIR11" consolidate --create --members "$ID_N1,$ID_N2" 2>&1 || true)
-assert_contains "title required" "$OUT" "title"
-
-step "consolidate create — requires members"
-OUT=$($M --data-dir "$TESTDIR11" consolidate --create --title "Test" 2>&1 || true)
-assert_contains "members required" "$OUT" "members"
-
-step "consolidate create — validates member IDs"
-OUT=$($M --data-dir "$TESTDIR11" consolidate --create --title "Test" --members "bad-id-1,bad-id-2" 2>&1 || true)
-assert_contains "member not found" "$OUT" "not found"
-
-step "link — narrative edge type works"
-OUT=$($M --data-dir "$TESTDIR11" link "$ID_N1" "$ID_N2" --type narrative --weight 0.9)
-assert_jq "status is linked" "$OUT" '.status' 'linked'
-assert_jq "edge type is narrative" "$OUT" '.edge_type' 'narrative'
-
-step "status — narrative category counted"
-OUT=$($M --data-dir "$TESTDIR11" status)
-assert_jq_gte "narrative category exists" "$OUT" '.by_category.narrative' '1'
 
 # ── Report ────────────────────────────────────────────────────────────
 echo ""

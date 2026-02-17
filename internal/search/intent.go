@@ -22,32 +22,28 @@ type IntentWeights map[model.EdgeType]float64
 
 var intentWeightsMap = map[Intent]IntentWeights{
 	IntentWhy: {
-		model.EdgeCausal:    0.70,
-		model.EdgeTemporal:  0.20,
-		model.EdgeEntity:    0.05,
-		model.EdgeSemantic:  0.05,
-		model.EdgeNarrative: 0.00,
+		model.EdgeCausal:   0.70,
+		model.EdgeTemporal: 0.20,
+		model.EdgeEntity:   0.05,
+		model.EdgeSemantic: 0.05,
 	},
 	IntentWhen: {
-		model.EdgeTemporal:  0.65,
-		model.EdgeCausal:    0.10,
-		model.EdgeEntity:    0.10,
-		model.EdgeSemantic:  0.05,
-		model.EdgeNarrative: 0.10,
+		model.EdgeTemporal: 0.65,
+		model.EdgeCausal:   0.15,
+		model.EdgeEntity:   0.10,
+		model.EdgeSemantic: 0.10,
 	},
 	IntentEntity: {
-		model.EdgeEntity:    0.55,
-		model.EdgeSemantic:  0.30,
-		model.EdgeTemporal:  0.05,
-		model.EdgeCausal:    0.05,
-		model.EdgeNarrative: 0.05,
+		model.EdgeEntity:   0.55,
+		model.EdgeSemantic: 0.30,
+		model.EdgeTemporal: 0.05,
+		model.EdgeCausal:   0.10,
 	},
 	IntentGeneral: {
-		model.EdgeTemporal:  0.20,
-		model.EdgeSemantic:  0.20,
-		model.EdgeCausal:    0.20,
-		model.EdgeEntity:    0.20,
-		model.EdgeNarrative: 0.20,
+		model.EdgeTemporal: 0.25,
+		model.EdgeSemantic: 0.25,
+		model.EdgeCausal:   0.25,
+		model.EdgeEntity:   0.25,
 	},
 }
 

@@ -385,54 +385,6 @@ func (db *DB) GetInsightsWithoutEmbedding(limit int) ([]*model.Insight, error) {
 	return scanInsights(rows)
 }
 
-// GetNextSequenceIndex returns the next sequence index for a new insight.
-func (db *DB) GetNextSequenceIndex() (int, error) {
-	var maxIdx sql.NullInt64
-	err := db.conn.QueryRow(`SELECT MAX(sequence_index) FROM insights WHERE deleted_at IS NULL`).Scan(&maxIdx)
-	if err != nil {
-		return 0, err
-	}
-	if !maxIdx.Valid {
-		return 0, nil
-	}
-	return int(maxIdx.Int64) + 1, nil
-}
-
-// GetInsightsBySequenceRange returns active insights within [seqIdx-k, seqIdx+k], excluding the given ID.
-func (db *DB) GetInsightsBySequenceRange(seqIdx, k int, excludeID string) ([]*model.Insight, error) {
-	lo := seqIdx - k
-	hi := seqIdx + k
-	rows, err := db.conn.Query(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
-		 FROM insights WHERE deleted_at IS NULL AND id != ? AND sequence_index IS NOT NULL
-		 AND sequence_index >= ? AND sequence_index <= ?
-		 ORDER BY sequence_index ASC`, excludeID, lo, hi)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanInsights(rows)
-}
-
-// UpdateSequenceIndex sets the sequence_index for an insight.
-func (db *DB) UpdateSequenceIndex(id string, idx int) error {
-	_, err := db.conn.Exec(`UPDATE insights SET sequence_index = ? WHERE id = ?`, idx, id)
-	return err
-}
-
-// GetSequenceIndex returns the sequence_index for an insight.
-func (db *DB) GetSequenceIndex(id string) (int, error) {
-	var idx sql.NullInt64
-	err := db.conn.QueryRow(`SELECT sequence_index FROM insights WHERE id = ?`, id).Scan(&idx)
-	if err != nil {
-		return 0, err
-	}
-	if !idx.Valid {
-		return -1, nil
-	}
-	return int(idx.Int64), nil
-}
-
 // MergeEntities merges new entities into existing ones (deduplicates).
 func (db *DB) MergeEntities(id string, newEntities []string) ([]string, error) {
 	insight, err := db.GetInsightByID(id)

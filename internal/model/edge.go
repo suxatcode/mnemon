@@ -9,19 +9,17 @@ import (
 type EdgeType string
 
 const (
-	EdgeTemporal  EdgeType = "temporal"
-	EdgeSemantic  EdgeType = "semantic"
-	EdgeCausal    EdgeType = "causal"
-	EdgeEntity    EdgeType = "entity"
-	EdgeNarrative EdgeType = "narrative"
+	EdgeTemporal EdgeType = "temporal"
+	EdgeSemantic EdgeType = "semantic"
+	EdgeCausal   EdgeType = "causal"
+	EdgeEntity   EdgeType = "entity"
 )
 
 var ValidEdgeTypes = map[EdgeType]bool{
-	EdgeTemporal:  true,
-	EdgeSemantic:  true,
-	EdgeCausal:    true,
-	EdgeEntity:    true,
-	EdgeNarrative: true,
+	EdgeTemporal: true,
+	EdgeSemantic: true,
+	EdgeCausal:   true,
+	EdgeEntity:   true,
 }
 
 // Edge represents a directed relationship between two insights.

@@ -15,7 +15,6 @@ const (
 	CategoryInsight    Category = "insight"
 	CategoryContext    Category = "context"
 	CategoryGeneral    Category = "general"
-	CategoryNarrative  Category = "narrative"
 )
 
 var ValidCategories = map[Category]bool{
@@ -25,7 +24,6 @@ var ValidCategories = map[Category]bool{
 	CategoryInsight:    true,
 	CategoryContext:    true,
 	CategoryGeneral:    true,
-	CategoryNarrative:  true,
 }
 
 // Insight represents a memory node in the knowledge graph.
