@@ -28,7 +28,7 @@ var linkCmd = &cobra.Command{
 		// Validate edge type
 		edgeType := model.EdgeType(linkType)
 		if !model.ValidEdgeTypes[edgeType] {
-			return fmt.Errorf("invalid edge type %q; valid: temporal, semantic, causal, entity", linkType)
+			return fmt.Errorf("invalid edge type %q; valid: temporal, semantic, causal, entity, narrative", linkType)
 		}
 
 		// Validate weight
@@ -105,7 +105,7 @@ var linkCmd = &cobra.Command{
 }
 
 func init() {
-	linkCmd.Flags().StringVar(&linkType, "type", "semantic", "edge type (temporal|semantic|causal|entity)")
+	linkCmd.Flags().StringVar(&linkType, "type", "semantic", "edge type (temporal|semantic|causal|entity|narrative)")
 	linkCmd.Flags().Float64Var(&linkWeight, "weight", 0.5, "edge weight (0.0-1.0)")
 	linkCmd.Flags().StringVar(&linkMeta, "meta", "", `optional metadata JSON (e.g. '{"reason":"similar topic"}')`)
 	rootCmd.AddCommand(linkCmd)

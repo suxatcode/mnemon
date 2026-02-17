@@ -67,6 +67,39 @@ mnemon link <new_id> <candidate_id> --type semantic --weight 0.85
 # Skip candidates with only lexical overlap but no real semantic relation
 ```
 
+## Causal linking (after remember)
+
+When `mnemon remember` outputs `causal_candidates`, evaluate each candidate:
+```bash
+# For each candidate with a real causal relationship:
+# 1. Determine sub_type: causes, enables, or prevents
+# 2. Create a causal edge with metadata
+mnemon link <new_id> <candidate_id> --type causal --weight 0.8 \
+  --meta '{"sub_type":"causes","reason":"..."}'
+# Skip candidates where token overlap is coincidental (no real causation)
+```
+
+## Entity enrichment (after remember)
+
+When `mnemon remember` shows `entities` in output, review if important entities were missed:
+```bash
+# For domain concepts, project names, people, technologies not captured by regex:
+mnemon enrich <id> --entities "Entity1,Entity2" --rebuild-edges
+# Skip if regex already captured all meaningful entities
+```
+
+## Narrative consolidation (periodic)
+
+Trigger when: 20+ insights without review, or user asks to organize memories.
+```bash
+# 1. Find narrative clusters
+mnemon consolidate --window 72h --min-cluster 3
+# 2. Review each cluster — does it represent a coherent narrative?
+# 3. For valid narratives:
+mnemon consolidate --create --title "..." --members "id1,id2,id3"
+# 4. Skip clusters that are just temporal coincidence
+```
+
 ## Retention review (periodic)
 
 Trigger when: 50+ insights, or 10+ conversations since last review, or user mentions memory clutter.
@@ -95,6 +128,9 @@ mnemon embed --all             # backfill existing insights
 mnemon search "<query>" --limit 10    # token-scored search
 mnemon related <id> --edge causal     # find causally related insights
 mnemon link <src> <tgt> --type semantic --weight 0.8  # create edge
+mnemon enrich <id> --entities "X,Y" --rebuild-edges   # supplement entities
+mnemon consolidate [--window 72h] [--min-cluster 3]   # find narrative clusters
+mnemon consolidate --create --title "..." --members "id1,id2,id3"  # create narrative
 mnemon gc [--threshold 0.4]           # review retention candidates
 mnemon gc --keep <id>                 # boost retention for an insight
 mnemon embed --status                 # embedding coverage

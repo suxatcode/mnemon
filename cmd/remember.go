@@ -31,7 +31,7 @@ var rememberCmd = &cobra.Command{
 
 		cat := model.Category(remCategory)
 		if !model.ValidCategories[cat] {
-			return fmt.Errorf("invalid category %q; valid: preference, decision, fact, insight, context, general", remCategory)
+			return fmt.Errorf("invalid category %q; valid: preference, decision, fact, insight, context, general, narrative", remCategory)
 		}
 		if remImportance < 1 || remImportance > 5 {
 			return fmt.Errorf("importance must be 1-5, got %d", remImportance)
@@ -100,6 +100,12 @@ var rememberCmd = &cobra.Command{
 			semanticCandidates = []graph.SemanticCandidate{}
 		}
 
+		// Find causal candidates for Claude to evaluate
+		causalCandidates := graph.FindCausalCandidates(db, insight)
+		if causalCandidates == nil {
+			causalCandidates = []graph.CausalCandidate{}
+		}
+
 		db.LogOp("remember", insight.ID, insight.Content)
 
 		output := map[string]interface{}{
@@ -109,9 +115,11 @@ var rememberCmd = &cobra.Command{
 			"importance":          insight.Importance,
 			"tags":                insight.Tags,
 			"entities":            insight.Entities,
+			"entity_hints":        "Auto-extracted by regex. Consider running `mnemon enrich " + insight.ID + " --entities \"X,Y\" --rebuild-edges` if important entities were missed.",
 			"created_at":          insight.CreatedAt.Format(time.RFC3339),
 			"edges_created":       edgeStats,
 			"semantic_candidates": semanticCandidates,
+			"causal_candidates":   causalCandidates,
 			"embedded":            embedded,
 		}
 		enc := json.NewEncoder(os.Stdout)

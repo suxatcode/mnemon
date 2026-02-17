@@ -43,6 +43,50 @@ func ExtractEntities(text string) []string {
 	return entities
 }
 
+// CreateEntityEdgesForNewEntities creates entity edges only for newly added entities
+// (used by the enrich command when --rebuild-edges is specified).
+func CreateEntityEdgesForNewEntities(db *store.DB, insight *model.Insight, newEntities []string) int {
+	if len(newEntities) == 0 {
+		return 0
+	}
+
+	now := time.Now().UTC()
+	count := 0
+
+	for _, entity := range newEntities {
+		ids, err := db.FindInsightsWithEntity(entity, insight.ID, maxEntityLinks)
+		if err != nil || len(ids) == 0 {
+			continue
+		}
+
+		for _, targetID := range ids {
+			err = db.InsertEdge(&model.Edge{
+				SourceID:  insight.ID,
+				TargetID:  targetID,
+				EdgeType:  model.EdgeEntity,
+				Weight:    1.0,
+				Metadata:  map[string]string{"entity": entity},
+				CreatedAt: now,
+			})
+			if err == nil {
+				count++
+			}
+			err = db.InsertEdge(&model.Edge{
+				SourceID:  targetID,
+				TargetID:  insight.ID,
+				EdgeType:  model.EdgeEntity,
+				Weight:    1.0,
+				Metadata:  map[string]string{"entity": entity},
+				CreatedAt: now,
+			})
+			if err == nil {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 // CreateEntityEdges creates entity co-occurrence edges between the new insight
 // and existing insights that share the same entities.
 func CreateEntityEdges(db *store.DB, insight *model.Insight) int {
