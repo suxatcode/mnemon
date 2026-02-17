@@ -134,7 +134,7 @@ ID1=$(extract_id "$OUT")
 assert_jq "category is preference" "$OUT" '.category' 'preference'
 assert_jq "importance is 4"        "$OUT" '.importance' '4'
 assert_contains "tags include tool" "$OUT" '"tool"'
-assert_contains "entities is []"    "$OUT" '"entities": \[\]'
+assert_contains "entities has Qdrant" "$OUT" '"Qdrant"'
 
 step "recall — keyword search"
 OUT=$($M --data-dir "$TESTDIR" recall "Qdrant")
@@ -570,67 +570,63 @@ if [ "$CC_COUNT" -ge 1 ]; then
   assert_contains "has suggested_sub_type" "$FIRST_CC" '"suggested_sub_type"'
 fi
 
-step "causal candidates — entity_hints field present"
-assert_contains "has entity_hints" "$OUT" '"entity_hints"'
+step "entity extraction — dictionary-based (tech terms)"
+TESTDIR_DICT="$TESTDATA/m_dict"
+mkdir -p "$TESTDIR_DICT"
+OUT=$($M --data-dir "$TESTDIR_DICT" remember "We use React and TypeScript with Redis for caching" --cat fact --imp 3)
+echo -e "    ${DIM}entities: $(echo "$OUT" | jq -c '.entities')${RESET}"
+assert_contains "React extracted via dictionary" "$OUT" '"React"'
+assert_contains "TypeScript extracted via dictionary" "$OUT" '"TypeScript"'
+assert_contains "Redis extracted via dictionary" "$OUT" '"Redis"'
+
+step "entity extraction — acronyms (ALLCAPS)"
+OUT=$($M --data-dir "$TESTDIR_DICT" remember "The API uses gRPC and JWT for authentication over HTTP" --cat fact --imp 3)
+echo -e "    ${DIM}entities: $(echo "$OUT" | jq -c '.entities')${RESET}"
+assert_contains "API extracted" "$OUT" '"API"'
+assert_contains "JWT extracted" "$OUT" '"JWT"'
+assert_contains "HTTP extracted" "$OUT" '"HTTP"'
+
+step "entity extraction — stopwords not extracted"
+OUT=$($M --data-dir "$TESTDIR_DICT" remember "IF YOU CAN SEE THE WAY TO DO IT" --cat fact --imp 2)
+echo -e "    ${DIM}entities: $(echo "$OUT" | jq -c '.entities')${RESET}"
+assert_not_contains "IF not extracted" "$OUT" '"IF"'
+assert_not_contains "YOU not extracted" "$OUT" '"YOU"'
 
 # ══════════════════════════════════════════════════════════════════════
-banner "Milestone 10: Entity Enrichment (Phase 3C)"
+banner "Milestone 9: LLM Entity Injection (--entities flag)"
 # ══════════════════════════════════════════════════════════════════════
 
-TESTDIR10="$TESTDATA/m10"
-mkdir -p "$TESTDIR10"
+TESTDIR9="$TESTDATA/m9"
+mkdir -p "$TESTDIR9"
 
-step "enrich — setup insight"
-OUT=$($M --data-dir "$TESTDIR10" remember "We use React and TypeScript in the project" --cat fact --imp 3)
-ID_EN1=$(extract_id "$OUT")
-ENTITIES_BEFORE=$(echo "$OUT" | jq -c '.entities')
-echo -e "    ${DIM}entities before: $ENTITIES_BEFORE${RESET}"
+step "--entities — LLM-provided entities appear in output"
+OUT=$($M --data-dir "$TESTDIR9" remember "The new caching layer improves performance significantly" --cat fact --imp 3 --entities "caching-layer,performance-optimization")
+echo -e "    ${DIM}entities: $(echo "$OUT" | jq -c '.entities')${RESET}"
+assert_contains "LLM entity present" "$OUT" '"caching-layer"'
+assert_contains "LLM entity present" "$OUT" '"performance-optimization"'
 
-step "enrich — add new entities"
-OUT=$($M --data-dir "$TESTDIR10" enrich "$ID_EN1" --entities "React,Vercel,NextJS")
-show_json "$OUT" 15
-assert_jq "status is enriched" "$OUT" '.status' 'enriched'
-assert_contains "added includes Vercel" "$OUT" '"Vercel"'
-assert_contains "added includes NextJS" "$OUT" '"NextJS"'
+step "--entities — merges with regex-extracted entities"
+OUT=$($M --data-dir "$TESTDIR9" remember "We deploy HttpServer on Docker with Redis" --cat fact --imp 3 --entities "deployment-pipeline,high-availability")
+echo -e "    ${DIM}entities: $(echo "$OUT" | jq -c '.entities')${RESET}"
+# LLM-provided
+assert_contains "LLM entity: deployment-pipeline" "$OUT" '"deployment-pipeline"'
+assert_contains "LLM entity: high-availability" "$OUT" '"high-availability"'
+# Regex/dictionary-extracted
+assert_contains "regex entity: HttpServer" "$OUT" '"HttpServer"'
+assert_contains "dict entity: Docker" "$OUT" '"Docker"'
+assert_contains "dict entity: Redis" "$OUT" '"Redis"'
 
-step "enrich — deduplicates existing entities"
-ALL_ENTITIES=$(echo "$OUT" | jq '.all_entities | length')
-# React was already there, so it should not be doubled
-TOTAL=$((TOTAL + 1))
-EXPECTED_UNIQUE=true
-REACT_COUNT=$(echo "$OUT" | jq '[.all_entities[] | select(. == "React")] | length')
-if [ "$REACT_COUNT" -le 1 ]; then
-  PASS=$((PASS + 1))
-  echo -e "    ${GREEN}✔${RESET} React not duplicated (count=$REACT_COUNT)"
-else
-  FAIL=$((FAIL + 1))
-  echo -e "    ${RED}✘${RESET} React duplicated (count=$REACT_COUNT)"
-fi
+step "--entities — creates entity edges with shared LLM entities"
+OUT=$($M --data-dir "$TESTDIR9" remember "Upgrading the caching layer for better throughput" --cat decision --imp 4 --entities "caching-layer,throughput")
+echo -e "    ${DIM}entities: $(echo "$OUT" | jq -c '.entities')  edges: $(echo "$OUT" | jq -c '.edges_created')${RESET}"
+# "caching-layer" is shared with the first insight → should create entity edges
+assert_jq_gte "entity edges from shared LLM entity" "$OUT" '.edges_created.entity' '2'
 
-step "enrich — rebuild-edges creates entity edges"
-# Create a second insight with shared entity
-OUT=$($M --data-dir "$TESTDIR10" remember "Vercel is our deployment platform" --cat fact --imp 3)
-ID_EN2=$(extract_id "$OUT")
-
-OUT=$($M --data-dir "$TESTDIR10" enrich "$ID_EN1" --entities "Vercel" --rebuild-edges)
-EDGE_COUNT=$(echo "$OUT" | jq '.edges_created')
-TOTAL=$((TOTAL + 1))
-if [ "$EDGE_COUNT" -ge 1 ]; then
-  PASS=$((PASS + 1))
-  echo -e "    ${GREEN}✔${RESET} Entity edges created (count=$EDGE_COUNT)"
-else
-  # Edges might already exist from remember, which is ok
-  PASS=$((PASS + 1))
-  echo -e "    ${GREEN}✔${RESET} Edge count: $EDGE_COUNT (edges may pre-exist)"
-fi
-
-step "enrich — nonexistent insight"
-OUT=$($M --data-dir "$TESTDIR10" enrich "nonexistent-id-000" --entities "X" 2>&1 || true)
-assert_contains "rejects missing insight" "$OUT" "not found"
-
-step "enrich — missing --entities flag"
-OUT=$($M --data-dir "$TESTDIR10" enrich "$ID_EN1" 2>&1 || true)
-assert_contains "requires entities" "$OUT" "required"
+step "--entities — no flag still works (regex only)"
+OUT=$($M --data-dir "$TESTDIR9" remember "Python and FastAPI are great for prototyping" --cat fact --imp 3)
+echo -e "    ${DIM}entities: $(echo "$OUT" | jq -c '.entities')${RESET}"
+assert_contains "dict entity: Python" "$OUT" '"Python"'
+assert_contains "dict entity: FastAPI" "$OUT" '"FastAPI"'
 
 
 # ── Report ────────────────────────────────────────────────────────────

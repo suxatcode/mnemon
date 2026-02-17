@@ -24,16 +24,13 @@ func NewEngine(db *store.DB) *Engine {
 }
 
 // OnInsightCreated runs all edge generators for a newly created insight.
-// It also populates the insight's Entities field as a side effect.
+// It merges any pre-provided entities (e.g. from LLM) with regex-extracted ones.
 func (e *Engine) OnInsightCreated(insight *model.Insight) EdgeStats {
 	var stats EdgeStats
 
-	// 1. Extract entities and update insight
-	entities := ExtractEntities(insight.Content)
-	if entities == nil {
-		entities = []string{}
-	}
-	insight.Entities = entities
+	// 1. Extract entities via regex+dictionary, merge with pre-provided (LLM-extracted)
+	extracted := ExtractEntities(insight.Content)
+	insight.Entities = mergeEntities(insight.Entities, extracted)
 
 	// 2. Temporal backbone + proximity edges
 	stats.Temporal = CreateTemporalEdge(e.db, insight)

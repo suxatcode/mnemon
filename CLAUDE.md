@@ -18,10 +18,19 @@ Always load relevant context before starting work.
 # 1. Check for duplicates first
 mnemon diff "<new fact>"
 # 2. Based on suggestion:
-#    ADD      → mnemon remember "<fact>" --cat <category> --imp <1-5>
-#    CONFLICT → mnemon forget <old_id> && mnemon remember "<updated>" --cat <cat> --imp <n>
+#    ADD      → mnemon remember "<fact>" --cat <category> --imp <1-5> --entities "entity1,entity2"
+#    CONFLICT → mnemon forget <old_id> && mnemon remember "<updated>" --cat <cat> --imp <n> --entities "..."
 #    DUPLICATE→ skip
 ```
+
+### Entity extraction (LLM-in-the-loop)
+When calling `remember`, extract key entities from the content and pass them via `--entities`:
+```bash
+mnemon remember "Chose Qdrant over Milvus for vector search" \
+  --cat decision --imp 5 \
+  --entities "Qdrant,Milvus,vector-search"
+```
+The `--entities` flag accepts comma-separated entities that get **merged** with auto-extracted entities (regex + dictionary). This aligns with MAGMA's dual-tier extraction (LLM + regex) without adding LLM dependency to the binary.
 
 ### When the user asks about past context
 ```bash
@@ -47,11 +56,10 @@ After `mnemon remember`, check `semantic_candidates` in the output. For truly re
 mnemon link <source_id> <target_id> --type semantic --weight 0.85
 ```
 
-### Causal & entity enrichment
-After `mnemon remember`, check `causal_candidates` and `entity_hints` in the output:
+### Causal linking
+After `mnemon remember`, check `causal_candidates` in the output:
 ```bash
 mnemon link <src> <tgt> --type causal --weight 0.8 --meta '{"sub_type":"causes"}'
-mnemon enrich <id> --entities "X,Y" --rebuild-edges  # supplement entities
 ```
 
 ### Retention review

@@ -19,6 +19,7 @@ var (
 	remImportance int
 	remTags       string
 	remSource     string
+	remEntities   string
 )
 
 var rememberCmd = &cobra.Command{
@@ -50,6 +51,19 @@ var rememberCmd = &cobra.Command{
 			tags = []string{}
 		}
 
+		var entities []string
+		if remEntities != "" {
+			for _, e := range strings.Split(remEntities, ",") {
+				e = strings.TrimSpace(e)
+				if e != "" {
+					entities = append(entities, e)
+				}
+			}
+		}
+		if entities == nil {
+			entities = []string{}
+		}
+
 		now := time.Now().UTC()
 		insight := &model.Insight{
 			ID:         uuid.New().String(),
@@ -57,7 +71,7 @@ var rememberCmd = &cobra.Command{
 			Category:   cat,
 			Importance: remImportance,
 			Tags:       tags,
-			Entities:   []string{},
+			Entities:   entities,
 			Source:     remSource,
 			CreatedAt:  now,
 			UpdatedAt:  now,
@@ -115,7 +129,6 @@ var rememberCmd = &cobra.Command{
 			"importance":          insight.Importance,
 			"tags":                insight.Tags,
 			"entities":            insight.Entities,
-			"entity_hints":        "Auto-extracted by regex. Consider running `mnemon enrich " + insight.ID + " --entities \"X,Y\" --rebuild-edges` if important entities were missed.",
 			"created_at":          insight.CreatedAt.Format(time.RFC3339),
 			"edges_created":       edgeStats,
 			"semantic_candidates": semanticCandidates,
@@ -133,5 +146,6 @@ func init() {
 	rememberCmd.Flags().IntVar(&remImportance, "imp", 3, "importance (1-5)")
 	rememberCmd.Flags().StringVar(&remTags, "tags", "", "comma-separated tags")
 	rememberCmd.Flags().StringVar(&remSource, "source", "user", "source (user|agent|external)")
+	rememberCmd.Flags().StringVar(&remEntities, "entities", "", "comma-separated entities (LLM-extracted, merged with auto-extraction)")
 	rootCmd.AddCommand(rememberCmd)
 }

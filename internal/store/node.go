@@ -385,34 +385,6 @@ func (db *DB) GetInsightsWithoutEmbedding(limit int) ([]*model.Insight, error) {
 	return scanInsights(rows)
 }
 
-// MergeEntities merges new entities into existing ones (deduplicates).
-func (db *DB) MergeEntities(id string, newEntities []string) ([]string, error) {
-	insight, err := db.GetInsightByID(id)
-	if err != nil {
-		return nil, err
-	}
-
-	seen := make(map[string]bool)
-	var merged []string
-	for _, e := range insight.Entities {
-		if !seen[e] {
-			seen[e] = true
-			merged = append(merged, e)
-		}
-	}
-	for _, e := range newEntities {
-		if !seen[e] {
-			seen[e] = true
-			merged = append(merged, e)
-		}
-	}
-
-	if err := db.UpdateEntities(id, merged); err != nil {
-		return nil, err
-	}
-	return merged, nil
-}
-
 func scanInsight(row *sql.Row) (*model.Insight, error) {
 	var i model.Insight
 	var cat, tags, entities, source, createdAt, updatedAt string
