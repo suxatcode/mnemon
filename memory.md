@@ -65,10 +65,25 @@ mnemon status                         # memory statistics
 mnemon log                            # recent operations
 ```
 
-## Mandatory workflow order
+## Memory + WebSearch coordination
+
+### When to skip web search
+If `mnemon recall` returns sufficient, non-time-sensitive results — **use them directly**.
+Do NOT re-search what you already know. Memory exists to avoid redundant searches.
+
+### When to search despite having memory
+- **Time-sensitive data** (prices, versions, news, status) — always verify with a fresh search, even if recall has results. Use the recalled data as a comparison baseline.
+- **User explicitly asks to search** — respect the request regardless of memory state.
+- **Memory is vague or incomplete** — search to fill gaps, then remember the new findings.
+
+### Use memory to improve search quality
+When you do search, use recalled context to form **more specific queries**.
+Example: recall tells you the user is tracking Qdrant → search "Qdrant v2.0 release 2026" instead of "vector database news".
+
+### Mandatory workflow order
 When a response involves WebSearch, WebFetch, or any external research:
-1. `mnemon recall` — load existing context
-2. Perform searches / fetches
+1. `mnemon recall` — load existing context, decide if search is needed
+2. Perform searches / fetches (use recalled context to refine queries)
 3. **`mnemon diff` + `mnemon remember` for ALL new facts — BEFORE composing the reply**
 4. Respond to the user
 
