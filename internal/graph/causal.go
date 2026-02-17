@@ -3,11 +3,10 @@ package graph
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
-	"unicode"
 
 	"github.com/Grivn/mnemon/internal/model"
+	"github.com/Grivn/mnemon/internal/search"
 	"github.com/Grivn/mnemon/internal/store"
 )
 
@@ -39,7 +38,7 @@ func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
 		return 0
 	}
 
-	newTokens := tokenize(insight.Content)
+	newTokens := search.Tokenize(insight.Content)
 	if len(newTokens) == 0 {
 		return 0
 	}
@@ -48,7 +47,7 @@ func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
 	count := 0
 
 	for _, prev := range recent {
-		prevTokens := tokenize(prev.Content)
+		prevTokens := search.Tokenize(prev.Content)
 		overlap := tokenOverlap(newTokens, prevTokens)
 		if overlap >= minCausalOverlap {
 			err = db.InsertEdge(&model.Edge{
@@ -65,62 +64,6 @@ func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
 		}
 	}
 	return count
-}
-
-// tokenize splits text into lowercase tokens. For English words it splits on
-// whitespace/punctuation; for CJK characters it generates character bigrams.
-func tokenize(text string) map[string]bool {
-	tokens := make(map[string]bool)
-	text = strings.ToLower(text)
-
-	// Extract English words
-	var word strings.Builder
-	runes := []rune(text)
-	var cjkBuf []rune
-
-	for _, r := range runes {
-		if unicode.Is(unicode.Han, r) {
-			// Flush any English word
-			if word.Len() > 0 {
-				tokens[word.String()] = true
-				word.Reset()
-			}
-			cjkBuf = append(cjkBuf, r)
-		} else {
-			// Flush CJK bigrams
-			if len(cjkBuf) > 0 {
-				for j := 0; j < len(cjkBuf)-1; j++ {
-					tokens[string(cjkBuf[j:j+2])] = true
-				}
-				if len(cjkBuf) == 1 {
-					tokens[string(cjkBuf)] = true
-				}
-				cjkBuf = cjkBuf[:0]
-			}
-
-			if unicode.IsLetter(r) || unicode.IsDigit(r) {
-				word.WriteRune(r)
-			} else {
-				if word.Len() > 0 {
-					tokens[word.String()] = true
-					word.Reset()
-				}
-			}
-		}
-	}
-	// Flush remaining
-	if word.Len() > 0 {
-		tokens[word.String()] = true
-	}
-	if len(cjkBuf) > 0 {
-		for j := 0; j < len(cjkBuf)-1; j++ {
-			tokens[string(cjkBuf[j:j+2])] = true
-		}
-		if len(cjkBuf) == 1 {
-			tokens[string(cjkBuf)] = true
-		}
-	}
-	return tokens
 }
 
 // tokenOverlap computes |intersection| / max(|a|, |b|).

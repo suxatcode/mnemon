@@ -226,6 +226,22 @@ func (db *DB) BoostRetention(id string) error {
 	return nil
 }
 
+// GetRecentInsightsInWindow returns non-deleted insights created within the given
+// time window (hours), excluding the given ID. Ordered by created_at DESC.
+func (db *DB) GetRecentInsightsInWindow(excludeID string, windowHours float64, limit int) ([]*model.Insight, error) {
+	cutoff := time.Now().UTC().Add(-time.Duration(windowHours * float64(time.Hour)))
+	rows, err := db.conn.Query(
+		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		 FROM insights WHERE id != ? AND deleted_at IS NULL AND created_at >= ?
+		 ORDER BY created_at DESC LIMIT ?`,
+		excludeID, cutoff.Format(time.RFC3339), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanInsights(rows)
+}
+
 // GetLatestInsightBySource returns the most recent non-deleted insight for a given source, excluding the given ID.
 func (db *DB) GetLatestInsightBySource(source string, excludeID string) (*model.Insight, error) {
 	row := db.conn.QueryRow(

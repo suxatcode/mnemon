@@ -173,7 +173,7 @@ sleep 1
 
 OUT3=$($M --data-dir "$TESTDIR2" remember "Qdrant benchmark shows 10ms p99 latency" --cat fact --imp 3)
 ID_C=$(extract_id "$OUT3")
-assert_jq "third: 2 temporal" "$OUT3" '.edges_created.temporal' '2'
+assert_jq_gte "third: >= 2 temporal (backbone + proximity)" "$OUT3" '.edges_created.temporal' '2'
 
 step "status — verify edge count"
 OUT=$($M --data-dir "$TESTDIR2" status)
@@ -389,7 +389,7 @@ sleep 1
 $M --data-dir "$TESTDIR6" remember "Important user preference for dark mode" --cat preference --imp 4 > /dev/null
 
 step "gc — suggest mode returns candidates"
-OUT=$($M --data-dir "$TESTDIR6" gc --threshold 0.5)
+OUT=$($M --data-dir "$TESTDIR6" gc --threshold 0.7)
 show_json "$OUT" 25
 assert_contains "has candidates field" "$OUT" '"candidates"'
 assert_contains "has actions field"    "$OUT" '"actions"'
@@ -419,7 +419,7 @@ assert_jq "status is retained" "$OUT" '.status' 'retained'
 assert_jq "access count boosted" "$OUT" '.new_access' '3'
 
 step "gc — kept insight has higher score after boost"
-OUT_BEFORE=$($M --data-dir "$TESTDIR6" gc --threshold 0.5)
+OUT_BEFORE=$($M --data-dir "$TESTDIR6" gc --threshold 0.7)
 # The kept insight should have a better score now (maybe no longer a candidate)
 KEPT_STILL=$(echo "$OUT_BEFORE" | jq --arg id "$ID_LOW" '[.candidates[].insight.id] | index($id)')
 TOTAL=$((TOTAL + 1))

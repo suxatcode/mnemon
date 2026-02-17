@@ -1,6 +1,7 @@
 package search
 
 import (
+	"container/heap"
 	"sort"
 
 	"github.com/Grivn/mnemon/internal/embed"
@@ -8,39 +9,43 @@ import (
 	"github.com/Grivn/mnemon/internal/store"
 )
 
-// Maximum traversal depth from each anchor point.
-const maxTraversalDepth = 2
+// Beam search parameters (MAGMA-aligned).
+const (
+	beamWidth      = 10  // candidates retained per level
+	maxDepth       = 5   // max traversal hops
+	maxVisited     = 50  // total node budget
+	anchorTopK     = 20  // per-signal anchor limit (MAGMA: 15-30)
+	lambda1        = 0.6 // structural weight (MAGMA default)
+	lambda2        = 0.4 // semantic weight (MAGMA default)
+)
+
+// RRF constant (standard value from Cormack et al. 2009).
+const rrfK = 60
 
 // RecallResult represents a recalled insight with its relevance score.
 type RecallResult struct {
 	Insight *model.Insight `json:"insight"`
 	Score   float64        `json:"score"`
 	Intent  Intent         `json:"intent"`
-	Via     string         `json:"via,omitempty"` // how it was found
+	Via     string         `json:"via,omitempty"`
 }
 
-// IntentAwareRecall performs intent-aware retrieval:
+// IntentAwareRecall performs MAGMA-aligned intent-aware retrieval:
 // 1. Detect query intent
-// 2. Keyword search (+ optional vector search) to find anchor points
-// 3. Multi-level BFS from anchors with intent-weighted score decay
+// 2. Multi-signal anchor selection via RRF (keyword + vector + time)
+// 3. Beam search from anchors with additive transition scoring
 // 4. Merge and rank results
-//
-// queryVec is optional — when non-nil, vector search is fused with keyword
-// search for anchor selection using Reciprocal Rank Fusion (RRF).
 func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int) ([]RecallResult, error) {
 	intent := DetectIntent(query)
 	weights := GetWeights(intent)
 
-	// Step 1: Get all active insights for keyword search
+	// Step 1: Get all active insights
 	all, err := db.GetAllActiveInsights()
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 2: Keyword search for anchors
-	keywordAnchors := KeywordSearch(all, query, 5)
-
-	// Build unified anchor list — keyword only, or RRF fusion with vectors
+	// Step 2: Multi-signal anchor selection via RRF
 	type anchor struct {
 		insight *model.Insight
 		score   float64
@@ -48,10 +53,8 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 	}
 	anchorMap := make(map[string]*anchor)
 
-	// RRF constant (standard value from literature)
-	const rrfK = 60
-
-	// Add keyword anchors with RRF rank scores
+	// Signal 1: Keyword search
+	keywordAnchors := KeywordSearch(all, query, anchorTopK)
 	for rank, a := range keywordAnchors {
 		anchorMap[a.Insight.ID] = &anchor{
 			insight: a.Insight,
@@ -60,13 +63,13 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		}
 	}
 
-	// If we have a query vector, do vector search and fuse via RRF
+	// Signal 2: Vector search (when available)
 	if queryVec != nil {
-		vectorHits := vectorSearch(db, queryVec, 5)
+		vectorHits := vectorSearch(db, queryVec, anchorTopK)
 		for rank, vh := range vectorHits {
 			rrfScore := 1.0 / float64(rrfK+rank+1)
 			if existing, ok := anchorMap[vh.id]; ok {
-				existing.score += rrfScore // fuse scores
+				existing.score += rrfScore
 				existing.via = "hybrid"
 			} else {
 				ins, err := db.GetInsightByID(vh.id)
@@ -82,7 +85,35 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		}
 	}
 
-	// Normalize anchor scores to [0, 1] range
+	// Signal 3: Time-based ranking (P5: MAGMA third RRF signal)
+	// Sort all insights by recency, fuse via RRF
+	timeSorted := make([]*model.Insight, len(all))
+	copy(timeSorted, all)
+	sort.Slice(timeSorted, func(i, j int) bool {
+		return timeSorted[i].CreatedAt.After(timeSorted[j].CreatedAt)
+	})
+	timeLimit := anchorTopK
+	if timeLimit > len(timeSorted) {
+		timeLimit = len(timeSorted)
+	}
+	for rank := 0; rank < timeLimit; rank++ {
+		ins := timeSorted[rank]
+		rrfScore := 1.0 / float64(rrfK+rank+1)
+		if existing, ok := anchorMap[ins.ID]; ok {
+			existing.score += rrfScore
+			if existing.via == "keyword" || existing.via == "vector" {
+				existing.via = "hybrid"
+			}
+		} else {
+			anchorMap[ins.ID] = &anchor{
+				insight: ins,
+				score:   rrfScore,
+				via:     "time",
+			}
+		}
+	}
+
+	// Normalize anchor scores to [0, 1]
 	var maxAnchorScore float64
 	for _, a := range anchorMap {
 		if a.score > maxAnchorScore {
@@ -95,7 +126,7 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		}
 	}
 
-	// Build score map: id -> best score found so far
+	// Initialize score map with anchors
 	scoreMap := make(map[string]float64)
 	viaMap := make(map[string]string)
 	insightMap := make(map[string]*model.Insight)
@@ -106,72 +137,10 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 		insightMap[id] = a.insight
 	}
 
-	// Step 3: Multi-level BFS from each anchor
-	type bfsItem struct {
-		id    string
-		score float64 // accumulated score arriving at this node
-		depth int
-	}
-
+	// Step 3: Beam search from each anchor (P0: replaces BFS)
+	// MAGMA transition score: score_v = score_u + λ₁·φ(edgeType, intent) + λ₂·sim(v_neighbor, v_query)
 	for id, a := range anchorMap {
-		queue := []bfsItem{{id: id, score: a.score, depth: 0}}
-		visited := map[string]bool{id: true}
-
-		for len(queue) > 0 {
-			cur := queue[0]
-			queue = queue[1:]
-
-			if cur.depth >= maxTraversalDepth {
-				continue
-			}
-
-			edges, err := db.GetEdgesByNode(cur.id)
-			if err != nil {
-				continue
-			}
-
-			for _, e := range edges {
-				neighborID := e.TargetID
-				if neighborID == cur.id {
-					neighborID = e.SourceID
-				}
-
-				// Score decays: parent_score * intent_weight * edge_weight
-				edgeWeight := weights[e.EdgeType]
-				neighborScore := cur.score * edgeWeight * e.Weight
-
-				// Boost with vector similarity if available
-				if queryVec != nil {
-					if blob, err := db.GetEmbedding(neighborID); err == nil && len(blob) > 0 {
-						nVec := embed.DeserializeVector(blob)
-						cosSim := embed.CosineSimilarity(queryVec, nVec)
-						if cosSim > 0 {
-							neighborScore += cosSim * 0.3 // λ₂ semantic boost
-						}
-					}
-				}
-
-				if existing, ok := scoreMap[neighborID]; !ok || neighborScore > existing {
-					scoreMap[neighborID] = neighborScore
-					viaMap[neighborID] = string(e.EdgeType)
-					if _, loaded := insightMap[neighborID]; !loaded {
-						ins, err := db.GetInsightByID(neighborID)
-						if err == nil && ins != nil {
-							insightMap[neighborID] = ins
-						}
-					}
-				}
-
-				if !visited[neighborID] {
-					visited[neighborID] = true
-					queue = append(queue, bfsItem{
-						id:    neighborID,
-						score: neighborScore,
-						depth: cur.depth + 1,
-					})
-				}
-			}
-		}
+		beamSearchFromAnchor(db, id, a.score, queryVec, weights, scoreMap, viaMap, insightMap)
 	}
 
 	// Step 4: Collect and sort results
@@ -202,6 +171,125 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64, limit int
 	return results, nil
 }
 
+// beamSearchFromAnchor performs beam search starting from a single anchor node.
+// It uses a priority queue to keep the top beamWidth candidates at each depth level.
+func beamSearchFromAnchor(
+	db *store.DB,
+	startID string,
+	startScore float64,
+	queryVec []float64,
+	weights IntentWeights,
+	scoreMap map[string]float64,
+	viaMap map[string]string,
+	insightMap map[string]*model.Insight,
+) {
+	visited := map[string]bool{startID: true}
+	totalVisited := 1
+
+	// Seed the beam with the anchor
+	current := &beamHeap{{id: startID, score: startScore, depth: 0}}
+	heap.Init(current)
+
+	for depth := 0; depth < maxDepth; depth++ {
+		if current.Len() == 0 || totalVisited >= maxVisited {
+			break
+		}
+
+		// Collect all candidates for the next level
+		next := &beamHeap{}
+		heap.Init(next)
+
+		// Process all nodes at the current level
+		for current.Len() > 0 {
+			cur := heap.Pop(current).(beamItem)
+			if cur.depth != depth {
+				// Put it back — it's for a future level
+				heap.Push(current, cur)
+				break
+			}
+
+			edges, err := db.GetEdgesByNode(cur.id)
+			if err != nil {
+				continue
+			}
+
+			for _, e := range edges {
+				neighborID := e.TargetID
+				if neighborID == cur.id {
+					neighborID = e.SourceID
+				}
+
+				// MAGMA transition score (P6): additive accumulation
+				// score_v = score_u + λ₁·φ(edgeType, intent) + λ₂·sim(v_neighbor, v_query)
+				structural := weights[e.EdgeType] * e.Weight // φ(edgeType, intent) * edge_weight
+				semantic := 0.0
+				if queryVec != nil {
+					if blob, err := db.GetEmbedding(neighborID); err == nil && len(blob) > 0 {
+						nVec := embed.DeserializeVector(blob)
+						cosSim := embed.CosineSimilarity(queryVec, nVec)
+						if cosSim > 0 {
+							semantic = cosSim
+						}
+					}
+				}
+				neighborScore := cur.score + lambda1*structural + lambda2*semantic
+
+				// Update global score map if this path is better
+				if existing, ok := scoreMap[neighborID]; !ok || neighborScore > existing {
+					scoreMap[neighborID] = neighborScore
+					viaMap[neighborID] = string(e.EdgeType)
+					if _, loaded := insightMap[neighborID]; !loaded {
+						ins, err := db.GetInsightByID(neighborID)
+						if err == nil && ins != nil {
+							insightMap[neighborID] = ins
+						}
+					}
+				}
+
+				if !visited[neighborID] {
+					visited[neighborID] = true
+					totalVisited++
+					heap.Push(next, beamItem{
+						id:    neighborID,
+						score: neighborScore,
+						depth: depth + 1,
+					})
+				}
+			}
+		}
+
+		// Prune beam: keep only top beamWidth candidates for next level
+		pruned := &beamHeap{}
+		heap.Init(pruned)
+		for next.Len() > 0 && pruned.Len() < beamWidth {
+			heap.Push(pruned, heap.Pop(next).(beamItem))
+		}
+		current = pruned
+	}
+}
+
+// beamItem is a node in the beam search priority queue.
+type beamItem struct {
+	id    string
+	score float64
+	depth int
+}
+
+// beamHeap implements a max-heap for beam search (highest score first).
+type beamHeap []beamItem
+
+func (h beamHeap) Len() int            { return len(h) }
+func (h beamHeap) Less(i, j int) bool  { return h[i].score > h[j].score } // max-heap
+func (h beamHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *beamHeap) Push(x interface{}) { *h = append(*h, x.(beamItem)) }
+func (h *beamHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	*h = old[:n-1]
+	return item
+}
+
 // vectorHit is a vector search result.
 type vectorHit struct {
 	id         string
@@ -222,7 +310,7 @@ func vectorSearch(db *store.DB, queryVec []float64, limit int) []vectorHit {
 			continue
 		}
 		sim := embed.CosineSimilarity(queryVec, vec)
-		if sim > 0.1 { // minimum similarity threshold
+		if sim > 0.1 {
 			hits = append(hits, vectorHit{id: e.ID, similarity: sim})
 		}
 	}
