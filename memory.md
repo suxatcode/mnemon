@@ -67,17 +67,27 @@ mnemon link <new_id> <candidate_id> --type semantic --weight 0.85
 # Skip candidates with only lexical overlap but no real semantic relation
 ```
 
-## Causal linking (after remember)
+## Causal linking (MANDATORY after remember when candidates exist)
 
-When `mnemon remember` outputs `causal_candidates`, evaluate each candidate:
+When `mnemon remember` outputs non-empty `causal_candidates`, you MUST evaluate them.
+Candidates include both keyword-matched (explicit) and embedding-matched (implicit) pairs.
+
+**For each candidate, answer three questions:**
+1. **Is there a real causal relationship?** (not just topic overlap)
+2. **What is the direction?** Source causes/enables/prevents Target
+3. **What sub_type?** causes (A led to B), enables (A made B possible), prevents (A stopped B)
+
 ```bash
-# For each candidate with a real causal relationship:
-# 1. Determine sub_type: causes, enables, or prevents
-# 2. Create a causal edge with metadata
-mnemon link <new_id> <candidate_id> --type causal --weight 0.8 \
+# For confirmed causal relationships:
+mnemon link <source_id> <target_id> --type causal --weight 0.8 \
   --meta '{"sub_type":"causes","reason":"..."}'
-# Skip candidates where token overlap is coincidental (no real causation)
+# weight guide: 0.6 (weak/indirect) → 0.8 (clear) → 0.95 (direct/strong)
+# Skip candidates where overlap is coincidental (no real causation)
 ```
+
+**Implicit candidates** (marked `causal_signal: "(implicit: embedding similarity)"`) are
+especially important — they catch decision→outcome pairs that lack explicit causal words.
+Evaluate these carefully: they are often real causal links that heuristics cannot auto-detect.
 
 ## Entity enrichment (after remember)
 
