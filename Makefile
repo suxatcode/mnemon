@@ -20,6 +20,8 @@ SENTINEL_END   := \#\# END mnemon-skill
 
 .PHONY: build install uninstall inject eject inject-hooks eject-hooks test clean help
 
+.DEFAULT_GOAL := help
+
 # ── Build ────────────────────────────────────────────────────────────
 
 build: ## Build the mnemon binary
