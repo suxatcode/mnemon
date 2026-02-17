@@ -1,0 +1,25 @@
+# Binary
+mnemon
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Mnemon data (local dev)
+*.db
+*.db-wal
+*.db-shm
+
+# Test artifacts
+/tmp/
+.testdata/
