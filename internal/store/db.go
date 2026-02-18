@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -143,25 +144,68 @@ CREATE INDEX IF NOT EXISTS idx_oplog_created ON oplog(created_at);
 		return err
 	}
 
-	// Phase 2 migration: add last_accessed_at column (safe for existing DBs)
-	db.conn.Exec(`ALTER TABLE insights ADD COLUMN last_accessed_at TEXT`)
+	// Phase 2 migration: add last_accessed_at column
+	if err := addColumnIfNotExists(db.conn, `ALTER TABLE insights ADD COLUMN last_accessed_at TEXT`); err != nil {
+		return fmt.Errorf("add last_accessed_at: %w", err)
+	}
 
-	// Phase 3 migration: add embedding column (safe for existing DBs)
-	db.conn.Exec(`ALTER TABLE insights ADD COLUMN embedding BLOB`)
+	// Phase 3 migration: add embedding column
+	if err := addColumnIfNotExists(db.conn, `ALTER TABLE insights ADD COLUMN embedding BLOB`); err != nil {
+		return fmt.Errorf("add embedding: %w", err)
+	}
 
-	// Lifecycle migration: add effective_importance column (safe for existing DBs)
-	db.conn.Exec(`ALTER TABLE insights ADD COLUMN effective_importance REAL DEFAULT 0.5`)
-	db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_insights_effective_imp ON insights(effective_importance)`)
+	// Lifecycle migration: add effective_importance column
+	if err := addColumnIfNotExists(db.conn, `ALTER TABLE insights ADD COLUMN effective_importance REAL DEFAULT 0.5`); err != nil {
+		return fmt.Errorf("add effective_importance: %w", err)
+	}
+	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_insights_effective_imp ON insights(effective_importance)`); err != nil {
+		return fmt.Errorf("create effective_imp index: %w", err)
+	}
 
 	// Migration: remove narrative edge type from existing databases
-	// If the CHECK constraint still allows 'narrative', recreate the table without it
+	if err := db.migrateRemoveNarrativeEdges(); err != nil {
+		return fmt.Errorf("remove narrative edges: %w", err)
+	}
+
+	// Clean up narrative category insights from existing databases
+	if _, err := db.conn.Exec(`UPDATE insights SET deleted_at = datetime('now') WHERE category = 'narrative' AND deleted_at IS NULL`); err != nil {
+		return fmt.Errorf("clean narrative insights: %w", err)
+	}
+
+	return nil
+}
+
+// addColumnIfNotExists runs an ALTER TABLE ADD COLUMN statement,
+// ignoring "duplicate column" errors (column already exists).
+func addColumnIfNotExists(conn *sql.DB, stmt string) error {
+	_, err := conn.Exec(stmt)
+	if err != nil && strings.Contains(err.Error(), "duplicate column") {
+		return nil
+	}
+	return err
+}
+
+// migrateRemoveNarrativeEdges recreates the edges table without the 'narrative' type
+// if the old CHECK constraint still allows it.
+func (db *DB) migrateRemoveNarrativeEdges() error {
+	// Probe whether the old schema allows 'narrative'
 	_, testErr := db.conn.Exec(`INSERT INTO edges VALUES ('__test','__test','narrative',0,'{}',datetime('now'))`)
-	if testErr == nil {
-		// Old schema allows 'narrative', need to migrate
-		db.conn.Exec(`DELETE FROM edges WHERE source_id = '__test'`)
-		db.conn.Exec(`DELETE FROM edges WHERE edge_type = 'narrative'`)
-		db.conn.Exec(`ALTER TABLE edges RENAME TO edges_old`)
-		db.conn.Exec(`CREATE TABLE edges (
+	if testErr != nil {
+		return nil // current schema already rejects 'narrative', nothing to do
+	}
+
+	// Old schema — migrate within a transaction
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	steps := []string{
+		`DELETE FROM edges WHERE source_id = '__test'`,
+		`DELETE FROM edges WHERE edge_type = 'narrative'`,
+		`ALTER TABLE edges RENAME TO edges_old`,
+		`CREATE TABLE edges (
 			source_id   TEXT NOT NULL,
 			target_id   TEXT NOT NULL,
 			edge_type   TEXT NOT NULL CHECK(edge_type IN ('temporal','semantic','causal','entity')),
@@ -171,16 +215,17 @@ CREATE INDEX IF NOT EXISTS idx_oplog_created ON oplog(created_at);
 			PRIMARY KEY (source_id, target_id, edge_type),
 			FOREIGN KEY (source_id) REFERENCES insights(id) ON DELETE CASCADE,
 			FOREIGN KEY (target_id) REFERENCES insights(id) ON DELETE CASCADE
-		)`)
-		db.conn.Exec(`INSERT INTO edges SELECT * FROM edges_old`)
-		db.conn.Exec(`DROP TABLE edges_old`)
-		db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id)`)
-		db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_id)`)
-		db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_edges_type ON edges(edge_type)`)
+		)`,
+		`INSERT INTO edges SELECT * FROM edges_old`,
+		`DROP TABLE edges_old`,
+		`CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_edges_type ON edges(edge_type)`,
 	}
-
-	// Clean up narrative category insights from existing databases
-	db.conn.Exec(`UPDATE insights SET deleted_at = datetime('now') WHERE category = 'narrative' AND deleted_at IS NULL`)
-
-	return nil
+	for _, s := range steps {
+		if _, err := tx.Exec(s); err != nil {
+			return fmt.Errorf("step %q: %w", s[:min(len(s), 40)], err)
+		}
+	}
+	return tx.Commit()
 }
