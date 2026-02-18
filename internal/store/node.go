@@ -199,7 +199,9 @@ func (db *DB) RefreshEffectiveImportance(id string) (float64, error) {
 	daysSince := time.Now().UTC().Sub(lastAccess).Hours() / 24.0
 
 	var edgeCount int
-	db.conn.QueryRow(`SELECT COUNT(*) FROM edges WHERE source_id = ? OR target_id = ?`, id, id).Scan(&edgeCount)
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM edges WHERE source_id = ? OR target_id = ?`, id, id).Scan(&edgeCount); err != nil {
+		return 0, fmt.Errorf("count edges for %s: %w", id, err)
+	}
 
 	ei := ComputeEffectiveImportance(importance, accessCount, daysSince, edgeCount)
 
@@ -274,10 +276,19 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 }
 
 // AutoPrune soft-deletes the lowest effective_importance non-immune insights
-// when total active count exceeds maxInsights. Returns number pruned.
-func (db *DB) AutoPrune(maxInsights int) (int, error) {
+// when total active count exceeds maxInsights. excludeID is protected from pruning
+// (typically the just-created insight). Returns number pruned.
+func (db *DB) AutoPrune(maxInsights int, excludeID string) (int, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("begin prune tx: %w", err)
+	}
+	defer tx.Rollback()
+
 	var total int
-	db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total)
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count insights: %w", err)
+	}
 	if total <= maxInsights {
 		return 0, nil
 	}
@@ -287,31 +298,41 @@ func (db *DB) AutoPrune(maxInsights int) (int, error) {
 		excess = PruneBatchSize
 	}
 
-	// Find lowest effective_importance non-immune insights
-	rows, err := db.conn.Query(
-		`SELECT id, importance, access_count, effective_importance FROM insights
-		 WHERE deleted_at IS NULL AND importance < 4 AND access_count < 3
-		 ORDER BY effective_importance ASC LIMIT ?`, excess)
+	// Collect candidate IDs first (close cursor before writing to avoid single-conn deadlock)
+	rows, err := tx.Query(
+		`SELECT id FROM insights
+		 WHERE deleted_at IS NULL AND importance < 4 AND access_count < 3 AND id != ?
+		 ORDER BY effective_importance ASC LIMIT ?`, excludeID, excess)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("query prune candidates: %w", err)
 	}
-	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("scan prune candidate: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	pruned := 0
-	for rows.Next() {
-		var id string
-		var imp, ac int
-		var ei float64
-		if err := rows.Scan(&id, &imp, &ac, &ei); err != nil {
-			continue
-		}
-		_, err := db.conn.Exec(
+	for _, id := range ids {
+		res, err := tx.Exec(
 			`UPDATE insights SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
 			now, now, id)
-		if err == nil {
+		if err != nil {
+			return pruned, fmt.Errorf("prune %s: %w", id, err)
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
 			pruned++
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit prune tx: %w", err)
 	}
 	return pruned, nil
 }

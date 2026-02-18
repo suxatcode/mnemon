@@ -122,10 +122,16 @@ var rememberCmd = &cobra.Command{
 		}
 
 		// Compute and store effective_importance (after edges are created)
-		ei, _ := db.RefreshEffectiveImportance(insight.ID)
+		ei, err := db.RefreshEffectiveImportance(insight.ID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: refresh EI: %v\n", err)
+		}
 
-		// Auto-prune if over capacity
-		pruned, _ := db.AutoPrune(store.MaxInsights)
+		// Auto-prune if over capacity (excludeID protects the just-created insight)
+		pruned, err := db.AutoPrune(store.MaxInsights, insight.ID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: auto-prune: %v\n", err)
+		}
 
 		db.LogOp("remember", insight.ID, insight.Content)
 
