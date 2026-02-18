@@ -1,6 +1,6 @@
 # Mnemon
 
-**Persistent memory for LLM agents** — single binary, zero API keys, MAGMA four-graph architecture.
+**Persistent memory for LLM agents** — LLM-supervised, skill-integrated, four-graph architecture.
 
 [![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![CI](https://github.com/Grivn/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/Grivn/mnemon/actions/workflows/ci.yml)
@@ -12,14 +12,14 @@ LLM agents forget everything between sessions. Context compaction drops critical
 
 Mnemon gives your LLM persistent, cross-session memory — with a single Go binary and a skill file.
 
-### Why LLM-Supervised?
+### Why Mnemon?
 
 Most memory systems embed a small LLM inside the pipeline (Mem0, MemGPT). Mnemon takes the opposite approach — **your host LLM is the supervisor, the binary is the organ**:
 
 | | LLM-Embedded (Mem0, etc.) | **LLM-Supervised (Mnemon)** |
 |---|---|---|
 | **LLM quality** | gpt-4o-mini (constrained) | Your host LLM (Opus-class) |
-| **API cost** | Every operation calls an API | Zero — all computation local |
+| **Extra cost** | Every operation calls an LLM API | Zero — all computation local |
 | **Network** | Required | Not required |
 | **Portability** | Tied to one API/framework | Any LLM CLI (Claude Code, Cursor, ...) |
 
@@ -78,13 +78,13 @@ For non-Claude-Code tools, merge the three layers into your system prompt or rul
 
 ## Features
 
-- **MAGMA four-graph architecture** — temporal, entity, causal, and semantic edges, not just vector similarity
-- **LLM-supervised** — the LLM actively decides what to remember, update, link, and forget
+- **LLM-supervised** — the host LLM actively decides what to remember, update, link, and forget; no embedded LLM, no extra API calls
+- **Skill-integrated** — a single skill file teaches any LLM CLI the full command protocol; works with Claude Code, Cursor, or anything that reads markdown
+- **Four-graph architecture** — temporal, entity, causal, and semantic edges, not just vector similarity
 - **Intent-aware recall** — `--smart` mode uses graph traversal + optional vector search (RRF fusion)
 - **Duplicate detection** — `diff` compares new content against existing insights before storing
 - **Retention lifecycle** — importance decay, access-count boosting, immunity rules, and garbage collection
 - **Optional embeddings** — local Ollama integration for hybrid vector+keyword search
-- **Zero external dependencies** — single binary, SQLite WAL, no API keys needed
 
 ## Usage
 
@@ -173,7 +173,7 @@ When embeddings are available, `recall --smart` automatically uses hybrid vector
       └──────────────────┘                 └──────────────────┘
 ```
 
-Based on [MAGMA](https://arxiv.org/abs/2601.03236) (Multi-Graph Agentic Memory Architecture). See [Design & Architecture](docs/DESIGN.md) for details.
+Inspired by the [MAGMA](https://arxiv.org/abs/2601.03236) four-graph model. See [Design & Architecture](docs/DESIGN.md) for details.
 
 ## Configuration
 
