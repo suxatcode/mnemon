@@ -188,4 +188,4 @@ make help           # show all targets
 
 ## License
 
-[GPL-3.0](LICENSE)
+[MIT](LICENSE)
