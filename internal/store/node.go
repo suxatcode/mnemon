@@ -104,7 +104,7 @@ func (db *DB) QueryInsights(f QueryFilter) ([]*model.Insight, error) {
 	return scanInsights(rows)
 }
 
-// SoftDeleteInsight sets deleted_at on an insight.
+// SoftDeleteInsight sets deleted_at on an insight and removes all associated edges.
 func (db *DB) SoftDeleteInsight(id string) error {
 	res, err := db.execer().Exec(
 		`UPDATE insights SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
@@ -115,6 +115,9 @@ func (db *DB) SoftDeleteInsight(id string) error {
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("insight %s not found or already deleted", id)
+	}
+	if err := db.DeleteEdgesByNode(id); err != nil {
+		return fmt.Errorf("delete edges for %s: %w", id, err)
 	}
 	return nil
 }
@@ -337,6 +340,7 @@ func (db *DB) autoPrune(maxInsights int, excludeID string) (int, error) {
 			return pruned, fmt.Errorf("prune %s: %w", id, err)
 		}
 		if n, _ := res.RowsAffected(); n > 0 {
+			db.DeleteEdgesByNode(id)
 			pruned++
 		}
 	}
