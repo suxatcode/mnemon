@@ -4,7 +4,7 @@ import "time"
 
 // LogOp records an operation to the oplog.
 func (db *DB) LogOp(operation, insightID, detail string) {
-	db.conn.Exec(
+	db.execer().Exec(
 		`INSERT INTO oplog (operation, insight_id, detail, created_at) VALUES (?, ?, ?, ?)`,
 		operation, insightID, detail, time.Now().UTC().Format(time.RFC3339))
 }
@@ -23,7 +23,7 @@ func (db *DB) GetOplog(limit int) ([]OplogEntry, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT id, operation, insight_id, detail, created_at FROM oplog ORDER BY id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err

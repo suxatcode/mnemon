@@ -25,7 +25,7 @@ const (
 
 // InsertInsight inserts a new insight into the database.
 func (db *DB) InsertInsight(i *model.Insight) error {
-	_, err := db.conn.Exec(
+	_, err := db.execer().Exec(
 		`INSERT INTO insights (id, content, category, importance, tags, entities, source, access_count, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		i.ID, i.Content, string(i.Category), i.Importance,
@@ -37,7 +37,7 @@ func (db *DB) InsertInsight(i *model.Insight) error {
 
 // GetInsightByID returns a single insight by ID (excludes soft-deleted).
 func (db *DB) GetInsightByID(id string) (*model.Insight, error) {
-	row := db.conn.QueryRow(
+	row := db.execer().QueryRow(
 		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
 		 FROM insights WHERE id = ? AND deleted_at IS NULL`, id)
 	return scanInsight(row)
@@ -45,7 +45,7 @@ func (db *DB) GetInsightByID(id string) (*model.Insight, error) {
 
 // GetInsightByIDIncludeDeleted returns a single insight by ID, including soft-deleted.
 func (db *DB) GetInsightByIDIncludeDeleted(id string) (*model.Insight, error) {
-	row := db.conn.QueryRow(
+	row := db.execer().QueryRow(
 		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
 		 FROM insights WHERE id = ?`, id)
 	return scanInsight(row)
@@ -95,7 +95,7 @@ func (db *DB) QueryInsights(f QueryFilter) ([]*model.Insight, error) {
 		strings.Join(conditions, " AND "))
 	args = append(args, limit)
 
-	rows, err := db.conn.Query(query, args...)
+	rows, err := db.execer().Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (db *DB) QueryInsights(f QueryFilter) ([]*model.Insight, error) {
 
 // SoftDeleteInsight sets deleted_at on an insight.
 func (db *DB) SoftDeleteInsight(id string) error {
-	res, err := db.conn.Exec(
+	res, err := db.execer().Exec(
 		`UPDATE insights SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
 		time.Now().UTC().Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339), id)
 	if err != nil {
@@ -122,7 +122,7 @@ func (db *DB) SoftDeleteInsight(id string) error {
 // UpdateEntities updates the entities field for an insight.
 func (db *DB) UpdateEntities(id string, entities []string) error {
 	i := &model.Insight{Entities: entities}
-	_, err := db.conn.Exec(
+	_, err := db.execer().Exec(
 		`UPDATE insights SET entities = ?, updated_at = ? WHERE id = ?`,
 		i.EntitiesJSON(), time.Now().UTC().Format(time.RFC3339), id)
 	return err
@@ -130,7 +130,7 @@ func (db *DB) UpdateEntities(id string, entities []string) error {
 
 // IncrementAccessCount bumps the access count and refreshes last_accessed_at.
 func (db *DB) IncrementAccessCount(id string) error {
-	_, err := db.conn.Exec(
+	_, err := db.execer().Exec(
 		`UPDATE insights SET access_count = access_count + 1, last_accessed_at = ? WHERE id = ?`,
 		time.Now().UTC().Format(time.RFC3339), id)
 	return err
@@ -183,7 +183,7 @@ func (db *DB) RefreshEffectiveImportance(id string) (float64, error) {
 	var importance, accessCount int
 	var createdAt string
 	var lastAccessedAt sql.NullString
-	err := db.conn.QueryRow(
+	err := db.execer().QueryRow(
 		`SELECT importance, access_count, created_at, last_accessed_at FROM insights WHERE id = ? AND deleted_at IS NULL`, id,
 	).Scan(&importance, &accessCount, &createdAt, &lastAccessedAt)
 	if err != nil {
@@ -199,13 +199,13 @@ func (db *DB) RefreshEffectiveImportance(id string) (float64, error) {
 	daysSince := time.Now().UTC().Sub(lastAccess).Hours() / 24.0
 
 	var edgeCount int
-	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM edges WHERE source_id = ? OR target_id = ?`, id, id).Scan(&edgeCount); err != nil {
+	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM edges WHERE source_id = ? OR target_id = ?`, id, id).Scan(&edgeCount); err != nil {
 		return 0, fmt.Errorf("count edges for %s: %w", id, err)
 	}
 
 	ei := ComputeEffectiveImportance(importance, accessCount, daysSince, edgeCount)
 
-	_, err = db.conn.Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, ei, id)
+	_, err = db.execer().Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, ei, id)
 	return ei, err
 }
 
@@ -231,7 +231,7 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 	for _, ins := range all {
 		lastAccess := ins.CreatedAt
 		var lastAccessedAt sql.NullString
-		db.conn.QueryRow(`SELECT last_accessed_at FROM insights WHERE id = ?`, ins.ID).Scan(&lastAccessedAt)
+		db.execer().QueryRow(`SELECT last_accessed_at FROM insights WHERE id = ?`, ins.ID).Scan(&lastAccessedAt)
 		if lastAccessedAt.Valid && lastAccessedAt.String != "" {
 			if t, err := time.Parse(time.RFC3339, lastAccessedAt.String); err == nil {
 				lastAccess = t
@@ -240,13 +240,13 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 		daysSince := now.Sub(lastAccess).Hours() / 24.0
 
 		var edgeCount int
-		db.conn.QueryRow(`SELECT COUNT(*) FROM edges WHERE source_id = ? OR target_id = ?`, ins.ID, ins.ID).Scan(&edgeCount)
+		db.execer().QueryRow(`SELECT COUNT(*) FROM edges WHERE source_id = ? OR target_id = ?`, ins.ID, ins.ID).Scan(&edgeCount)
 
 		ei := ComputeEffectiveImportance(ins.Importance, ins.AccessCount, daysSince, edgeCount)
 		immune := IsImmune(ins.Importance, ins.AccessCount)
 
 		// Update stored value
-		db.conn.Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, ei, ins.ID)
+		db.execer().Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, ei, ins.ID)
 
 		if ei < threshold && !immune {
 			candidates = append(candidates, RetentionCandidate{
@@ -278,15 +278,25 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 // AutoPrune soft-deletes the lowest effective_importance non-immune insights
 // when total active count exceeds maxInsights. excludeID is protected from pruning
 // (typically the just-created insight). Returns number pruned.
+// If already inside a transaction (db.tx != nil), executes inline; otherwise wraps in its own transaction.
 func (db *DB) AutoPrune(maxInsights int, excludeID string) (int, error) {
-	tx, err := db.conn.Begin()
-	if err != nil {
-		return 0, fmt.Errorf("begin prune tx: %w", err)
+	if db.tx != nil {
+		return db.autoPrune(maxInsights, excludeID)
 	}
-	defer tx.Rollback()
+	var pruned int
+	err := db.InTransaction(func() error {
+		var innerErr error
+		pruned, innerErr = db.autoPrune(maxInsights, excludeID)
+		return innerErr
+	})
+	return pruned, err
+}
+
+func (db *DB) autoPrune(maxInsights int, excludeID string) (int, error) {
+	ex := db.execer()
 
 	var total int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total); err != nil {
+	if err := ex.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total); err != nil {
 		return 0, fmt.Errorf("count insights: %w", err)
 	}
 	if total <= maxInsights {
@@ -299,7 +309,7 @@ func (db *DB) AutoPrune(maxInsights int, excludeID string) (int, error) {
 	}
 
 	// Collect candidate IDs first (close cursor before writing to avoid single-conn deadlock)
-	rows, err := tx.Query(
+	rows, err := ex.Query(
 		`SELECT id FROM insights
 		 WHERE deleted_at IS NULL AND importance < 4 AND access_count < 3 AND id != ?
 		 ORDER BY effective_importance ASC LIMIT ?`, excludeID, excess)
@@ -320,7 +330,7 @@ func (db *DB) AutoPrune(maxInsights int, excludeID string) (int, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	pruned := 0
 	for _, id := range ids {
-		res, err := tx.Exec(
+		res, err := ex.Exec(
 			`UPDATE insights SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
 			now, now, id)
 		if err != nil {
@@ -331,15 +341,12 @@ func (db *DB) AutoPrune(maxInsights int, excludeID string) (int, error) {
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit prune tx: %w", err)
-	}
 	return pruned, nil
 }
 
 // BoostRetention boosts an insight's retention: access_count +3, refreshes last_accessed_at.
 func (db *DB) BoostRetention(id string) error {
-	res, err := db.conn.Exec(
+	res, err := db.execer().Exec(
 		`UPDATE insights SET access_count = access_count + 3, last_accessed_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
 		time.Now().UTC().Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339), id)
 	if err != nil {
@@ -356,7 +363,7 @@ func (db *DB) BoostRetention(id string) error {
 // time window (hours), excluding the given ID. Ordered by created_at DESC.
 func (db *DB) GetRecentInsightsInWindow(excludeID string, windowHours float64, limit int) ([]*model.Insight, error) {
 	cutoff := time.Now().UTC().Add(-time.Duration(windowHours * float64(time.Hour)))
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
 		 FROM insights WHERE id != ? AND deleted_at IS NULL AND created_at >= ?
 		 ORDER BY created_at DESC LIMIT ?`,
@@ -370,7 +377,7 @@ func (db *DB) GetRecentInsightsInWindow(excludeID string, windowHours float64, l
 
 // GetLatestInsightBySource returns the most recent non-deleted insight for a given source, excluding the given ID.
 func (db *DB) GetLatestInsightBySource(source string, excludeID string) (*model.Insight, error) {
-	row := db.conn.QueryRow(
+	row := db.execer().QueryRow(
 		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
 		 FROM insights WHERE source = ? AND id != ? AND deleted_at IS NULL
 		 ORDER BY created_at DESC, rowid DESC LIMIT 1`, source, excludeID)
@@ -379,7 +386,7 @@ func (db *DB) GetLatestInsightBySource(source string, excludeID string) (*model.
 
 // GetRecentInsightsBySource returns the N most recent non-deleted insights for a source, excluding the given ID.
 func (db *DB) GetRecentInsightsBySource(source string, excludeID string, limit int) ([]*model.Insight, error) {
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
 		 FROM insights WHERE source = ? AND id != ? AND deleted_at IS NULL
 		 ORDER BY created_at DESC LIMIT ?`, source, excludeID, limit)
@@ -392,7 +399,7 @@ func (db *DB) GetRecentInsightsBySource(source string, excludeID string, limit i
 
 // GetAllActiveInsights returns all non-deleted insights.
 func (db *DB) GetAllActiveInsights() ([]*model.Insight, error) {
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
 		 FROM insights WHERE deleted_at IS NULL ORDER BY created_at DESC`)
 	if err != nil {
@@ -415,13 +422,13 @@ func (db *DB) GetStats() (*InsightStats, error) {
 	stats := &InsightStats{ByCategory: make(map[string]int)}
 
 	// Total active
-	db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&stats.Total)
+	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&stats.Total)
 
 	// Deleted
-	db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NOT NULL`).Scan(&stats.DeletedCount)
+	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NOT NULL`).Scan(&stats.DeletedCount)
 
 	// By category
-	rows, err := db.conn.Query(`SELECT category, COUNT(*) FROM insights WHERE deleted_at IS NULL GROUP BY category`)
+	rows, err := db.execer().Query(`SELECT category, COUNT(*) FROM insights WHERE deleted_at IS NULL GROUP BY category`)
 	if err != nil {
 		return nil, err
 	}
@@ -436,14 +443,14 @@ func (db *DB) GetStats() (*InsightStats, error) {
 	}
 
 	// Edge count
-	db.conn.QueryRow(`SELECT COUNT(*) FROM edges`).Scan(&stats.EdgeCount)
+	db.execer().QueryRow(`SELECT COUNT(*) FROM edges`).Scan(&stats.EdgeCount)
 
 	return stats, nil
 }
 
 // UpdateEmbedding stores an embedding vector for an insight.
 func (db *DB) UpdateEmbedding(id string, blob []byte) error {
-	_, err := db.conn.Exec(
+	_, err := db.execer().Exec(
 		`UPDATE insights SET embedding = ?, updated_at = ? WHERE id = ?`,
 		blob, time.Now().UTC().Format(time.RFC3339), id)
 	return err
@@ -452,7 +459,7 @@ func (db *DB) UpdateEmbedding(id string, blob []byte) error {
 // GetEmbedding returns the raw embedding blob for an insight.
 func (db *DB) GetEmbedding(id string) ([]byte, error) {
 	var blob []byte
-	err := db.conn.QueryRow(`SELECT embedding FROM insights WHERE id = ? AND deleted_at IS NULL`, id).Scan(&blob)
+	err := db.execer().QueryRow(`SELECT embedding FROM insights WHERE id = ? AND deleted_at IS NULL`, id).Scan(&blob)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +475,7 @@ type EmbeddedInsight struct {
 
 // GetAllEmbeddings returns all active insights that have embeddings.
 func (db *DB) GetAllEmbeddings() ([]EmbeddedInsight, error) {
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT id, content, embedding FROM insights WHERE deleted_at IS NULL AND embedding IS NOT NULL`)
 	if err != nil {
 		return nil, err
@@ -490,8 +497,8 @@ func (db *DB) GetAllEmbeddings() ([]EmbeddedInsight, error) {
 
 // EmbeddingStats returns total insights and how many have embeddings.
 func (db *DB) EmbeddingStats() (total int, embedded int, err error) {
-	db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total)
-	db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL AND embedding IS NOT NULL`).Scan(&embedded)
+	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total)
+	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL AND embedding IS NOT NULL`).Scan(&embedded)
 	return total, embedded, nil
 }
 
@@ -500,7 +507,7 @@ func (db *DB) GetInsightsWithoutEmbedding(limit int) ([]*model.Insight, error) {
 	if limit <= 0 {
 		limit = 100
 	}
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
 		 FROM insights WHERE deleted_at IS NULL AND embedding IS NULL
 		 ORDER BY importance DESC, created_at DESC LIMIT ?`, limit)

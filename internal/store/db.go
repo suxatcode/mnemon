@@ -9,10 +9,45 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// dbExecer abstracts sql.DB and sql.Tx so store methods work in both contexts.
+type dbExecer interface {
+	Exec(string, ...any) (sql.Result, error)
+	Query(string, ...any) (*sql.Rows, error)
+	QueryRow(string, ...any) *sql.Row
+}
+
 // DB wraps the SQLite database connection.
 type DB struct {
 	conn *sql.DB
+	tx   *sql.Tx // current active transaction (nil = no transaction)
 	path string
+}
+
+// execer returns the active transaction if set, otherwise the raw connection.
+func (db *DB) execer() dbExecer {
+	if db.tx != nil {
+		return db.tx
+	}
+	return db.conn
+}
+
+// InTransaction runs fn inside a single SQL transaction.
+// All store methods called within fn will use the transaction automatically.
+func (db *DB) InTransaction(fn func() error) error {
+	if db.tx != nil {
+		return fmt.Errorf("nested transactions not supported")
+	}
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	db.tx = tx
+	defer func() { db.tx = nil }()
+	if err := fn(); err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // DefaultDataDir returns ~/.mnemon.

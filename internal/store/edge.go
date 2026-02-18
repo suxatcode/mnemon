@@ -8,7 +8,7 @@ import (
 
 // InsertEdge inserts or replaces an edge.
 func (db *DB) InsertEdge(e *model.Edge) error {
-	_, err := db.conn.Exec(
+	_, err := db.execer().Exec(
 		`INSERT OR REPLACE INTO edges (source_id, target_id, edge_type, weight, metadata, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		e.SourceID, e.TargetID, string(e.EdgeType), e.Weight,
@@ -19,7 +19,7 @@ func (db *DB) InsertEdge(e *model.Edge) error {
 
 // GetEdgesByNode returns all edges where the given node is source or target.
 func (db *DB) GetEdgesByNode(nodeID string) ([]*model.Edge, error) {
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT source_id, target_id, edge_type, weight, metadata, created_at
 		 FROM edges WHERE source_id = ? OR target_id = ?`, nodeID, nodeID)
 	if err != nil {
@@ -31,7 +31,7 @@ func (db *DB) GetEdgesByNode(nodeID string) ([]*model.Edge, error) {
 
 // GetEdgesByNodeAndType returns edges for a node filtered by edge type.
 func (db *DB) GetEdgesByNodeAndType(nodeID string, edgeType model.EdgeType) ([]*model.Edge, error) {
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT source_id, target_id, edge_type, weight, metadata, created_at
 		 FROM edges WHERE (source_id = ? OR target_id = ?) AND edge_type = ?`,
 		nodeID, nodeID, string(edgeType))
@@ -44,7 +44,7 @@ func (db *DB) GetEdgesByNodeAndType(nodeID string, edgeType model.EdgeType) ([]*
 
 // GetEdgesBySourceAndType returns edges where the given node is source, filtered by type.
 func (db *DB) GetEdgesBySourceAndType(sourceID string, edgeType model.EdgeType) ([]*model.Edge, error) {
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT source_id, target_id, edge_type, weight, metadata, created_at
 		 FROM edges WHERE source_id = ? AND edge_type = ?`, sourceID, string(edgeType))
 	if err != nil {
@@ -56,7 +56,7 @@ func (db *DB) GetEdgesBySourceAndType(sourceID string, edgeType model.EdgeType) 
 
 // FindInsightsWithEntity returns insight IDs that have the given entity in their entities JSON array.
 func (db *DB) FindInsightsWithEntity(entity string, excludeID string, limit int) ([]string, error) {
-	rows, err := db.conn.Query(
+	rows, err := db.execer().Query(
 		`SELECT id FROM insights
 		 WHERE deleted_at IS NULL AND id != ? AND entities LIKE ?
 		 ORDER BY created_at DESC LIMIT ?`,
@@ -79,7 +79,7 @@ func (db *DB) FindInsightsWithEntity(entity string, excludeID string, limit int)
 
 // DeleteEdgesByNode removes all edges referencing a node.
 func (db *DB) DeleteEdgesByNode(nodeID string) error {
-	_, err := db.conn.Exec(
+	_, err := db.execer().Exec(
 		`DELETE FROM edges WHERE source_id = ? OR target_id = ?`, nodeID, nodeID)
 	return err
 }

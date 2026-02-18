@@ -84,56 +84,74 @@ var rememberCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		if err := db.InsertInsight(insight); err != nil {
-			return fmt.Errorf("insert insight: %w", err)
-		}
-
-		// Generate embedding BEFORE graph engine so semantic edges can use it
-		embedded := false
+		// 1. Compute embedding BEFORE the transaction (HTTP call should not hold a DB lock)
+		var embeddingBlob []byte
 		ec := embed.NewClient()
 		if ec.Available() {
 			if vec, err := ec.Embed(content); err == nil {
-				blob := embed.SerializeVector(vec)
-				if err := db.UpdateEmbedding(insight.ID, blob); err == nil {
-					embedded = true
-				}
+				embeddingBlob = embed.SerializeVector(vec)
 			}
 		}
 
-		// Run graph edge engine (includes auto semantic edges when embedded)
-		engine := graph.NewEngine(db)
-		edgeStats := engine.OnInsightCreated(insight)
+		// 2. All DB writes in a single atomic transaction
+		var (
+			edgeStats graph.EdgeStats
+			ei        float64
+			pruned    int
+			embedded  bool
+		)
+		err = db.InTransaction(func() error {
+			if err := db.InsertInsight(insight); err != nil {
+				return fmt.Errorf("insert insight: %w", err)
+			}
 
-		// Update entities extracted by the engine
-		if len(insight.Entities) > 0 {
-			_ = db.UpdateEntities(insight.ID, insight.Entities)
+			if embeddingBlob != nil {
+				if err := db.UpdateEmbedding(insight.ID, embeddingBlob); err != nil {
+					return fmt.Errorf("update embedding: %w", err)
+				}
+				embedded = true
+			}
+
+			// Run graph edge engine (includes auto semantic edges when embedded)
+			engine := graph.NewEngine(db)
+			edgeStats = engine.OnInsightCreated(insight)
+
+			// Update entities extracted by the engine
+			if len(insight.Entities) > 0 {
+				_ = db.UpdateEntities(insight.ID, insight.Entities)
+			}
+
+			// Compute and store effective_importance (after edges are created)
+			var eiErr error
+			ei, eiErr = db.RefreshEffectiveImportance(insight.ID)
+			if eiErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: refresh EI: %v\n", eiErr)
+			}
+
+			// Auto-prune if over capacity (excludeID protects the just-created insight)
+			var pruneErr error
+			pruned, pruneErr = db.AutoPrune(store.MaxInsights, insight.ID)
+			if pruneErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: auto-prune: %v\n", pruneErr)
+			}
+
+			db.LogOp("remember", insight.ID, insight.Content)
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
-		// Find semantic candidates for Claude to evaluate (additional manual linking)
+		// 3. Read-only operations outside the transaction (data already committed)
 		semanticCandidates := graph.FindSemanticCandidates(db, insight)
 		if semanticCandidates == nil {
 			semanticCandidates = []graph.SemanticCandidate{}
 		}
 
-		// Find causal candidates for Claude to evaluate
 		causalCandidates := graph.FindCausalCandidates(db, insight)
 		if causalCandidates == nil {
 			causalCandidates = []graph.CausalCandidate{}
 		}
-
-		// Compute and store effective_importance (after edges are created)
-		ei, err := db.RefreshEffectiveImportance(insight.ID)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: refresh EI: %v\n", err)
-		}
-
-		// Auto-prune if over capacity (excludeID protects the just-created insight)
-		pruned, err := db.AutoPrune(store.MaxInsights, insight.ID)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: auto-prune: %v\n", err)
-		}
-
-		db.LogOp("remember", insight.ID, insight.Content)
 
 		output := map[string]interface{}{
 			"id":                  insight.ID,
