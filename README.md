@@ -14,16 +14,17 @@ Mnemon gives your LLM persistent, cross-session memory — with a single Go bina
 
 ### Why Mnemon?
 
-Most memory systems embed a small LLM inside the pipeline (Mem0, MemGPT). Mnemon takes the opposite approach — **your host LLM is the supervisor, the binary is the organ**:
+Memory has a **compound interest effect** — the longer it accumulates, the more valuable it becomes. LLM engines keep iterating, skills cost nothing to write, but memory is a private asset that grows with the user. It is the only component in the agent ecosystem worth deep investment.
 
-| | LLM-Embedded (Mem0, etc.) | **LLM-Supervised (Mnemon)** |
+Mnemon is built on one principle: **the LLM itself is the best orchestrator.** Instead of embedding a small LLM inside the pipeline, Mnemon lets your host LLM — the one already in your conversation with full context — serve as the supervisor. The binary is the organ (deterministic storage, graph indexing, search, decay); the LLM is the brain (decides what to remember, how to link, when to forget). A skill file is the textbook that teaches the protocol.
+
+This means: **memory management logic moves from prompt to code — deterministic, testable, portable.** The same binary + skill works across Claude Code, Cursor, or any LLM CLI that reads markdown.
+
+| Pattern | LLM Role | Representative |
 |---|---|---|
-| **LLM quality** | gpt-4o-mini (constrained) | Your host LLM (Opus-class) |
-| **Extra cost** | Every operation calls an LLM API | Zero — all computation local |
-| **Network** | Required | Not required |
-| **Portability** | Tied to one API/framework | Any LLM CLI (Claude Code, Cursor, ...) |
-
-The binary handles all deterministic work (storage, graph indexing, keyword search, decay formulas). The host LLM handles high-value judgment (causal evaluation, semantic relevance, memory triage). This means stronger reasoning at zero extra cost, and the same binary works across any LLM CLI.
+| **LLM-Embedded** | Executor inside the pipeline | Mem0, MAGMA |
+| **MCP Server** | Tool provider via MCP protocol | MemCP |
+| **LLM-Supervised** | External supervisor over a standalone binary | Mnemon |
 
 See [Design & Architecture](docs/DESIGN.md) for the full philosophy.
 

@@ -85,7 +85,7 @@ Mnemon adopts the **LLM-Supervised** pattern:
 | Pattern | Where is the LLM | What does the LLM do | Representative |
 |---------|------------------|---------------------|----------------|
 | **LLM-Embedded** | Inside the pipeline | Executor (extraction, classification, reasoning) | Mem0, MAGMA |
-| **LLM-as-Subagent** | Dispatched subprocess | Orchestrated agent (responds to MCP tool calls) | MemCP |
+| **MCP Server** | Tool provider via MCP protocol | Exposes memory operations as MCP tools for the host LLM | MemCP |
 | **LLM-Supervised** | Outside the pipeline | Supervisor (reviews candidates, makes judgments, decides trade-offs) | Mnemon |
 
 Under the LLM-Supervised pattern, responsibilities are clearly separated into two tiers:
