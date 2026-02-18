@@ -4,20 +4,20 @@
 
 | 简化决策 | 影响范围 | 收益 | 风险 | 缓解措施 | 最终判断 |
 |----------|---------|------|------|----------|----------|
-| regex 替代 LLM 实体提取 | Entity 图质量 | 零成本, 零延迟 | 代词、隐式实体丢失 | `--entities` flag 让 Claude 补充 | ✅ 合理 |
-| regex 替代 LLM 因果推断 | Causal 图质量 | 零成本, 同步执行 | 隐式因果丢失 (~30-40%) | causal_candidates + Claude 评估 | ⚠️ 可接受但有损失 |
+| 实体提取双层化：二进制 regex + 引擎 Claude | Entity 图质量 | 自动化层零成本零延迟 | — | `--entities` flag 让引擎 LLM 补充高价值实体 | ✅ 优于单层 LLM（引擎能力更强） |
+| 因果推断双层化：二进制检测 + 引擎评估 | Causal 图质量 | 自动化层零成本 | 二进制层仅捕获显式因果 | causal_candidates + 引擎 Claude 评估隐式因果 | ✅ 合理（引擎 LLM 评估质量高于管道内 gpt-4o-mini） |
 | 去除 Episode/Session/Narrative | 记忆组织粒度 | 架构简洁 | 缺少会话级语义 | source 字段 + temporal backbone | ✅ 合理（场景差异） |
 | 去除 Multi-hop 分解 | 复杂查询能力 | 无管道内 LLM 依赖 | 无 | Claude 外部自然分解 | ✅ 最佳选择 |
 | 去除 Best-of-N | 答案质量 | 系统定位清晰 | 无 | 不适用（Mnemon 不生成答案） | ✅ 最佳选择 |
 | SQLite 替代 FAISS | 向量搜索性能 | 统一存储, 事务一致 | O(n) 全扫描 | 1000 insight 上限可控 | ✅ 合理（当前规模） |
 | Ollama 替代 OpenAI embed | 向量质量 | 零 API 成本, 本地运行 | 模型能力差异 | nomic-embed-text 质量足够 | ✅ 合理 |
 | 同步写入替代双流 | 写入架构 | 简洁, 无并发问题 | 写入延迟含全部边生成 | Go 编译型足够快 (~10ms) | ✅ 合理 |
-| CLI-in-the-loop 替代 LLM-in-pipe | LLM 集成方式 | 零依赖, 可换 LLM | Claude 判断有额外 round-trip | Signals 元数据辅助判断 | ✅ 最佳选择 |
+| CLI-in-the-loop 引擎架构 | LLM 集成方式 | 引擎层 LLM 能力更强, 引擎可替换 | 引擎 LLM 判断有额外 round-trip | Signals 元数据辅助引擎判断 | ✅ 最佳选择 |
 | 1000 insight 上限 | 存储容量 | 控制搜索延迟 | 长期使用可能不够 | auto-prune + gc 管理 | ⚠️ 可能需要提高 |
 
 ## 5.2 核心风险详细分析
 
-### 风险 1：因果图质量 — 最大的简化损失
+### 分析 1：因果图质量 — 双层架构 vs 管道内 LLM
 
 **量化评估**：
 
@@ -27,21 +27,22 @@ MAGMA 论文消融实验:
   - 去掉 causal 图: -0.042 (约 -6%)
   - 去掉 LLM 因果推断 (只留 temporal proximity): -0.056 (约 -8%)
 
-Mnemon 的位置: 介于"完整因果"和"无因果"之间
-  - regex 能捕获显式因果 (~60-70% 的因果关系有语言标记)
-  - 估计损失: -3% ~ -5% (相比完整 LLM 因果)
+Mnemon 的位置: 双层因果推断
+  - 二进制层 regex 自动捕获显式因果 (~60-70% 有语言标记)
+  - 引擎层 Claude (Opus/Sonnet) 评估 causal_candidates，补充隐式因果
+  - 引擎 LLM 的判断质量远超 gpt-4o-mini，估计实际差距: -1% ~ -3%
 ```
 
-**风险场景**：
-- "选了 Redis" → 后来 "延迟降到 5ms"：没有因果关键词，regex 无法发现
-- "重构了 API 层" → 后来 "测试覆盖率从 60% 提升到 85%"：隐式因果
+**隐式因果的处理**：
+- "选了 Redis" → 后来 "延迟降到 5ms"：二进制层 regex 无法发现，但 2-hop BFS + embedding 相似度会将其列为 candidate
+- 引擎层 Claude 基于完整对话上下文评估 candidate，准确率高于管道内的 gpt-4o-mini
 
-**缓解措施有效性**：
-- `causal_candidates` 通过 2-hop BFS 邻域发现潜在因果，Claude 评估
-- embedding 相似度发现的隐式候选标记为 `(implicit: embedding similarity)`
-- 实际使用中，编程助手场景的因果关系比对话场景更显式
+**双层架构的优势**：
+- `causal_candidates` 通过 2-hop BFS 邻域发现潜在因果，标记 `(implicit: embedding similarity)`
+- 引擎层 Claude 有完整对话上下文，比管道内的 gpt-4o-mini（只看局部 2-hop 邻域）判断更准确
+- 编程助手场景的因果关系比对话场景更显式，二进制层覆盖率更高
 
-**结论**：可接受。在编程场景下 regex 覆盖率可能达 70-80%（因为技术讨论的因果表达更规范），加上 Claude 补充的因果链接，实际损失可控。
+**结论**：合理。二进制层自动化 + 引擎层高质量 LLM 评估，综合因果质量接近甚至可能超过 MAGMA 的管道内 gpt-4o-mini 推断。
 
 ### 风险 2：全表扫描的向量搜索 — 容量瓶颈
 
@@ -109,27 +110,27 @@ Mnemon 的位置: 介于"完整因果"和"无因果"之间
 
 ## 5.3 简化带来的独特优势
 
-### 优势 1：零成本运行
+### 优势 1：二进制层零额外成本
 
 ```
-MAMGA 运行成本估算 (月):
-  - 写入: 500 insights × $0.002/条 (提取+因果) = $1.00
-  - 查询: 1000 次 × $0.001/次 (生成+选择) = $1.00
+MAMGA 额外运行成本估算 (月, 除主 LLM 会话外):
+  - 写入: 500 insights × $0.002/条 (管道内 gpt-4o-mini 提取+因果) = $1.00
+  - 查询: 1000 次 × $0.001/次 (管道内 gpt-4o-mini 生成+选择) = $1.00
   - Embedding: $0.50 (text-embedding-3-small)
-  - 合计: ~$2.50/月
+  - 合计: ~$2.50/月 (额外 API 成本)
 
-memcp 运行成本估算 (月):
-  - 可选 LLM: ~$0.30 (Haiku 子代理)
+memcp 额外运行成本估算 (月):
+  - 可选 LLM: ~$0.30 (Haiku 子代理, 额外 API 调用)
   - Embedding: $0 (本地 Model2Vec)
-  - 合计: ~$0.30/月
+  - 合计: ~$0.30/月 (额外 API 成本)
 
-Mnemon 运行成本:
-  - $0/月 (所有计算本地完成)
+Mnemon 额外运行成本:
+  - $0/月 (二进制层所有计算本地完成)
+  - LLM 能力由引擎层 (Claude 会话) 提供, 已含在主 LLM 的使用成本中
+  - 没有额外的 API 调用开销
 ```
 
-看似微不足道的成本差异，在规模化时意义重大：
-- 10 个代理 × 12 个月 × MAMGA: $300
-- 10 个代理 × 12 个月 × Mnemon: $0
+关键区别：MAMGA/memcp 在主 LLM 会话之外还需要额外的 API 调用（管道内/子代理的 LLM 调用）。Mnemon 的 LLM 能力完全由引擎层的主 LLM 会话承担，不产生额外 API 成本。
 
 ### 优势 2：部署简洁性
 
@@ -148,15 +149,17 @@ memcp 部署:
 Mnemon 部署:
   - 下载单二进制 (或 go install)
   - 可选: brew install ollama && ollama pull nomic-embed-text
-  - 适合: 任何环境, 任何 LLM
+  - 引擎层: 任何支持 CLI 调用的 LLM (Claude Code, GPT, Gemini, 本地模型)
+  - 适合: 任何环境, 任何 LLM 引擎
 ```
 
-### 优势 3：LLM 无关性
+### 优势 3：引擎可替换性
 
-Mnemon 不绑定任何 LLM 提供商：
-- 当前用 Claude → 可以切换到 GPT / Gemini / 本地模型
-- skill 提示是纯文本，可适配任何系统提示格式
-- CLI 输出是标准 JSON，任何程序都可以解析
+Mnemon 的引擎层不绑定任何特定 LLM 提供商：
+- 当前引擎用 Claude（Opus/Sonnet 级别）→ 可以切换到 GPT / Gemini / 本地模型
+- skill 提示是纯文本，可适配任何 LLM 的系统提示格式
+- CLI 输出是标准 JSON，任何 LLM 引擎都可以解析和处理
+- 这与 MAMGA（绑定 OpenAI）和 memcp（绑定 Claude MCP）形成鲜明对比
 
 ### 优势 4：可审计性
 
@@ -192,8 +195,8 @@ Mnemon 是唯一一个将 reranking 信号暴露给调用方的实现：
 
 ### 短期不变（当前设计合理）
 
-1. ✅ CLI-in-the-loop 架构
-2. ✅ 零 API 依赖
+1. ✅ CLI-in-the-loop 引擎架构（LLM 能力在引擎层）
+2. ✅ 二进制层零外部依赖
 3. ✅ SQLite 统一存储
 4. ✅ regex + 字典 + `--entities` 的实体提取
 5. ✅ Signals 元数据输出
@@ -208,7 +211,7 @@ Mnemon 是唯一一个将 reranking 信号暴露给调用方的实现：
 
 ### 长期可考虑
 
-1. **可选 LLM 因果推断**：提供 `--llm-causal` flag，当用户配置了 LLM API 时启用 slow path 因果推断。保持默认行为不变（零依赖），但给高级用户选项。
+1. **可选二进制层 LLM 因果推断**：提供 `--llm-causal` flag，当用户配置了 LLM API 时在二进制层也启用 LLM 因果推断（补充引擎层的评估）。保持默认行为不变（二进制层零外部依赖），但给高级用户选项。
 2. **向量索引**：当容量需求超过 5000 时，引入 Go HNSW 库。
 3. **MCP 适配层**：在 CLI 之上提供可选的 MCP server wrapper，支持 Claude Code 以外的 MCP 客户端。不改变核心架构。
 
@@ -222,15 +225,15 @@ Mnemon 是唯一一个将 reranking 信号暴露给调用方的实现：
 
 ## 5.5 结论
 
-Mnemon 在学术成果转化为工业实现的过程中做出了一系列务实的取舍。核心判断准则是：
+Mnemon 在学术成果转化为工业实现的过程中做出了一系列务实的架构重构。核心设计准则是：
 
-> **保留架构骨架，简化实现路径，用 LLM 外部协作弥补管道内部的能力损失。**
+> **保留架构骨架，将 LLM 能力从管道内部提升到引擎层——CLI 就是 LLM 引擎。**
 
 具体而言：
 
 1. **四图架构的核心价值得到保留**：多视图分离、意图自适应是 MAGMA 最重要的贡献，Mnemon 完整实现
-2. **LLM 密集操作用规则+外部协作替代**：regex 提取 + Claude 补充 ≈ LLM 内部提取，但成本为零
+2. **LLM 能力不是被"去掉"，而是被放到更合适的位置**：二进制层（regex + 图计算）处理高频低成本的自动化操作，引擎层 LLM（Opus/Sonnet）处理高价值判断（实体补充、因果评估、语义链接）。引擎层的 LLM 能力远超 MAGMA 管道内的 gpt-4o-mini
 3. **生命周期管理是纯增量**：论文没有的功能，对生产环境至关重要
-4. **Signals 透明度是独特创新**：让外部 LLM 能做出比管道内部 LLM 更好的判断
+4. **Signals 透明度是独特创新**：让引擎层 LLM 能做出比管道内部 LLM 更好的判断——因为引擎层有完整的对话上下文
 
-最终，Mnemon 证明了一个观点：**在 LLM 能力越来越强的时代，记忆系统不需要自己内嵌 LLM —— 它只需要提供足够好的结构和足够透明的信号，让外部的 LLM 做出最终判断。**
+最终，Mnemon 证明了一个架构观点：**记忆系统不需要将 LLM 嵌入管道内部 —— 将 LLM 提升到引擎层，二进制只需要提供足够好的结构和足够透明的信号。这就像游戏使用 Unity 作为渲染引擎：游戏本身不"缺乏"渲染能力，而是将渲染委托给了更专业的引擎。CLI（Claude Code）就是 Mnemon 的 LLM 引擎。**

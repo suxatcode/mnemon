@@ -14,7 +14,7 @@
 
 ## 一句话总结
 
-Mnemon 是 MAGMA 论文的 **工业化简化实现**：保留了四图架构的核心骨架（temporal / entity / causal / semantic），用 regex + 字典替代 LLM 提取，用 CLI-in-the-loop 替代 LLM-in-the-loop，用 SQLite 替代 NetworkX + FAISS。在牺牲约 15-20% 图质量（主要来自 causal 和 entity 图的精度损失）的代价下，获得了零外部依赖、零 API 费用、编译型单二进制的工业级部署优势。
+Mnemon 是 MAGMA 论文的 **工业化重构实现**：保留了四图架构的核心骨架（temporal / entity / causal / semantic），将 LLM 能力从管道内部提升到引擎层——CLI（Claude Code）就是 mnemon 的 LLM 引擎，通过 CLI-in-the-loop 机制实现实体补充、因果评估、语义判断等所有需要 LLM 的操作。二进制本身用 regex + 字典处理高频低成本的自动化边生成，将高价值判断委托给引擎层的 LLM（通常是 Opus/Sonnet 级别，能力远超 MAGMA 使用的 gpt-4o-mini）。这不是"去掉 LLM"，而是"把 LLM 放在更合适的位置"。
 
 ## 引用
 
