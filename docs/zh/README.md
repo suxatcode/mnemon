@@ -1,31 +1,12 @@
 # Mnemon
 
-**Persistent memory for LLM agents** — single binary, zero API keys, MAGMA four-graph architecture.
+A persistent memory system for LLM agents, built on MAGMA's four-graph architecture.
 
-[![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-[![CI](https://github.com/Grivn/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/Grivn/mnemon/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
----
+## What is Mnemon?
 
 LLM agents forget everything between sessions. Context compaction drops critical decisions, cross-session knowledge vanishes, and long conversations push early information out of the window.
 
 Mnemon gives your LLM persistent, cross-session memory — with a single Go binary and a skill file.
-
-### Why LLM-Supervised?
-
-Most memory systems embed a small LLM inside the pipeline (Mem0, MemGPT). Mnemon takes the opposite approach — **your host LLM is the supervisor, the binary is the organ**:
-
-| | LLM-Embedded (Mem0, etc.) | **LLM-Supervised (Mnemon)** |
-|---|---|---|
-| **LLM quality** | gpt-4o-mini (constrained) | Your host LLM (Opus-class) |
-| **API cost** | Every operation calls an API | Zero — all computation local |
-| **Network** | Required | Not required |
-| **Portability** | Tied to one API/framework | Any LLM CLI (Claude Code, Cursor, ...) |
-
-The binary handles all deterministic work (storage, graph indexing, keyword search, decay formulas). The host LLM handles high-value judgment (causal evaluation, semantic relevance, memory triage). This means stronger reasoning at zero extra cost, and the same binary works across any LLM CLI.
-
-See [Design & Architecture](docs/DESIGN.md) for the full philosophy.
 
 ## Quick Start
 
@@ -173,7 +154,7 @@ When embeddings are available, `recall --smart` automatically uses hybrid vector
       └──────────────────┘                 └──────────────────┘
 ```
 
-Based on [MAGMA](https://arxiv.org/abs/2601.03236) (Multi-Graph Agentic Memory Architecture). See [Design & Architecture](docs/DESIGN.md) for details.
+Based on [MAGMA](https://arxiv.org/abs/2601.03236) (Multi-Graph Agentic Memory Architecture). See [Design & Architecture](DESIGN.md) for details.
 
 ## Configuration
 
@@ -204,9 +185,8 @@ make help           # show all targets
 
 ## Documentation
 
-- [Design & Architecture](docs/DESIGN.md) — core concepts, MAGMA four-graph model, LLM-supervised architecture, algorithms, design decisions
-- [Architecture Diagrams](docs/diagrams/) — system architecture, remember/recall pipelines, four-graph model, lifecycle management (drawio + exported images)
-- [中文文档](docs/zh/) — Chinese version of README and DESIGN
+- [Design & Architecture](DESIGN.md) — core concepts, MAGMA four-graph model, LLM-supervised architecture, algorithms, design decisions
+- [Architecture Diagrams](../diagrams/) — system architecture, remember/recall pipelines, four-graph model, lifecycle management (drawio + exported images)
 
 ## License
 
