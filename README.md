@@ -15,46 +15,44 @@ git clone https://github.com/Grivn/mnemon.git && cd mnemon
 make setup    # build + install binary + install skill
 ```
 
-That's it. Start a new Claude Code session — Claude auto-discovers the skill and begins recalling context and remembering facts across sessions.
+That's it. Start a new Claude Code session — the hook auto-recalls relevant memories, the skill teaches command syntax, and CLAUDE.md guides when to remember.
 
-## How it works: Binary + Skill
+## How it works
 
-Mnemon has two parts:
+Mnemon has three layers:
 
 **The binary** — a Go CLI with SQLite storage. Handles persistence, graph indexing, keyword search, embedding, retention decay. No LLM inside, no API keys, no network calls.
 
-**The [skill](skills/mnemon/SKILL.md)** — a markdown file that teaches the LLM *when* and *how* to call the binary. It's a natural language memory protocol:
+**Three integration layers** teach the LLM to use the binary:
 
-```markdown
-# What the skill tells the LLM:
+| Layer | Role | How |
+|-------|------|-----|
+| **[Hook](scripts/hooks/user_prompt.sh)** | Auto-recall | Runs `mnemon recall` on every user message, injects results into LLM context |
+| **[CLAUDE.md](CLAUDE.md)** | Behavioral guidance | Tells the LLM *when* to use recalled memories and *when* to remember new ones |
+| **[Skill](skills/mnemon/SKILL.md)** | Command reference | Documents command syntax, categories, workflow |
 
-On conversation start → mnemon recall "<topic>" --smart
-When a fact is learned → mnemon diff → mnemon remember
-When insights are related → mnemon link --type causal
-When memory gets stale → mnemon gc
+```
+User message
+    │
+    ▼
+  Hook ─── auto-recall ──→ [Past memory] injected into context
+    │
+    ▼
+  CLAUDE.md ── "use past memory; evaluate remember after responding"
+    │
+    ▼
+  Skill ── "here's how: mnemon diff → mnemon remember --cat ..."
 ```
 
-The skill is not code. It's ~100 lines of instructions that any LLM can follow. `make setup` copies it to `~/.claude/skills/mnemon/` where Claude Code auto-discovers it.
+### Why this design?
 
-### Why a skill, not an SDK or MCP server?
-
-The LLM is already the smartest component in the system. It doesn't need an SDK to call `mnemon remember` — it needs to know *when* to call it and *what* to pass. That's what the skill provides.
-
-| Approach | What it requires | LLM involvement |
-|----------|-----------------|-----------------|
-| **SDK/library** | Language bindings, import, API wrapper | LLM calls wrapper functions |
-| **MCP server** | Protocol implementation, long-running process | LLM calls MCP tools |
-| **Skill + CLI** | A markdown file + a binary in PATH | LLM reads instructions, runs shell commands |
-
-The skill approach means:
-- **Zero protocol overhead** — no MCP handshake, no tool registration, no JSON schema
-- **Portable** — any LLM-CLI that can run shell commands works (Claude Code, Cursor, Windsurf, etc.)
-- **LLM is the intelligent layer** — entity extraction, causal reasoning, deduplication judgment all happen in the LLM, not in embedded small models
-- **Inspectable** — the entire integration is a readable markdown file, not compiled code
+- **Hook handles recall reliably** — no LLM initiative required, memories appear in every conversation
+- **CLAUDE.md has high authority** — project-level instructions the LLM follows more consistently than tool docs
+- **Skill stays focused** — pure command reference, no behavioral logic mixed in
 
 ### Adapting for other LLM-CLIs
 
-The skill at [`skills/mnemon/SKILL.md`](skills/mnemon/SKILL.md) is plain markdown. For non-Claude-Code tools, copy its content into your `.cursorrules`, system prompt, or rules file.
+For non-Claude-Code tools, merge the three layers into your system prompt or rules file: copy the recall logic, behavioral guidance, and command reference into `.cursorrules`, `RULES.md`, or equivalent.
 
 ## Features
 
@@ -171,8 +169,9 @@ Or use the `--data-dir` flag on any command.
 make build          # build binary
 make install        # build + install to $GOBIN
 make test           # run E2E test suite
-make setup          # full setup (binary + skill + hooks)
-make eject          # remove skill + hooks
+make setup          # full setup (binary + skill + hook)
+make eject          # remove skill
+make eject-hooks    # remove hook from Claude Code settings
 make uninstall      # remove everything
 make help           # show all targets
 ```
