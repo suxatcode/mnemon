@@ -249,8 +249,8 @@ mnemon/
 ├── cmd/                       # CLI commands (Cobra)
 │   ├── root.go                # Root command, global flags
 │   ├── remember.go            # Store insight + auto-create edges
-│   ├── recall.go              # Retrieval (basic + --smart graph-enhanced)
-│   ├── diff.go                # Dedup/conflict detection
+│   ├── recall.go              # Retrieval (smart graph-enhanced, default)
+│   ├── diff.go                # Standalone dedup/conflict check
 │   ├── link.go                # Manually create edges
 │   ├── related.go             # BFS traversal from an insight
 │   ├── search.go              # Keyword search
@@ -271,6 +271,7 @@ mnemon/
 │   │   └── semantic.go        # Semantic edges
 │   ├── search/                # Retrieval algorithms
 │   │   ├── recall.go          # Intent-aware multi-signal retrieval
+│   │   ├── diff.go            # Built-in dedup check (also used by standalone diff command)
 │   │   ├── intent.go          # Intent detection
 │   │   └── keyword.go         # Token-level keyword scoring
 │   ├── store/                 # SQLite persistence
@@ -283,6 +284,7 @@ mnemon/
 │       └── vector.go          # Vector serialization, cosine similarity
 ├── scripts/
 │   ├── hooks/user_prompt.sh   # Claude Code auto-recall hook
+│   ├── hooks/stop.sh          # Memory reminder hook (post-response)
 │   └── claude_memory.md       # Memory behavior guidance text
 ├── skills/mnemon/SKILL.md     # Command reference (Skill format)
 ├── main.go                    # Entry point
@@ -401,7 +403,7 @@ When asking "why was SQLite chosen," the causal edge weight is highest, so the s
 
 ## 6. Write Pipeline: Remember
 
-`mnemon remember` is the core command for writing memories. The entire pipeline executes atomically within a single SQLite transaction.
+`mnemon remember` is the core command for writing memories. It includes a built-in diff step that automatically detects duplicates and conflicts before storage. The write transaction executes atomically within a single SQLite transaction.
 
 ![Remember Pipeline](diagrams/02-remember-pipeline.jpg)
 
@@ -422,10 +424,20 @@ mnemon remember "Chose Qdrant as the vector database" \
 - If Ollama is available: HTTP POST -> nomic-embed-text -> 768-dim float64 vector
 - If unavailable: embedding = nil, falls back to token overlap downstream
 
+**Step 2.5: Built-in Diff (outside transaction, read-only)**
+
+Compute similarity against all active insights:
+- **DUPLICATE** (sim > 0.90) → skip insert entirely, return `action="skipped"`
+- **CONFLICT/UPDATE** (sim 0.50–0.90) → soft-delete old insight, insert new as replacement
+- **ADD** (sim < 0.50) → normal insert
+
+This step uses embedding cosine similarity when available, falling back to token overlap. The `--no-diff` flag disables this check.
+
 **Step 3: Atomic Transaction**
 
 ```
 BEGIN TRANSACTION
+  ⓪ Soft-delete replaced insight (if diff found CONFLICT/UPDATE)
   ① INSERT insight (UUID, content, category, importance, tags, entities, source)
   ② UPDATE embedding (if vector is available)
   ③ Graph Engine: OnInsightCreated
@@ -447,6 +459,9 @@ COMMIT
 ```json
 {
   "id": "abc-123",
+  "action": "added",
+  "diff_suggestion": "ADD",
+  "replaced_id": null,
   "edges_created": {"temporal": 2, "entity": 3, "causal": 1, "semantic": 1},
   "semantic_candidates": [
     {"id": "def-456", "content": "...", "cosine": 0.72, "auto_linked": false}
@@ -460,13 +475,15 @@ COMMIT
 }
 ```
 
+The `action` field indicates what the built-in diff decided: `"added"` (new entry), `"replaced"` (conflict auto-replaced, `replaced_id` contains the old insight ID), or `"skipped"` (duplicate detected, no insert).
+
 After receiving this output, the LLM can evaluate candidates and establish edges it considers appropriate via the `mnemon link` command.
 
 ---
 
-## 7. Read Pipeline: Smart Recall
+## 7. Read Pipeline: Smart Recall (Default)
 
-`mnemon recall --smart` is Mnemon's core retrieval algorithm. It combines intent detection, multi-signal anchor selection, Beam Search graph traversal, and multi-factor re-ranking to achieve intent-aware graph-enhanced retrieval.
+`mnemon recall` is Mnemon's core retrieval algorithm. Smart recall is the default mode for all queries. It combines intent detection, multi-signal anchor selection, Beam Search graph traversal, and multi-factor re-ranking to achieve intent-aware graph-enhanced retrieval. Use `--basic` for legacy SQL LIKE fallback.
 
 ![Smart Recall Pipeline](diagrams/03-smart-recall-pipeline.jpg)
 
@@ -586,40 +603,51 @@ This is a unique innovation in Mnemon: **exposing the retrieval pipeline's inter
 
 ![Diff & Dedup Pipeline](diagrams/07-diff-dedup-pipeline.jpg)
 
-`mnemon diff` detects duplicates and conflicts before storage, preventing knowledge base bloat.
+Diff is now **built into `remember`** — no separate call needed. When `mnemon remember` is invoked, it automatically runs a diff check before inserting. The standalone `mnemon diff` command still exists for pre-checking without writing.
 
-### 8.1 Flow
+### 8.1 Built-in Diff (inside remember)
+
+When `remember` is called, the built-in diff runs before the transaction:
+
+1. Compute similarity against all active insights (embedding cosine when available, token overlap as fallback)
+2. Determine the action based on similarity thresholds:
+
+| Similarity | Action | Behavior |
+|------------|--------|----------|
+| > 0.90 | **DUPLICATE** | Skip insert entirely, return `action="skipped"` |
+| 0.50 ~ 0.90 | **CONFLICT/UPDATE** | Soft-delete old insight, insert new as replacement |
+| < 0.50 | **ADD** | Normal insert |
+
+The `--no-diff` flag disables this check for cases where the caller wants unconditional insertion.
+
+### 8.2 Standalone Diff Command
+
+The standalone command is useful for pre-checking without actually writing:
 
 ```
 mnemon diff "New fact content"
 ```
 
 1. Run KeywordSearch across all insights, take top-5
-2. Compute ContentSimilarity (token overlap rate) for each match
-3. Determine the suggested action based on similarity and negation patterns:
+2. Compute ContentSimilarity (token overlap rate or embedding cosine) for each match
+3. Detect negation patterns: `not`, `no longer`, `don't`, `never`, `switched from`, `replaced`, `不`, `没有`, `放弃`, `改为`
+4. Return suggested action (ADD, UPDATE, CONFLICT, or DUPLICATE)
 
-| Similarity | Negation Pattern | Suggestion |
-|------------|-----------------|------------|
-| < 0.50 | — | **ADD** (new entry) |
-| >= 0.50 with negation detected | Yes | **CONFLICT** |
-| > 0.90 | No | **DUPLICATE** |
-| 0.50 ~ 0.90 | No | **UPDATE** |
+### 8.3 Typical Workflow
 
-**Negation pattern detection**: `not`, `no longer`, `don't`, `never`, `switched from`, `replaced`, `不`, `没有`, `放弃`, `改为`
-
-### 8.2 Typical Workflow
-
-The LLM calls diff before remember:
+With the built-in diff, a single `remember` call handles everything:
 
 ```bash
-# Step 1: Check for duplicates
-mnemon diff "Chose PostgreSQL as the primary database"
-# → Returns: CONFLICT with "Chose SQLite as storage" (sim=0.65, negation detected)
-
-# Step 2: LLM decides to update rather than add
-mnemon forget <old_id>
-mnemon remember "Chose PostgreSQL to replace SQLite as the primary database" --cat decision --imp 5
+# Single command — diff is automatic
+mnemon remember "Chose PostgreSQL to replace SQLite as the primary database" \
+  --cat decision --imp 5 --source agent
+# → If conflict with existing "Chose SQLite as storage":
+#   auto-replaces old insight, returns action="replaced", replaced_id="<old_id>"
+# → If duplicate: returns action="skipped"
+# → If new: returns action="added"
 ```
+
+The previous workflow of calling `diff` then `remember` separately is no longer required but still supported via the standalone `mnemon diff` command.
 
 ---
 
@@ -705,9 +733,9 @@ Vectors are serialized as little-endian float64 BLOBs stored in the `insights.em
 | Scenario | Without Embedding | With Embedding |
 |----------|------------------|----------------|
 | remember -> semantic edges | Token overlap > 0.10 | cos >= 0.80 auto-link |
-| recall --smart -> anchors | Keyword + recency | Keyword + vector + recency |
-| recall --smart -> traversal | Pure structural score | Structural + semantic similarity |
-| recall --smart -> re-ranking | KW + Entity + Graph | KW + Entity + Similarity + Graph |
+| recall -> anchors | Keyword + recency | Keyword + vector + recency |
+| recall -> traversal | Pure structural score | Structural + semantic similarity |
+| recall -> re-ranking | KW + Entity + Graph | KW + Entity + Similarity + Graph |
 
 ### 10.4 Management Commands
 
@@ -732,27 +760,34 @@ Mnemon integrates with LLM CLIs (such as Claude Code) through a three-layer mech
 User message
     │
     ▼
-  Hook ─── auto-recall ──→ [Past memory] injected into LLM context
+  Hook (recall) ─── auto-recall ──→ [Past memory] injected into LLM context
     │
     ▼
   CLAUDE.md ── "Use past memories; evaluate whether to remember"
     │
     ▼
-  Skill ── "Command syntax: mnemon diff → mnemon remember --cat ..."
+  Skill ── "Command syntax: mnemon remember --cat ... (diff built-in)"
+    │
+    ▼
+  LLM generates response
+    │
+    ▼
+  Hook (stop) ─── memory reminder ──→ "Consider remembering if valuable"
 ```
 
-**Layer 1: Hook (Auto-Recall)**
+**Layer 1: Hooks (Auto-Recall + Memory Reminder)**
 
-Installed at `~/.claude/hooks/`, automatically executed each time the user sends a message:
+Two hooks installed at `~/.claude/hooks/`:
 
 ```bash
-# scripts/hooks/user_prompt.sh
-mnemon recall "$USER_MESSAGE" --smart --limit 5
+# scripts/hooks/user_prompt.sh — runs on every user message
+mnemon recall "$USER_MESSAGE" --limit 5
+
+# scripts/hooks/stop.sh — runs after each LLM response
+# Reminds the LLM to consider remembering valuable information
 ```
 
-Results are injected into the LLM context with a `[Past memory]` marker. This ensures:
-- Relevant memories are available for every conversation without the LLM having to initiate retrieval
-- Zero perceived latency — memories are ready before the LLM begins reasoning
+The recall hook injects results into the LLM context with a `[Past memory]` marker. The stop hook serves as a post-response nudge to evaluate whether new information is worth remembering.
 
 **Layer 2: CLAUDE.md (Behavior Guidance)**
 
@@ -761,12 +796,45 @@ Project-level instructions that tell the LLM when to use memories and when to cr
 - **Recall**: Reference relevant memories when `[Past memory]` is present
 - **Remember**: After each response, ask yourself "if I forget this, will the user need to repeat it?"
 - **Three types worth remembering**: User directives, reasoning conclusions, observed state
+- **Sub-agent delegation**: The main agent (Opus) decides WHAT to remember, then delegates to a Task sub-agent (Sonnet) which reads SKILL.md and executes the correct commands
 
 **Layer 3: Skill (Command Reference)**
 
-A pure command syntax document that teaches the LLM how to use mnemon commands. Separated from behavior guidance to maintain clear separation of concerns.
+A pure command syntax document that teaches the LLM how to use mnemon commands. Separated from behavior guidance to maintain clear separation of concerns. The skill includes judgment-based link evaluation — the sub-agent evaluates candidates with judgment, not mechanical rules.
 
-### 11.2 Adapting to Other LLM CLIs
+### 11.2 Sub-Agent Delegation
+
+Memory writes don't happen in the main conversation. Instead, the host LLM delegates to a lightweight sub-agent:
+
+```
+Main Agent (Opus)                     Sub-Agent (Sonnet)
+┌──────────────────────┐              ┌──────────────────────┐
+│ Full conversation     │  delegates   │ ~1000 tokens context │
+│ context (~25k tokens) │ ──────────→ │ Reads SKILL.md       │
+│                       │              │ Executes commands    │
+│ Decides WHAT to       │  result      │ Evaluates candidates │
+│ remember              │ ←────────── │ with judgment        │
+└──────────────────────┘              └──────────────────────┘
+```
+
+**Why sub-agent?**
+
+| Dimension | Main conversation | Sub-agent |
+|-----------|-------------------|-----------|
+| Context size | ~25,000 tokens | ~1,000 tokens |
+| Model | Opus (expensive) | Sonnet (cheaper) |
+| Scope | Full conversation | Memory task only |
+| Execution | Synchronous, blocks user | Background, non-blocking |
+
+The main agent provides only WHAT to store — content, category, importance, entities. The sub-agent reads SKILL.md, executes the correct `mnemon remember` command, and evaluates `remember`'s link candidates with judgment — not mechanical rules.
+
+This separation means:
+
+- **Token economy**: ~7,000 total tokens per memory write vs ~25,000 if done in main conversation
+- **Context isolation**: Memory processing doesn't pollute the main conversation context
+- **Model efficiency**: Sonnet handles routine execution while Opus focuses on high-level decisions
+
+### 11.3 Adapting to Other LLM CLIs
 
 For non-Claude Code tools, merge the three layers into the corresponding system prompt file:
 

@@ -50,7 +50,8 @@ Mnemon 分三层：
 
 | 层 | 职责 | 方式 |
 |---|---|---|
-| **[Hook](../../scripts/hooks/user_prompt.sh)** | 自动召回 | 每条用户消息运行 `mnemon recall`，将结果注入 LLM 上下文 |
+| **[Hook (recall)](../../scripts/hooks/user_prompt.sh)** | 自动召回 | 每条用户消息运行 `mnemon recall`，将结果注入 LLM 上下文 |
+| **[Hook (stop)](../../scripts/hooks/stop.sh)** | 记忆提醒 | 每次回复后，提醒 LLM 考虑是否需要记忆 |
 | **[CLAUDE.md](../../CLAUDE.md)** | 行为引导 | 告诉 LLM *何时*使用记忆、*何时*存储新记忆 |
 | **[Skill](../../skills/mnemon/SKILL.md)** | 命令参考 | 记录命令语法、分类、工作流 |
 
@@ -64,7 +65,10 @@ Mnemon 分三层：
   CLAUDE.md ── "使用过往记忆；回复后评估是否记忆"
     │
     ▼
-  Skill ── "方法：mnemon diff → mnemon remember --cat ..."
+  Skill ── "方法：mnemon remember --cat ...（diff 内置）"
+    │
+    ▼
+  Sub-agent ── 主 LLM 委派；sub-agent 读取 Skill 并执行命令
 ```
 
 ### 为什么这样设计？
@@ -72,6 +76,7 @@ Mnemon 分三层：
 - **Hook 可靠处理召回** — 无需 LLM 主动发起，记忆自动出现在每次对话中
 - **CLAUDE.md 权限最高** — 项目级指令，LLM 遵循度高于工具文档
 - **Skill 保持专注** — 纯命令参考，不混入行为逻辑
+- **Sub-agent 隔离开销** — 记忆写入在轻量 sub-agent（~1000 tokens）中执行，而非主对话（~25000 tokens）
 
 ### 适配其他 LLM CLI
 
@@ -82,8 +87,8 @@ Mnemon 分三层：
 - **LLM 监督式** — 宿主 LLM 主动决定记什么、更新什么、关联什么、遗忘什么；无内嵌 LLM，无额外 API 调用
 - **技能集成** — 一个技能文件教会任何 LLM CLI 完整的命令协议；适用于 Claude Code、Cursor 或任何读取 markdown 的工具
 - **四图架构** — 时序、实体、因果、语义四种边，不仅仅是向量相似度
-- **意图感知召回** — `--smart` 模式使用图遍历 + 可选向量搜索（RRF 融合）
-- **去重检测** — `diff` 在存储前比对新内容与已有洞察
+- **意图感知召回** — 图遍历 + 可选向量搜索（RRF 融合），所有查询默认启用
+- **内置去重** — `remember` 自动检测重复和冲突；跳过或自动替换
 - **保留度生命周期** — 重要性衰减、访问计数提升、免疫规则、垃圾回收
 - **可选嵌入向量** — 本地 Ollama 集成，支持混合向量+关键词搜索
 
@@ -92,17 +97,17 @@ Mnemon 分三层：
 ### 核心命令
 
 ```bash
-# Remember — 存储新洞察
+# Remember — 存储新洞察（内置 diff：重复跳过，冲突自动替换）
 mnemon remember "选择 Qdrant 而非 Milvus 做向量搜索" \
-  --cat decision --imp 5 --entities "Qdrant,Milvus"
+  --cat decision --imp 5 --entities "Qdrant,Milvus" --source agent
 
-# Recall — 检索洞察（--smart 启用图增强检索）
-mnemon recall "vector database" --smart --limit 10
+# Recall — 意图感知的图增强检索（默认）
+mnemon recall "vector database" --limit 10
 
 # Search — 基于 token 评分的关键词搜索
 mnemon search "authentication" --limit 10
 
-# Diff — 记忆前检查重复/冲突
+# Diff — 独立的重复/冲突检查（可选；remember 已内置此功能）
 mnemon diff "待检查的新事实"
 
 # Forget — 软删除洞察
@@ -150,7 +155,7 @@ mnemon embed --all       # 批量生成所有洞察的嵌入
 mnemon embed <id>        # 为单个洞察生成嵌入
 ```
 
-嵌入向量可用时，`recall --smart` 自动使用混合向量+关键词搜索（RRF 融合）。
+嵌入向量可用时，`recall` 自动使用混合向量+关键词搜索（RRF 融合）。
 
 ## 架构
 
@@ -158,7 +163,7 @@ mnemon embed <id>        # 为单个洞察生成嵌入
 ┌──────────────────┐     CLI commands      ┌──────────────────┐
 │   LLM Agent      │ ───────────────────── │     Mnemon       │
 │ (Claude Code,    │  remember, recall,    │                  │
-│  Cursor, etc.)   │  diff, link, forget   │  SQLite (WAL)    │
+│  Cursor, etc.)   │  link, forget, gc     │  SQLite (WAL)    │
 └──────────────────┘                       │  ┌────────────┐  │
                                            │  │ Insights   │  │
         The LLM decides WHAT               │  ├────────────┤  │

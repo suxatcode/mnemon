@@ -50,7 +50,8 @@ Mnemon has three layers:
 
 | Layer | Role | How |
 |-------|------|-----|
-| **[Hook](scripts/hooks/user_prompt.sh)** | Auto-recall | Runs `mnemon recall` on every user message, injects results into LLM context |
+| **[Hook (recall)](scripts/hooks/user_prompt.sh)** | Auto-recall | Runs `mnemon recall` on every user message, injects results into LLM context |
+| **[Hook (stop)](scripts/hooks/stop.sh)** | Memory reminder | After each response, reminds the LLM to consider remembering |
 | **[CLAUDE.md](CLAUDE.md)** | Behavioral guidance | Tells the LLM *when* to use recalled memories and *when* to remember new ones |
 | **[Skill](skills/mnemon/SKILL.md)** | Command reference | Documents command syntax, categories, workflow |
 
@@ -64,7 +65,10 @@ User message
   CLAUDE.md ── "use past memory; evaluate remember after responding"
     │
     ▼
-  Skill ── "here's how: mnemon diff → mnemon remember --cat ..."
+  Skill ── "here's how: mnemon remember --cat ... (diff built-in)"
+    │
+    ▼
+  Sub-agent ── main LLM delegates; sub-agent reads Skill, executes commands
 ```
 
 ### Why this design?
@@ -72,6 +76,7 @@ User message
 - **Hook handles recall reliably** — no LLM initiative required, memories appear in every conversation
 - **CLAUDE.md has high authority** — project-level instructions the LLM follows more consistently than tool docs
 - **Skill stays focused** — pure command reference, no behavioral logic mixed in
+- **Sub-agent isolates cost** — memory writes run in a lightweight sub-agent (~1000 tokens), not the main conversation (~25000 tokens)
 
 ### Adapting for other LLM-CLIs
 
@@ -82,8 +87,8 @@ For non-Claude-Code tools, merge the three layers into your system prompt or rul
 - **LLM-supervised** — the host LLM actively decides what to remember, update, link, and forget; no embedded LLM, no extra API calls
 - **Skill-integrated** — a single skill file teaches any LLM CLI the full command protocol; works with Claude Code, Cursor, or anything that reads markdown
 - **Four-graph architecture** — temporal, entity, causal, and semantic edges, not just vector similarity
-- **Intent-aware recall** — `--smart` mode uses graph traversal + optional vector search (RRF fusion)
-- **Duplicate detection** — `diff` compares new content against existing insights before storing
+- **Intent-aware recall** — graph traversal + optional vector search (RRF fusion), default for all queries
+- **Built-in deduplication** — `remember` automatically detects duplicates and conflicts; skips or auto-replaces
 - **Retention lifecycle** — importance decay, access-count boosting, immunity rules, and garbage collection
 - **Optional embeddings** — local Ollama integration for hybrid vector+keyword search
 
@@ -92,17 +97,17 @@ For non-Claude-Code tools, merge the three layers into your system prompt or rul
 ### Core commands
 
 ```bash
-# Remember — store a new insight
+# Remember — store a new insight (built-in diff: duplicates skipped, conflicts auto-replaced)
 mnemon remember "Chose Qdrant over Milvus for vector search" \
-  --cat decision --imp 5 --entities "Qdrant,Milvus"
+  --cat decision --imp 5 --entities "Qdrant,Milvus" --source agent
 
-# Recall — retrieve insights (--smart for graph-enhanced retrieval)
-mnemon recall "vector database" --smart --limit 10
+# Recall — intent-aware graph-enhanced retrieval (default)
+mnemon recall "vector database" --limit 10
 
 # Search — token-scored keyword search
 mnemon search "authentication" --limit 10
 
-# Diff — check for duplicates/conflicts before remembering
+# Diff — standalone duplicate/conflict check (optional; remember has this built-in)
 mnemon diff "New fact to check"
 
 # Forget — soft-delete an insight
@@ -150,7 +155,7 @@ mnemon embed --all       # backfill all insights
 mnemon embed <id>        # embed a specific insight
 ```
 
-When embeddings are available, `recall --smart` automatically uses hybrid vector+keyword search with RRF fusion.
+When embeddings are available, `recall` automatically uses hybrid vector+keyword search with RRF fusion.
 
 ## Architecture
 
@@ -158,7 +163,7 @@ When embeddings are available, `recall --smart` automatically uses hybrid vector
 ┌──────────────────┐     CLI commands      ┌──────────────────┐
 │   LLM Agent      │ ───────────────────── │     Mnemon       │
 │ (Claude Code,    │  remember, recall,    │                  │
-│  Cursor, etc.)   │  diff, link, forget   │  SQLite (WAL)    │
+│  Cursor, etc.)   │  link, forget, gc     │  SQLite (WAL)    │
 └──────────────────┘                       │  ┌────────────┐  │
                                            │  │ Insights   │  │
         The LLM decides WHAT               │  ├────────────┤  │
