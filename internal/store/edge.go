@@ -77,6 +77,17 @@ func (db *DB) FindInsightsWithEntity(entity string, excludeID string, limit int)
 	return ids, nil
 }
 
+// GetAllEdges returns all edges in the graph.
+func (db *DB) GetAllEdges() ([]*model.Edge, error) {
+	rows, err := db.execer().Query(
+		`SELECT source_id, target_id, edge_type, weight, metadata, created_at FROM edges`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanEdges(rows)
+}
+
 // DeleteEdgesByNode removes all edges referencing a node.
 func (db *DB) DeleteEdgesByNode(nodeID string) error {
 	_, err := db.execer().Exec(

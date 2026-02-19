@@ -91,6 +91,7 @@ For non-Claude-Code tools, merge the three layers into your system prompt or rul
 - **Built-in deduplication** — `remember` automatically detects duplicates and conflicts; skips or auto-replaces
 - **Retention lifecycle** — importance decay, access-count boosting, immunity rules, and garbage collection
 - **Optional embeddings** — local Ollama integration for hybrid vector+keyword search
+- **Graph visualization** — export as Graphviz DOT or interactive vis.js HTML
 
 ## Usage
 
@@ -142,6 +143,22 @@ mnemon gc --keep <id>
 mnemon status    # memory statistics
 mnemon log       # recent operations
 ```
+
+### Visualization
+
+Export the knowledge graph for visual exploration:
+
+```bash
+# DOT format — render with Graphviz (brew install graphviz)
+mnemon viz --format dot -o graph.dot
+dot -Tpng graph.dot -o graph.png
+
+# Interactive HTML — open directly in browser (vis.js, no install needed)
+mnemon viz --format html -o graph.html
+open graph.html
+```
+
+Nodes are color-coded by category (decision, fact, insight, preference, context). Edges are color-coded by type (temporal, semantic, causal, entity).
 
 ### Embeddings (optional)
 

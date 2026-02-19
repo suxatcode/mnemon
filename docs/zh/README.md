@@ -91,6 +91,7 @@ Mnemon 分三层：
 - **内置去重** — `remember` 自动检测重复和冲突；跳过或自动替换
 - **保留度生命周期** — 重要性衰减、访问计数提升、免疫规则、垃圾回收
 - **可选嵌入向量** — 本地 Ollama 集成，支持混合向量+关键词搜索
+- **图谱可视化** — 导出为 Graphviz DOT 或交互式 vis.js HTML
 
 ## 用法
 
@@ -142,6 +143,22 @@ mnemon gc --keep <id>
 mnemon status    # 记忆统计
 mnemon log       # 操作日志
 ```
+
+### 可视化
+
+导出知识图谱进行可视化探索：
+
+```bash
+# DOT 格式 — 使用 Graphviz 渲染（brew install graphviz）
+mnemon viz --format dot -o graph.dot
+dot -Tpng graph.dot -o graph.png
+
+# 交互式 HTML — 直接在浏览器中打开（vis.js，无需安装）
+mnemon viz --format html -o graph.html
+open graph.html
+```
+
+节点按分类着色（decision、fact、insight、preference、context），边按类型着色（temporal、semantic、causal、entity）。
 
 ### 嵌入向量（可选）
 
