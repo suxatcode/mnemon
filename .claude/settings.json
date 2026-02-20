@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": ".claude/hooks/mnemon/stop.sh",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": ".claude/hooks/mnemon/user_prompt.sh",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

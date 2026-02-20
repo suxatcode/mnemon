@@ -1,0 +1,7 @@
+{
+  "name": "mnemon",
+  "version": "0.1.0",
+  "description": "Persistent memory for LLM agents",
+  "events": ["message_received", "agent_end", "session_start"],
+  "entry": "index.ts"
+}

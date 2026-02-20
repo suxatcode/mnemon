@@ -17,7 +17,7 @@ CLAUDE_SETTINGS := $(HOME)/.claude/settings.json
 CLAUDE_MEMORY   := scripts/claude_memory.md
 CLAUDE_MD       := CLAUDE.md
 
-.PHONY: build install uninstall inject eject inject-hooks eject-hooks claude-inject claude-eject setup test clean help
+.PHONY: build install uninstall inject eject inject-hooks eject-hooks claude-inject claude-eject setup sync-assets check-assets test clean help
 
 .DEFAULT_GOAL := help
 
@@ -108,14 +108,29 @@ claude-eject: ## Remove memory guidance from ./CLAUDE.md
 
 # ── Setup (one-command) ─────────────────────────────────────────────
 
-setup: install inject inject-hooks ## Full setup: binary + skill + hooks
+setup: install inject inject-hooks ## Full setup: binary + skill + hooks (deprecated: use 'mnemon setup')
 	@echo ""
 	@echo "Setup complete:"
 	@echo "  Binary → $(GOBIN)/$(BINARY)"
 	@echo "  Skill  → $(SKILL_DST)/SKILL.md"
 	@echo "  Hooks  → $(HOOKS_DST)/"
 	@echo ""
+	@echo "NOTE: 'make setup' is deprecated. Use 'mnemon setup' instead."
 	@echo "Start a new Claude Code session to verify."
+
+# ── Asset Sync ──────────────────────────────────────────────────────
+
+ASSETS_DIR := internal/setup/assets/claude
+
+sync-assets: ## Sync source-of-truth files into embedded assets
+	@cp scripts/hooks/user_prompt.sh $(ASSETS_DIR)/user_prompt.sh
+	@cp scripts/hooks/stop.sh $(ASSETS_DIR)/stop.sh
+	@cp skills/mnemon/SKILL.md $(ASSETS_DIR)/SKILL.md
+	@cp scripts/claude_memory.md $(ASSETS_DIR)/claude_memory.md
+	@echo "Assets synced to $(ASSETS_DIR)/"
+
+check-assets: sync-assets ## Verify embedded assets match source (CI)
+	@git diff --exit-code $(ASSETS_DIR)/ || (echo "ERROR: Embedded assets out of sync. Run 'make sync-assets'." && exit 1)
 
 # ── Test ─────────────────────────────────────────────────────────────
 

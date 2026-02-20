@@ -35,14 +35,22 @@ See [Design & Architecture](docs/DESIGN.md) for the full philosophy.
 ## Quick Start
 
 ```bash
-git clone https://github.com/mnemon-dev/mnemon.git && cd mnemon
-make setup          # build + install binary + skill + hook
-make claude-inject  # inject memory guidance into ./CLAUDE.md
+go install github.com/mnemon-dev/mnemon@latest
+mnemon setup        # detect environments, deploy skill + hooks
 ```
 
-That's it. Start a new Claude Code session — the hook auto-recalls relevant memories, the skill teaches command syntax, and CLAUDE.md guides when to remember.
+Or from source:
 
-To remove the memory guidance from CLAUDE.md: `make claude-eject`.
+```bash
+git clone https://github.com/mnemon-dev/mnemon.git && cd mnemon
+make install && mnemon setup
+```
+
+That's it. `mnemon setup` auto-detects Claude Code (and OpenClaw), deploys hooks and skills, and optionally injects memory guidance into your project's CLAUDE.md.
+
+Start a new LLM CLI session — the hook auto-recalls relevant memories, the skill teaches command syntax, and CLAUDE.md guides when to remember.
+
+To remove all integrations: `mnemon setup --eject`.
 
 ## How it works
 
@@ -218,10 +226,9 @@ Or use the `--data-dir` flag on any command.
 make build          # build binary
 make install        # build + install to $GOBIN
 make test           # run E2E test suite
-make setup          # full setup (binary + skill + hook)
-make eject          # remove skill
-make eject-hooks    # remove hook from Claude Code settings
-make uninstall      # remove everything
+mnemon setup        # interactive setup (replaces 'make setup')
+mnemon setup --eject  # remove all integrations
+make sync-assets    # sync source files into embedded assets
 make help           # show all targets
 ```
 
