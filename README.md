@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo/logo.svg" width="160" height="160" alt="Mnemon Logo" />
+</p>
+
 # Mnemon
 
 **Persistent memory for LLM agents** — LLM-supervised, skill-integrated, four-graph architecture.
