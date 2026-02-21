@@ -16,6 +16,8 @@ Mnemon 是一个为 LLM 智能体设计的持久化记忆系统。它基于 [MAG
 - [2. 设计哲学](#2-设计哲学)
 - [3. 核心概念](#3-核心概念)
 - [4. 系统架构](#4-系统架构)
+  - [4.1 数据目录布局](#41-数据目录布局)
+  - [4.2 记忆体隔离](#42-记忆体隔离)
 - [5. MAGMA 四图模型](#5-magma-四图模型)
 - [6. 写入管线：Remember](#6-写入管线remember)
 - [7. 读取管线：Smart Recall](#7-读取管线smart-recall)
@@ -306,6 +308,52 @@ mnemon/
 ├── CLAUDE.md                  # 项目级开发指南
 └── Makefile                   # 构建、安装、测试
 ```
+
+### 4.1 数据目录布局
+
+```
+~/.mnemon/
+├── active                        # 当前默认记忆体名（纯文本）
+├── prompt/                       # 所有记忆体共享
+│   ├── guide.md                  # 行为引导（recall/remember 规则）
+│   └── skill.md                  # 技能定义（命令参考）
+└── data/                         # 每个记忆体拥有独立目录
+    ├── default/
+    │   └── mnemon.db             # SQLite 数据库（WAL 模式）
+    ├── work/
+    │   └── mnemon.db
+    └── <name>/
+        └── mnemon.db
+```
+
+**隔离边界**：每个记忆体包含独立的 `mnemon.db` — 洞察、边、操作日志完全隔离。Prompt 文件（`guide.md`、`skill.md`）共享 — 行为规则是通用的，记忆数据是私有的。
+
+### 4.2 记忆体隔离
+
+Mnemon 支持命名记忆体（store），为不同 agent、项目或场景提供轻量数据隔离。
+
+**为什么用命名记忆体而非只靠 `--data-dir`？**
+
+`--data-dir` 覆盖整个基础目录 — 需要调用者管理完整路径，语义不清晰。命名记忆体提供语义明确的标识（`MNEMON_STORE=work` 对比 `--data-dir ~/.mnemon-work`），并且天然适配环境变量 — 这是并发进程间隔离的标准机制。
+
+**解析优先级**（从高到低）：
+
+```
+--store 标志  >  MNEMON_STORE 环境变量  >  ~/.mnemon/active 文件  >  "default"
+```
+
+分层设计服务于不同场景：
+
+| 机制 | 场景 |
+|------|------|
+| `--store` 标志 | 一次性 CLI 覆盖、脚本 |
+| `MNEMON_STORE` 环境变量 | 按进程隔离 — 不同 agent 使用不同记忆体 |
+| `active` 文件 | 持久化用户偏好 — `mnemon store set work` |
+| `"default"` | 零配置 — 开箱即用 |
+
+**自动迁移**：当 `data/` 目录不存在但旧版 `~/.mnemon/mnemon.db` 存在时，mnemon 自动将其移动到 `data/default/mnemon.db`。老用户升级无感知。
+
+**设计原则 — 轻量且有界**：记忆体隔离解决的是必要的数据分离需求，不会膨胀为多租户系统。没有访问控制、没有跨 store 查询、除名称外没有 store 元数据。保持功能有界 — Mnemon 是记忆守护进程，不是知识库平台。
 
 ---
 

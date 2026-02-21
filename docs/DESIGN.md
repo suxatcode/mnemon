@@ -16,6 +16,8 @@ This document describes Mnemon's design philosophy, core concepts, system archit
 - [2. Design Philosophy](#2-design-philosophy)
 - [3. Core Concepts](#3-core-concepts)
 - [4. System Architecture](#4-system-architecture)
+  - [4.1 Data Directory Layout](#41-data-directory-layout)
+  - [4.2 Store Isolation](#42-store-isolation)
 - [5. MAGMA Four-Graph Model](#5-magma-four-graph-model)
 - [6. Write Pipeline: Remember](#6-write-pipeline-remember)
 - [7. Read Pipeline: Smart Recall](#7-read-pipeline-smart-recall)
@@ -306,6 +308,52 @@ mnemon/
 ├── CLAUDE.md                  # Project-level development guidelines
 └── Makefile                   # Build, install, test
 ```
+
+### 4.1 Data Directory Layout
+
+```
+~/.mnemon/
+├── active                        # Current default store name (plain text)
+├── prompt/                       # Shared across all stores
+│   ├── guide.md                  # Behavioral guide (recall/remember rules)
+│   └── skill.md                  # Skill definition (command reference)
+└── data/                         # Each store has its own isolated directory
+    ├── default/
+    │   └── mnemon.db             # SQLite database (WAL mode)
+    ├── work/
+    │   └── mnemon.db
+    └── <name>/
+        └── mnemon.db
+```
+
+**Isolation boundary**: Each store contains an independent `mnemon.db` — insights, edges, and oplog are fully isolated. Prompt files (`guide.md`, `skill.md`) are shared — behavioral rules are universal, memory data is private.
+
+### 4.2 Store Isolation
+
+Mnemon supports named stores for lightweight data isolation between different agents, projects, or scenarios.
+
+**Why named stores instead of just `--data-dir`?**
+
+`--data-dir` overrides the entire base directory — a blunt instrument that requires the caller to manage full paths. Named stores provide semantic clarity (`MNEMON_STORE=work` vs `--data-dir ~/.mnemon-work`) and work naturally with environment variables, which are the standard isolation mechanism for concurrent processes.
+
+**Resolution priority** (highest to lowest):
+
+```
+--store flag  >  MNEMON_STORE env  >  ~/.mnemon/active file  >  "default"
+```
+
+This layered design serves different scenarios:
+
+| Mechanism | Scenario |
+|-----------|----------|
+| `--store` flag | One-off CLI override, scripting |
+| `MNEMON_STORE` env | Per-process isolation — different agents use different stores |
+| `active` file | Persistent user preference — `mnemon store set work` |
+| `"default"` | Zero-config — works out of the box |
+
+**Automatic migration**: When the new `data/` directory doesn't exist but a legacy `~/.mnemon/mnemon.db` does, mnemon automatically moves it to `data/default/mnemon.db`. Users upgrading from older versions experience a seamless transition.
+
+**Design principle — lightweight and bounded**: Store isolation addresses a necessary data separation concern without growing into a multi-tenant system. There are no access controls, no cross-store queries, no store metadata beyond the name. This keeps the feature bounded — Mnemon is a memory daemon, not a knowledge base platform.
 
 ---
 
