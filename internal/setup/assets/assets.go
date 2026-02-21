@@ -23,6 +23,21 @@ var ClaudeGuide []byte
 //go:embed openclaw/SKILL.md
 var OpenClawSkill []byte
 
+//go:embed openclaw/hooks/mnemon-prime/HOOK.md
+var OpenClawHookMD []byte
+
+//go:embed openclaw/hooks/mnemon-prime/handler.js
+var OpenClawHookHandler []byte
+
+//go:embed openclaw/plugin/package.json
+var OpenClawPluginPackage []byte
+
+//go:embed openclaw/plugin/openclaw-plugin.json
+var OpenClawPluginManifest []byte
+
+//go:embed openclaw/plugin/index.js
+var OpenClawPluginIndex []byte
+
 // All returns the embedded filesystem for inspection.
 //
 //go:embed claude openclaw

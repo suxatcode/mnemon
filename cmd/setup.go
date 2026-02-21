@@ -288,7 +288,7 @@ func installOpenClaw(env *setup.Environment) error {
 	fmt.Printf("\nSetting up OpenClaw (%s)...\n", configDir)
 
 	// Phase 1: Skill
-	fmt.Println("\n[1/2] Skill")
+	fmt.Println("\n[1/4] Skill")
 	if path, err := setup.OpenClawWriteSkill(configDir); err != nil {
 		setup.StatusError(0, 0, "Skill", err)
 		return err
@@ -297,7 +297,7 @@ func installOpenClaw(env *setup.Environment) error {
 	}
 
 	// Phase 2: Prompt files (guide.md + skill.md → ~/.mnemon/prompt/)
-	fmt.Println("\n[2/2] Prompts")
+	fmt.Println("\n[2/4] Prompts")
 	if path, err := setup.WritePromptFiles(); err != nil {
 		setup.StatusError(0, 0, "Prompts", err)
 		return err
@@ -305,27 +305,78 @@ func installOpenClaw(env *setup.Environment) error {
 		setup.StatusOK(0, 0, "Prompts", path)
 	}
 
-	// Summary + manual configuration guide
+	// Phase 3: Internal hook (agent:bootstrap → inject guide)
+	fmt.Println("\n[3/4] Hook")
+	if path, err := setup.OpenClawWriteHook(configDir); err != nil {
+		setup.StatusError(0, 0, "Hook: prime", err)
+	} else {
+		setup.StatusOK(0, 0, "Hook: prime", path)
+	}
+
+	// Phase 4: Plugin (optional hooks selection + install)
+	fmt.Println("\n[4/4] Plugin")
+	sel := selectOpenClawOptionalHooks()
+
+	if path, err := setup.OpenClawWritePlugin(configDir); err != nil {
+		setup.StatusError(0, 0, "Plugin", err)
+	} else {
+		setup.StatusOK(0, 0, "Plugin", path)
+	}
+
+	if path, err := setup.OpenClawRegisterPlugin(configDir, sel); err != nil {
+		setup.StatusError(0, 0, "Config", err)
+	} else {
+		setup.StatusUpdated(0, 0, "Config", path)
+	}
+
+	// Summary
+	var hookNames []string
+	hookNames = append(hookNames, "prime")
+	if sel.Remind {
+		hookNames = append(hookNames, "remind")
+	}
+	if sel.Nudge {
+		hookNames = append(hookNames, "nudge")
+	}
+	if sel.Compact {
+		hookNames = append(hookNames, "compact")
+	}
+
 	fmt.Println()
 	fmt.Println("Setup complete!")
 	fmt.Printf("  Skill   %s/skills/mnemon/SKILL.md\n", configDir)
+	fmt.Printf("  Hook    %s/hooks/mnemon-prime/ (agent:bootstrap)\n", configDir)
+	fmt.Printf("  Plugin  %s/extensions/mnemon/ (hooks: %s)\n", configDir, strings.Join(hookNames, ", "))
 	fmt.Printf("  Prompts ~/.mnemon/prompt/ (guide.md, skill.md)\n")
 	fmt.Println()
-	fmt.Println("To activate mnemon in OpenClaw, configure your environment manually:")
-	fmt.Println()
-	fmt.Println("  1. Create a plugin directory:")
-	fmt.Println("     mkdir -p ~/.openclaw/extensions/mnemon")
-	fmt.Println()
-	fmt.Println("  2. Write your plugin entry point (index.ts) using the OpenClaw SDK.")
-	fmt.Println("     Reference ~/.mnemon/prompt/guide.md for recall/remember behavior.")
-	fmt.Println()
-	fmt.Println("  3. Register the plugin in ~/.openclaw/openclaw.json:")
-	fmt.Println(`     { "plugins": { "entries": { "mnemon": { "enabled": true } } } }`)
-	fmt.Println()
+	fmt.Println("Restart the OpenClaw gateway to activate.")
 	fmt.Println("Edit ~/.mnemon/prompt/guide.md to customize behavior.")
 	fmt.Println("Run 'mnemon setup --eject' to remove.")
 
 	return nil
+}
+
+// selectOpenClawOptionalHooks prompts user for which plugin hooks to enable.
+// Remind and Nudge default on; Compact defaults off — mirrors Claude Code behaviour.
+func selectOpenClawOptionalHooks() setup.HookSelection {
+	sel := setup.HookSelection{Remind: true, Nudge: true, Compact: false}
+
+	if setupYes || !setup.IsInteractive() {
+		return sel
+	}
+
+	opts := []string{
+		"Remind  — recall relevant memories + remind agent on each message (recommended)",
+		"Nudge   — suggest remember sub-agent after each reply",
+		"Compact — save key insights before context compaction",
+	}
+	defs := []bool{true, true, false}
+	choices := setup.SelectMulti("Select plugin hooks to enable", opts, defs)
+
+	sel.Remind = choices[0]
+	sel.Nudge = choices[1]
+	sel.Compact = choices[2]
+	return sel
 }
 
 // ─── Eject ──────────────────────────────────────────────────────────

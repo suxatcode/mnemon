@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,21 +22,143 @@ func OpenClawWriteSkill(configDir string) (string, error) {
 	return skillPath, nil
 }
 
-// OpenClawEject removes mnemon skill from the given OpenClaw config dir.
+// OpenClawWriteHook writes the mnemon-prime internal hook to the OpenClaw hooks directory.
+func OpenClawWriteHook(configDir string) (string, error) {
+	hookDir := filepath.Join(configDir, "hooks", "mnemon-prime")
+	if err := os.MkdirAll(hookDir, 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(hookDir, "HOOK.md"), assets.OpenClawHookMD, 0644); err != nil {
+		return "", err
+	}
+	handlerPath := filepath.Join(hookDir, "handler.js")
+	if err := os.WriteFile(handlerPath, assets.OpenClawHookHandler, 0644); err != nil {
+		return "", err
+	}
+	return hookDir, nil
+}
+
+// OpenClawWritePlugin writes the mnemon plugin to the OpenClaw extensions directory.
+func OpenClawWritePlugin(configDir string) (string, error) {
+	pluginDir := filepath.Join(configDir, "extensions", "mnemon")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		return "", err
+	}
+	files := []struct {
+		name string
+		data []byte
+	}{
+		{"package.json", assets.OpenClawPluginPackage},
+		{"openclaw-plugin.json", assets.OpenClawPluginManifest},
+		{"index.js", assets.OpenClawPluginIndex},
+	}
+	for _, f := range files {
+		if err := os.WriteFile(filepath.Join(pluginDir, f.name), f.data, 0644); err != nil {
+			return "", err
+		}
+	}
+	return pluginDir, nil
+}
+
+// OpenClawRegisterPlugin adds the mnemon plugin entry to openclaw.json,
+// recording which optional hooks the user selected.
+func OpenClawRegisterPlugin(configDir string, sel HookSelection) (string, error) {
+	cfgPath := filepath.Join(configDir, "openclaw.json")
+
+	var cfg map[string]any
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			cfg = make(map[string]any)
+		} else {
+			return "", err
+		}
+	} else {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return "", fmt.Errorf("parse openclaw.json: %w", err)
+		}
+	}
+
+	plugins, _ := cfg["plugins"].(map[string]any)
+	if plugins == nil {
+		plugins = make(map[string]any)
+	}
+	entries, _ := plugins["entries"].(map[string]any)
+	if entries == nil {
+		entries = make(map[string]any)
+	}
+
+	// Always write the entry so config reflects current selection.
+	entries["mnemon"] = map[string]any{
+		"enabled": true,
+		"config": map[string]any{
+			"remind":  sel.Remind,
+			"nudge":   sel.Nudge,
+			"compact": sel.Compact,
+		},
+	}
+	plugins["entries"] = entries
+	cfg["plugins"] = plugins
+
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(cfgPath, append(out, '\n'), 0600); err != nil {
+		return "", err
+	}
+
+	return cfgPath, nil
+}
+
+// OpenClawEject removes mnemon skill, hook, and plugin from the given OpenClaw config dir.
 func OpenClawEject(configDir string) []error {
 	var errs []error
 
 	fmt.Printf("\nRemoving OpenClaw integration (%s)...\n", configDir)
 
-	skillDir := filepath.Join(configDir, "skills", "mnemon")
-	if err := os.RemoveAll(skillDir); err != nil {
-		StatusError(1, 1, "Skill", err)
-		errs = append(errs, err)
-	} else {
-		StatusOK(1, 1, "Skill", skillDir+" removed")
+	targets := []struct {
+		label string
+		path  string
+	}{
+		{"Skill", filepath.Join(configDir, "skills", "mnemon")},
+		{"Hook", filepath.Join(configDir, "hooks", "mnemon-prime")},
+		{"Plugin", filepath.Join(configDir, "extensions", "mnemon")},
 	}
-	removeIfEmpty(filepath.Join(configDir, "skills"))
-	removeIfEmpty(configDir)
 
+	total := len(targets)
+	for i, t := range targets {
+		if err := os.RemoveAll(t.path); err != nil {
+			StatusError(i+1, total, t.label, err)
+			errs = append(errs, err)
+		} else {
+			StatusOK(i+1, total, t.label, t.path+" removed")
+		}
+	}
+
+	// Clean up empty parent dirs
+	removeIfEmpty(filepath.Join(configDir, "skills"))
+	removeIfEmpty(filepath.Join(configDir, "hooks"))
+	removeIfEmpty(filepath.Join(configDir, "extensions"))
+
+	// Remove plugin entry from openclaw.json
+	cfgPath := filepath.Join(configDir, "openclaw.json")
+	if data, err := os.ReadFile(cfgPath); err == nil {
+		var cfg map[string]any
+		if json.Unmarshal(data, &cfg) == nil {
+			if plugins, ok := cfg["plugins"].(map[string]any); ok {
+				if entries, ok := plugins["entries"].(map[string]any); ok {
+					delete(entries, "mnemon")
+					plugins["entries"] = entries
+					cfg["plugins"] = plugins
+					if out, err := json.MarshalIndent(cfg, "", "  "); err == nil {
+						os.WriteFile(cfgPath, append(out, '\n'), 0600)
+					}
+				}
+			}
+		}
+	}
+
+	removeIfEmpty(configDir)
 	return errs
 }

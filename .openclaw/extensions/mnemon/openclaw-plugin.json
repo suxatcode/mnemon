@@ -1,0 +1,10 @@
+{
+  "name": "mnemon",
+  "version": "0.1.0",
+  "description": "LLM-supervised persistent memory — recall before responding, remember after",
+  "hooks": [
+    "before_prompt_build",
+    "agent_end"
+  ],
+  "entry": "index.js"
+}

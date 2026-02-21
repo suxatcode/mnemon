@@ -1,0 +1,9 @@
+{
+  "plugins": {
+    "entries": {
+      "mnemon": {
+        "enabled": true
+      }
+    }
+  }
+}
