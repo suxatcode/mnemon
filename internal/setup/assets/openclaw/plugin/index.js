@@ -1,4 +1,9 @@
 import { execSync } from "child_process";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import { homedir } from "os";
+import { join } from "path";
+
+const COMPACT_FLAG = join(homedir(), ".mnemon", ".compact-pending");
 
 /**
  * Extract a focused recall query from the user's prompt.
@@ -7,7 +12,6 @@ import { execSync } from "child_process";
  */
 function extractQuery(prompt) {
   if (!prompt || typeof prompt !== "string") return "";
-  // Take the first 200 chars, collapse whitespace
   return prompt.slice(0, 200).replace(/\s+/g, " ").trim();
 }
 
@@ -31,56 +35,66 @@ function recall(query) {
 }
 
 export default function register(api) {
-  const cfg = api.config?.plugins?.entries?.mnemon?.config ?? {};
+  // api.pluginConfig holds plugins.entries.mnemon.config from openclaw.json
+  const cfg = api.pluginConfig ?? {};
   const remind  = cfg.remind  !== false; // default on
   const nudge   = cfg.nudge   !== false; // default on
   const compact = cfg.compact === true;  // default off
 
-  // ── Remind (before_prompt_build) ──────────────────────────────
-  // Per-message: inject recall results + remember reminder.
-  // Equivalent to Claude Code's UserPromptSubmit hook.
-  if (remind) {
-    api.on("before_prompt_build", async (event) => {
-      const query = extractQuery(event.prompt);
-      const memories = recall(query);
+  // ── before_compaction (void) ──────────────────────────────────
+  // Cannot inject context directly — write a flag file instead.
+  // before_prompt_build will pick it up on the next turn.
+  if (compact) {
+    api.on("before_compaction", async () => {
+      try {
+        writeFileSync(COMPACT_FLAG, String(Date.now()), "utf-8");
+      } catch {
+        // ignore write failure
+      }
+    });
+  }
 
+  // ── before_prompt_build ───────────────────────────────────────
+  // Handles: remind (recall + remember reminder) + nudge reminder
+  // + compact flag consumption.
+  if (remind || nudge || compact) {
+    api.on("before_prompt_build", async (event) => {
       const parts = [];
 
-      if (memories) {
-        parts.push(`[mnemon] Relevant memories:\n${memories}`);
+      // Compact flag: was compaction triggered since last turn?
+      if (compact && existsSync(COMPACT_FLAG)) {
+        try { unlinkSync(COMPACT_FLAG); } catch { /* ignore */ }
+        parts.push(
+          "[mnemon] Context compaction starting. Review this session and remember the most valuable insights (up to 5) before context is compressed. Delegate to Task sub-agents now."
+        );
       }
 
-      parts.push(
-        "[mnemon] Evaluate: recall needed? After responding, evaluate: remember needed?"
-      );
+      if (remind) {
+        const query = extractQuery(event.prompt);
+        const memories = recall(query);
+        if (memories) {
+          parts.push(`[mnemon] Relevant memories:\n${memories}`);
+        }
+        parts.push(
+          "[mnemon] Evaluate: recall needed? After responding, evaluate: remember needed?"
+        );
+      }
 
+      if (nudge) {
+        parts.push(
+          "[mnemon] Consider: does this exchange warrant a remember sub-agent?"
+        );
+      }
+
+      if (parts.length === 0) return;
       return { prependContext: parts.join("\n\n") };
     });
   }
 
-  // ── Nudge (agent_end) ─────────────────────────────────────────
-  // After agent replies: nudge to consider a remember sub-agent.
-  if (nudge) {
-    api.on("agent_end", async (event) => {
-      const lastMsg = event?.lastAssistantMessage ?? "";
-      // Stay silent if agent already mentioned memory operations
-      if (/mnemon remember|sub-agent.*remember|Stored.*imp=/i.test(lastMsg)) {
-        return;
-      }
-      return {
-        nudge: "[mnemon] Consider: does this exchange warrant a remember sub-agent?",
-      };
-    });
-  }
-
-  // ── Compact (before_compaction) ───────────────────────────────
-  // Before context compaction: prompt to save key insights.
-  if (compact) {
-    api.on("before_compaction", async () => {
-      return {
-        prependContext:
-          "[mnemon] Context compaction starting. Review this session and remember the most valuable insights (up to 5) before context is compressed. Delegate to Task sub-agents now.",
-      };
-    });
-  }
+  // ── agent_end (void — no return value supported) ──────────────
+  // Placeholder for future diagnostics; memory evaluation is handled
+  // by the LLM itself via the before_prompt_build nudge above.
+  api.on("agent_end", async () => {
+    // no-op
+  });
 }
