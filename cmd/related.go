@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mnemon-dev/mnemon/internal/graph"
 	"github.com/mnemon-dev/mnemon/internal/model"
 	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
@@ -63,85 +64,20 @@ type relatedResult struct {
 }
 
 func bfsTraverse(db *store.DB, startID string, edgeFilter model.EdgeType, maxDepth int) []relatedResult {
-	// Pre-load all insights and edges for in-memory BFS (avoids N+1 queries).
-	allInsights, err := db.GetAllActiveInsights()
-	if err != nil {
-		return nil
-	}
-	insightMap := make(map[string]*model.Insight, len(allInsights))
-	for _, ins := range allInsights {
-		insightMap[ins.ID] = ins
-	}
-
-	allEdges, err := db.GetAllEdges()
-	if err != nil {
-		return nil
-	}
-	edgeAdj := make(map[string][]*model.Edge)
-	for _, e := range allEdges {
-		edgeAdj[e.SourceID] = append(edgeAdj[e.SourceID], e)
-		if e.SourceID != e.TargetID {
-			edgeAdj[e.TargetID] = append(edgeAdj[e.TargetID], e)
-		}
-	}
-
-	type queueItem struct {
-		id       string
-		depth    int
-		edgeType string
-	}
-
-	visited := map[string]bool{startID: true}
-	queue := []queueItem{{id: startID, depth: 0}}
-	results := make([]relatedResult, 0)
-
-	for len(queue) > 0 {
-		item := queue[0]
-		queue = queue[1:]
-
-		if item.depth > maxDepth {
-			continue
-		}
-
-		// Add to results (skip the start node)
-		if item.id != startID {
-			insight := insightMap[item.id]
-			if insight == nil {
-				continue
-			}
-			results = append(results, relatedResult{
-				ID:         insight.ID,
-				Content:    insight.Content,
-				Category:   string(insight.Category),
-				Importance: insight.Importance,
-				Depth:      item.depth,
-				EdgeType:   item.edgeType,
-			})
-		}
-
-		if item.depth >= maxDepth {
-			continue
-		}
-
-		// Get edges from pre-loaded adjacency
-		edges := edgeAdj[item.id]
-		for _, e := range edges {
-			if edgeFilter != "" && e.EdgeType != edgeFilter {
-				continue
-			}
-			neighborID := e.TargetID
-			if neighborID == item.id {
-				neighborID = e.SourceID
-			}
-			if !visited[neighborID] {
-				visited[neighborID] = true
-				queue = append(queue, queueItem{
-					id:       neighborID,
-					depth:    item.depth + 1,
-					edgeType: string(e.EdgeType),
-				})
-			}
-		}
+	nodes := graph.BFS(db, startID, graph.BFSOptions{
+		MaxDepth:   maxDepth,
+		EdgeFilter: edgeFilter,
+	})
+	results := make([]relatedResult, 0, len(nodes))
+	for _, n := range nodes {
+		results = append(results, relatedResult{
+			ID:         n.Insight.ID,
+			Content:    n.Insight.Content,
+			Category:   string(n.Insight.Category),
+			Importance: n.Insight.Importance,
+			Depth:      n.Hop,
+			EdgeType:   string(n.ViaEdge.EdgeType),
+		})
 	}
 	return results
 }

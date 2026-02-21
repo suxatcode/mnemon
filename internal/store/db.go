@@ -279,6 +279,9 @@ CREATE INDEX IF NOT EXISTS idx_oplog_created ON oplog(created_at);
 	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_insights_effective_imp ON insights(effective_importance)`); err != nil {
 		return fmt.Errorf("create effective_imp index: %w", err)
 	}
+	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_prune_candidates ON insights(deleted_at, importance, access_count, effective_importance)`); err != nil {
+		return fmt.Errorf("create prune_candidates index: %w", err)
+	}
 
 	// Migration: remove narrative edge type from existing databases
 	if err := db.migrateRemoveNarrativeEdges(); err != nil {

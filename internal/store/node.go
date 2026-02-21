@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -345,6 +346,7 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 			}
 			if txErr != nil {
 				tx.Rollback()
+				fmt.Fprintf(os.Stderr, "warning: batch EI update failed, rolled back: %v\n", txErr)
 			} else {
 				tx.Commit()
 			}
@@ -535,15 +537,19 @@ func (db *DB) GetStats() (*InsightStats, error) {
 	stats := &InsightStats{ByCategory: make(map[string]int)}
 
 	// Total active
-	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&stats.Total)
+	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&stats.Total); err != nil {
+		return nil, fmt.Errorf("count active: %w", err)
+	}
 
 	// Deleted
-	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NOT NULL`).Scan(&stats.DeletedCount)
+	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NOT NULL`).Scan(&stats.DeletedCount); err != nil {
+		return nil, fmt.Errorf("count deleted: %w", err)
+	}
 
 	// By category
 	rows, err := db.execer().Query(`SELECT category, COUNT(*) FROM insights WHERE deleted_at IS NULL GROUP BY category`)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query categories: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -556,10 +562,14 @@ func (db *DB) GetStats() (*InsightStats, error) {
 	}
 
 	// Edge count
-	db.execer().QueryRow(`SELECT COUNT(*) FROM edges`).Scan(&stats.EdgeCount)
+	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM edges`).Scan(&stats.EdgeCount); err != nil {
+		return nil, fmt.Errorf("count edges: %w", err)
+	}
 
 	// Oplog count
-	db.execer().QueryRow(`SELECT COUNT(*) FROM oplog`).Scan(&stats.OplogCount)
+	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM oplog`).Scan(&stats.OplogCount); err != nil {
+		return nil, fmt.Errorf("count oplog: %w", err)
+	}
 
 	// Top entities by link count (across active insights)
 	eRows, err := db.execer().Query(`
@@ -680,12 +690,18 @@ func (db *DB) GetInsightsWithoutEmbedding(limit int) ([]*model.Insight, error) {
 	return scanInsights(rows)
 }
 
-func scanInsight(row *sql.Row) (*model.Insight, error) {
+// insightScanner abstracts sql.Row and sql.Rows for shared insight row scanning.
+type insightScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanOneInsight scans a single insight row and parses all fields.
+func scanOneInsight(s insightScanner) (*model.Insight, error) {
 	var i model.Insight
 	var cat, tags, entities, source, createdAt, updatedAt string
 	var deletedAt sql.NullString
 
-	err := row.Scan(&i.ID, &i.Content, &cat, &i.Importance, &tags, &entities,
+	err := s.Scan(&i.ID, &i.Content, &cat, &i.Importance, &tags, &entities,
 		&source, &i.AccessCount, &createdAt, &updatedAt, &deletedAt)
 	if err != nil {
 		return nil, err
@@ -711,37 +727,18 @@ func scanInsight(row *sql.Row) (*model.Insight, error) {
 	return &i, nil
 }
 
+func scanInsight(row *sql.Row) (*model.Insight, error) {
+	return scanOneInsight(row)
+}
+
 func scanInsights(rows *sql.Rows) ([]*model.Insight, error) {
 	results := make([]*model.Insight, 0)
 	for rows.Next() {
-		var i model.Insight
-		var cat, tags, entities, source, createdAt, updatedAt string
-		var deletedAt sql.NullString
-
-		err := rows.Scan(&i.ID, &i.Content, &cat, &i.Importance, &tags, &entities,
-			&source, &i.AccessCount, &createdAt, &updatedAt, &deletedAt)
+		ins, err := scanOneInsight(rows)
 		if err != nil {
 			return nil, err
 		}
-
-		i.Category = model.Category(cat)
-		i.Source = source
-		i.ParseTags(tags)
-		i.ParseEntities(entities)
-		if i.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
-			return nil, fmt.Errorf("parse created_at for %s: %w", i.ID, err)
-		}
-		if i.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt); err != nil {
-			return nil, fmt.Errorf("parse updated_at for %s: %w", i.ID, err)
-		}
-		if deletedAt.Valid {
-			t, parseErr := time.Parse(time.RFC3339, deletedAt.String)
-			if parseErr != nil {
-				return nil, fmt.Errorf("parse deleted_at for %s: %w", i.ID, parseErr)
-			}
-			i.DeletedAt = &t
-		}
-		results = append(results, &i)
+		results = append(results, ins)
 	}
 	return results, nil
 }

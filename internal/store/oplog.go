@@ -1,20 +1,29 @@
 package store
 
-import "time"
+import (
+	"fmt"
+	"os"
+	"time"
+)
 
 // MaxOplogEntries is the maximum number of oplog entries to retain.
 const MaxOplogEntries = 5000
 
 // LogOp records an operation to the oplog and trims old entries beyond MaxOplogEntries.
+// Best-effort: failures are logged to stderr but do not propagate.
 func (db *DB) LogOp(operation, insightID, detail string) {
-	db.execer().Exec(
+	if _, err := db.execer().Exec(
 		`INSERT INTO oplog (operation, insight_id, detail, created_at) VALUES (?, ?, ?, ?)`,
-		operation, insightID, detail, time.Now().UTC().Format(time.RFC3339))
+		operation, insightID, detail, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: oplog insert: %v\n", err)
+	}
 
 	// Trim old entries: only deletes when count exceeds limit (O(1) in the common case).
-	db.execer().Exec(
+	if _, err := db.execer().Exec(
 		`DELETE FROM oplog WHERE id <= (SELECT MAX(id) FROM oplog) - ?`,
-		MaxOplogEntries)
+		MaxOplogEntries); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: oplog trim: %v\n", err)
+	}
 }
 
 // OplogEntry represents a single operation log entry.

@@ -173,89 +173,18 @@ type NeighborNode struct {
 // GetNeighborhood performs a BFS from nodeID up to maxHops, following all edge
 // types (temporal, semantic, causal, entity). Returns up to maxNodes neighbor
 // nodes, excluding the start node and soft-deleted nodes.
-//
-// Pre-loads all insights and edges to avoid N+1 queries during traversal.
 func GetNeighborhood(db *store.DB, nodeID string, maxHops int, maxNodes int) []NeighborNode {
-	// Pre-load all active insights and edges for in-memory BFS.
-	allInsights, err := db.GetAllActiveInsights()
-	if err != nil {
-		return nil
-	}
-	insightMap := make(map[string]*model.Insight, len(allInsights))
-	for _, ins := range allInsights {
-		insightMap[ins.ID] = ins
-	}
-
-	allEdges, err := db.GetAllEdges()
-	if err != nil {
-		return nil
-	}
-	edgeAdj := make(map[string][]*model.Edge)
-	for _, e := range allEdges {
-		edgeAdj[e.SourceID] = append(edgeAdj[e.SourceID], e)
-		if e.SourceID != e.TargetID {
-			edgeAdj[e.TargetID] = append(edgeAdj[e.TargetID], e)
+	nodes := BFS(db, nodeID, BFSOptions{MaxDepth: maxHops, MaxNodes: maxNodes})
+	result := make([]NeighborNode, len(nodes))
+	for i, n := range nodes {
+		result[i] = NeighborNode{
+			ID:       n.Insight.ID,
+			Content:  n.Insight.Content,
+			Category: string(n.Insight.Category),
+			Hop:      n.Hop,
+			ViaEdge:  string(n.ViaEdge.EdgeType),
 		}
 	}
-
-	type bfsEntry struct {
-		id      string
-		hop     int
-		viaEdge string
-	}
-
-	visited := map[string]bool{nodeID: true}
-	queue := []bfsEntry{{id: nodeID, hop: 0, viaEdge: ""}}
-	var result []NeighborNode
-
-	for len(queue) > 0 && len(result) < maxNodes {
-		current := queue[0]
-		queue = queue[1:]
-
-		if current.hop >= maxHops {
-			continue
-		}
-
-		for _, edge := range edgeAdj[current.id] {
-			// Determine the neighbor ID (the other end of the edge)
-			neighborID := edge.TargetID
-			if neighborID == current.id {
-				neighborID = edge.SourceID
-			}
-
-			if visited[neighborID] {
-				continue
-			}
-			visited[neighborID] = true
-
-			// Skip soft-deleted nodes (not in active insight map)
-			insight := insightMap[neighborID]
-			if insight == nil {
-				continue
-			}
-
-			nextHop := current.hop + 1
-			result = append(result, NeighborNode{
-				ID:       insight.ID,
-				Content:  insight.Content,
-				Category: string(insight.Category),
-				Hop:      nextHop,
-				ViaEdge:  string(edge.EdgeType),
-			})
-
-			if len(result) >= maxNodes {
-				break
-			}
-
-			// Enqueue for further traversal
-			queue = append(queue, bfsEntry{
-				id:      neighborID,
-				hop:     nextHop,
-				viaEdge: string(edge.EdgeType),
-			})
-		}
-	}
-
 	return result
 }
 

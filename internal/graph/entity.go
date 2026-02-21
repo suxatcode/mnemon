@@ -12,6 +12,9 @@ import (
 // Maximum number of existing nodes to link per entity (avoid hot-entity explosion).
 const maxEntityLinks = 5
 
+// Maximum total entity edges to create per insight (bounds cost of many-entity insights).
+const maxTotalEntityEdges = 50
+
 var entityPatterns = []*regexp.Regexp{
 	// CamelCase identifiers (e.g., MyClass, HttpServer)
 	regexp.MustCompile(`\b([A-Z][a-z]+(?:[A-Z][a-z]+)+)\b`),
@@ -158,12 +161,18 @@ func CreateEntityEdges(db *store.DB, insight *model.Insight) int {
 	count := 0
 
 	for _, entity := range insight.Entities {
+		if count >= maxTotalEntityEdges {
+			break
+		}
 		ids, err := db.FindInsightsWithEntity(entity, insight.ID, maxEntityLinks)
 		if err != nil || len(ids) == 0 {
 			continue
 		}
 
 		for _, targetID := range ids {
+			if count >= maxTotalEntityEdges {
+				break
+			}
 			// new → old
 			err = db.InsertEdge(&model.Edge{
 				SourceID:  insight.ID,
