@@ -20,12 +20,12 @@ const (
 
 // DiffMatch represents one existing insight compared against the new content.
 type DiffMatch struct {
-	ID              string         `json:"id"`
-	Content         string         `json:"content"`
-	TokenSimilarity float64        `json:"token_similarity"`
-	CosineSimilarity float64       `json:"cosine_similarity,omitempty"`
-	Similarity      float64        `json:"similarity"`
-	Suggestion      DiffSuggestion `json:"suggestion"`
+	ID               string         `json:"id"`
+	Content          string         `json:"content"`
+	TokenSimilarity  float64        `json:"token_similarity"`
+	CosineSimilarity float64        `json:"cosine_similarity,omitempty"`
+	Similarity       float64        `json:"similarity"`
+	Suggestion       DiffSuggestion `json:"suggestion"`
 }
 
 // DiffResult is the output of a diff check.
@@ -36,8 +36,8 @@ type DiffResult struct {
 
 // DiffOptions controls diff behavior.
 type DiffOptions struct {
-	Limit         int       // max candidates to compare (default 5)
-	NewEmbedding  []float64 // pre-computed embedding for new content (optional)
+	Limit         int            // max candidates to compare (default 5)
+	NewEmbedding  []float64      // pre-computed embedding for new content (optional)
 	ExistingEmbed []EmbeddedItem // pre-loaded embeddings (optional, avoids DB call)
 }
 

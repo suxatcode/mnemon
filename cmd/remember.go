@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mnemon-dev/mnemon/internal/embed"
 	"github.com/mnemon-dev/mnemon/internal/graph"
 	"github.com/mnemon-dev/mnemon/internal/model"
 	"github.com/mnemon-dev/mnemon/internal/search"
 	"github.com/mnemon-dev/mnemon/internal/store"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -178,7 +178,7 @@ var rememberCmd = &cobra.Command{
 				"content":         content,
 				"action":          "skipped",
 				"diff_suggestion": string(diffSuggestion),
-				"replaced_id":    replacedID,
+				"replaced_id":     replacedID,
 			}
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")

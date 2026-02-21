@@ -105,7 +105,10 @@ func (db *DB) DeleteEdgesByNode(nodeID string) error {
 	return err
 }
 
-func scanEdges(rows interface{ Next() bool; Scan(...interface{}) error }) ([]*model.Edge, error) {
+func scanEdges(rows interface {
+	Next() bool
+	Scan(...interface{}) error
+}) ([]*model.Edge, error) {
 	var results []*model.Edge
 	for rows.Next() {
 		var e model.Edge

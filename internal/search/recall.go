@@ -418,8 +418,8 @@ func causalTopologicalSort(db *store.DB, results []RecallResult) []RecallResult 
 	}
 
 	// Build DAG from causal edges: source → target means source causes target
-	adj := make(map[string][]string)    // source → targets
-	inDegree := make(map[string]int)    // target → incoming edge count
+	adj := make(map[string][]string) // source → targets
+	inDegree := make(map[string]int) // target → incoming edge count
 
 	for _, r := range results {
 		inDegree[r.Insight.ID] = 0

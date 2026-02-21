@@ -186,8 +186,8 @@ func TestVectorSearch_Basic(t *testing.T) {
 
 	// Store embeddings
 	query := []float64{1.0, 0.0, 0.0}
-	db.UpdateEmbedding("vs-1", embed.SerializeVector([]float64{0.9, 0.1, 0.0}))  // similar
-	db.UpdateEmbedding("vs-2", embed.SerializeVector([]float64{0.0, 0.0, 1.0}))  // different
+	db.UpdateEmbedding("vs-1", embed.SerializeVector([]float64{0.9, 0.1, 0.0}))   // similar
+	db.UpdateEmbedding("vs-2", embed.SerializeVector([]float64{0.0, 0.0, 1.0}))   // different
 	db.UpdateEmbedding("vs-3", embed.SerializeVector([]float64{0.85, 0.15, 0.0})) // similar
 
 	hits := vectorSearch(db, query, 10)

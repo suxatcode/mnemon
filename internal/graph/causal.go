@@ -66,7 +66,7 @@ func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
 		//   → new has keyword → new is effect → prev is cause → prev→new
 		// e.g. prev="chose X because of Y", new="Y has low latency"
 		//   → prev has keyword → prev is effect → new is cause → new→prev
-		sourceID := prev.ID  // default: new has signal → new is effect, prev is cause
+		sourceID := prev.ID // default: new has signal → new is effect, prev is cause
 		targetID := insight.ID
 		if !newHasSignal && prevHasSignal {
 			// Only prev has signal → prev is effect, new is cause
@@ -77,10 +77,10 @@ func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
 		subType := suggestSubType(insight.Content + " " + prev.Content)
 
 		err = db.InsertEdge(&model.Edge{
-			SourceID:  sourceID,
-			TargetID:  targetID,
-			EdgeType:  model.EdgeCausal,
-			Weight:    overlap,
+			SourceID: sourceID,
+			TargetID: targetID,
+			EdgeType: model.EdgeCausal,
+			Weight:   overlap,
 			Metadata: map[string]string{
 				"overlap":  formatFloat(overlap),
 				"sub_type": subType,
@@ -129,7 +129,7 @@ type CausalCandidate struct {
 	ID               string `json:"id"`
 	Content          string `json:"content"`
 	Category         string `json:"category"`
-	Hop              int    `json:"hop"`               // graph distance (1 or 2)
+	Hop              int    `json:"hop"`                // graph distance (1 or 2)
 	ViaEdge          string `json:"via_edge"`           // edge type that connected
 	CausalSignal     string `json:"causal_signal"`      // keyword if found, else ""
 	SuggestedSubType string `json:"suggested_sub_type"` // heuristic suggestion

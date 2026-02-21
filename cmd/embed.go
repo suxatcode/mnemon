@@ -41,11 +41,11 @@ Modes:
 				return fmt.Errorf("embedding stats: %w", err)
 			}
 			output := map[string]interface{}{
-				"total_insights":    total,
-				"embedded":          embedded,
-				"coverage":          fmt.Sprintf("%.0f%%", float64(embedded)/float64(max(total, 1))*100),
-				"ollama_available":  ec.Available(),
-				"model":             ec.Model(),
+				"total_insights":   total,
+				"embedded":         embedded,
+				"coverage":         fmt.Sprintf("%.0f%%", float64(embedded)/float64(max(total, 1))*100),
+				"ollama_available": ec.Available(),
+				"model":            ec.Model(),
 			}
 			return enc.Encode(output)
 		}

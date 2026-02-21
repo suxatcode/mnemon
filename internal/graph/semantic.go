@@ -233,9 +233,9 @@ func findCandidatesByTokenOverlap(db *store.DB, insight *model.Insight) []Semant
 	result := make([]SemanticCandidate, len(candidates))
 	for i, c := range candidates {
 		result[i] = SemanticCandidate{
-			ID:              c.insight.ID,
-			Content:         c.insight.Content,
-			Category:        string(c.insight.Category),
+			ID:         c.insight.ID,
+			Content:    c.insight.Content,
+			Category:   string(c.insight.Category),
 			Similarity: c.similarity,
 		}
 	}

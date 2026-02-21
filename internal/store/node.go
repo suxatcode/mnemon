@@ -55,11 +55,11 @@ func (db *DB) GetInsightByIDIncludeDeleted(id string) (*model.Insight, error) {
 
 // QueryFilter holds optional filters for querying insights.
 type QueryFilter struct {
-	Keyword    string
-	Category   string
+	Keyword       string
+	Category      string
 	MinImportance int
-	Source     string
-	Limit      int
+	Source        string
+	Limit         int
 }
 
 // QueryInsights returns insights matching the filter, ordered by importance DESC, created_at DESC.
@@ -223,11 +223,11 @@ func (db *DB) RefreshEffectiveImportance(id string) (float64, error) {
 
 // RetentionCandidate holds an insight and its effective importance breakdown.
 type RetentionCandidate struct {
-	Insight              *model.Insight `json:"insight"`
-	EffectiveImportance  float64        `json:"effective_importance"`
-	DaysSinceAccess      float64        `json:"days_since_access"`
-	EdgeCount            int            `json:"edge_count"`
-	Immune               bool           `json:"immune"`
+	Insight             *model.Insight `json:"insight"`
+	EffectiveImportance float64        `json:"effective_importance"`
+	DaysSinceAccess     float64        `json:"days_since_access"`
+	EdgeCount           int            `json:"edge_count"`
+	Immune              bool           `json:"immune"`
 }
 
 // GetRetentionCandidates returns non-immune insights sorted by effective_importance ascending.
@@ -524,12 +524,12 @@ type EntityStat struct {
 
 // InsightStats holds aggregate statistics.
 type InsightStats struct {
-	Total         int            `json:"total"`
-	ByCategory    map[string]int `json:"by_category"`
-	EdgeCount     int            `json:"edge_count"`
-	DeletedCount  int            `json:"deleted_count"`
-	TopEntities   []EntityStat   `json:"top_entities"`
-	OplogCount    int            `json:"oplog_count"`
+	Total        int            `json:"total"`
+	ByCategory   map[string]int `json:"by_category"`
+	EdgeCount    int            `json:"edge_count"`
+	DeletedCount int            `json:"deleted_count"`
+	TopEntities  []EntityStat   `json:"top_entities"`
+	OplogCount   int            `json:"oplog_count"`
 }
 
 // GetStats returns aggregate statistics.

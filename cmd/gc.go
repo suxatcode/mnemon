@@ -53,7 +53,7 @@ Keep mode:
 				"content":              ins.Content,
 				"new_access":           ins.AccessCount + 3,
 				"effective_importance": ei,
-				"immune":              store.IsImmune(ins.Importance, ins.AccessCount+3),
+				"immune":               store.IsImmune(ins.Importance, ins.AccessCount+3),
 			}
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")

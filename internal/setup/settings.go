@@ -255,4 +255,3 @@ func addClaudeHooksSelective(data map[string]interface{}, hooksDir string, sel H
 		hooks["PreCompact"] = append(compactArr, compactEntry)
 	}
 }
-

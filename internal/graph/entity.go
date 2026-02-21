@@ -74,7 +74,7 @@ var acronymStopwords = map[string]bool{
 	"OR": true, "AN": true, "IF": true, "IS": true, "IT": true,
 	"OF": true, "AS": true, "DO": true, "NO": true, "SO": true,
 	"UP": true, "WE": true, "HE": true, "MY": true, "BE": true,
-	"GO": true, // "Go" (capitalized) is in techDictionary, but "GO" all-caps is ambiguous
+	"GO":  true, // "Go" (capitalized) is in techDictionary, but "GO" all-caps is ambiguous
 	"THE": true, "AND": true, "FOR": true, "ARE": true, "BUT": true,
 	"NOT": true, "YOU": true, "ALL": true, "CAN": true, "HER": true,
 	"WAS": true, "ONE": true, "OUR": true, "OUT": true, "HAS": true,
