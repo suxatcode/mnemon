@@ -4,7 +4,7 @@
 >
 > The word shares its root with Mnemosyne (Μνημοσύνη), the goddess of memory — from her union with Zeus the nine Muses were born, symbolizing memory as the wellspring of all knowledge and creativity.
 
-Mnemon is a persistent memory system designed for LLM agents. It implements the four-graph architecture from the [MAGMA](https://arxiv.org/abs/2601.03236) (Multi-Graph Agentic Memory Architecture) paper as a single Go binary + SQLite, with no external API dependencies.
+Mnemon is a persistent memory system designed for LLM agents. It adopts the **LLM-Supervised** pattern: the host LLM acts as external orchestrator of a standalone memory binary through symbolic CLI interfaces, while the binary handles deterministic storage, graph indexing, and lifecycle management. Memory is organized as a four-graph knowledge structure with temporal, entity, causal, and semantic edges. Implemented as a single Go binary + SQLite, with no external API dependencies.
 
 This document describes Mnemon's design philosophy, core concepts, system architecture, and key algorithms in detail.
 
@@ -16,8 +16,6 @@ This document describes Mnemon's design philosophy, core concepts, system archit
 - [2. Design Philosophy](#2-design-philosophy)
 - [3. Core Concepts](#3-core-concepts)
 - [4. System Architecture](#4-system-architecture)
-  - [4.1 Data Directory Layout](#41-data-directory-layout)
-  - [4.2 Store Isolation](#42-store-isolation)
 - [5. MAGMA Four-Graph Model](#5-magma-four-graph-model)
 - [6. Write Pipeline: Remember](#6-write-pipeline-remember)
 - [7. Read Pipeline: Smart Recall](#7-read-pipeline-smart-recall)
@@ -125,6 +123,40 @@ Binary encapsulates all logic that does not require an LLM; Skill only teaches t
 - **Skills have near-zero marginal cost** — defining agent behavior via markdown is like game blueprints enabling non-programmers to participate
 - **The memory layer is the only part worth deep investment** — memory has a compound interest effect; it is the dividing line between an agent as a "tool" versus an "assistant"
 - **The LLM itself is the best orchestrator** — no need for Python DAG orchestration of call chains; the LLM reads the Skill and knows what to do
+
+### 2.4 Theoretical Foundations
+
+Mnemon's design draws on the **paradigm** of one paper and the **methodology** of another, while making its own engineering choices for the bridge between them.
+
+**RLM Paradigm: LLM as Orchestrator**
+
+The [Recursive Language Models](https://arxiv.org/abs/2512.24601) paper (Zhang, Kraska & Khattab, MIT 2025) establishes the paradigm that LLMs are more effective as orchestrators of external structured environments than as direct data processors. The paper's key findings at the paradigm level:
+
+- An 8B model handles inputs **100x beyond its context window** by treating data as external environment variables
+- **Two-stage pipelines** (fast filtering + LLM semantic verification) consistently outperform single-pass approaches
+- Passing **constant-size metadata** — not raw data — to the model is more effective
+
+The RLM paper's own implementation uses **code generation + Python REPL** as the interaction mechanism: the LLM writes Python code, a sandbox executes it, and results feed back. Mnemon shares the paradigm but takes a different path at the protocol level (see below).
+
+**MAGMA Methodology: Four-Graph Memory Architecture**
+
+The [MAGMA](https://arxiv.org/abs/2601.03236) paper provides the concrete methodology for **what the external environment should contain**. Its key contribution: a single edge type (e.g., vector similarity) is insufficient for memory — different query intents require different relational perspectives. MAGMA's four-graph architecture (temporal, entity, causal, semantic) with intent-adaptive retrieval and multi-signal fusion gives Mnemon its data model and retrieval algorithms.
+
+**Mnemon's Own Contribution: The Engineering Bridge**
+
+Neither paper addresses how to connect an LLM orchestrator to a graph-structured memory in production. Mnemon fills this gap:
+
+| Layer | Source | Choice |
+|---|---|---|
+| **Paradigm** — who orchestrates? | RLM | The host LLM, not an embedded model |
+| **Methodology** — what's in the environment? | MAGMA | Four-graph with intent-adaptive retrieval |
+| **Protocol** — how do they talk? | Mnemon | CLI commands + structured JSON (not code generation) |
+| **Lifecycle** — how does memory evolve? | Mnemon | Hook-driven remember → diff → link → gc |
+| **Distribution** — how to ship it? | Mnemon | Single Go binary, zero dependencies |
+
+Where the RLM implementation relies on code generation in a sandboxed REPL (flexible but requires a runtime and raises safety concerns), Mnemon uses deterministic CLI commands as the symbolic interface — constrained, but auditable, portable, and zero-sandbox. Where MAGMA's reference implementation is a Python library with in-memory NetworkX graphs, Mnemon persists everything in SQLite with a complete write-back lifecycle.
+
+The result is: **RLM's paradigm + MAGMA's methodology + a CLI-native engineering path** that runs on any LLM CLI without Python, without sandboxes, without API keys.
 
 ![LLM-Supervised Architecture](diagrams/05-llm-supervised.jpg)
 
@@ -359,7 +391,7 @@ This layered design serves different scenarios:
 
 ## 5. MAGMA Four-Graph Model
 
-The core idea of the MAGMA paper is: **a single edge type (such as pure vector similarity) is insufficient to capture the multidimensional relationships between memories.** Different query intents require different relational perspectives — asking "why" requires causal chains, asking "when" requires timelines, asking "about X" requires entity associations.
+Within the [RLM paradigm](#24-theoretical-foundations), MAGMA provides the specific data structure for the external environment that the LLM orchestrates. The core idea of the MAGMA paper is: **a single edge type (such as pure vector similarity) is insufficient to capture the multidimensional relationships between memories.** Different query intents require different relational perspectives — asking "why" requires causal chains, asking "when" requires timelines, asking "about X" requires entity associations.
 
 Mnemon implements four graphs, each capturing one dimension of relationships:
 
@@ -1022,4 +1054,4 @@ For CLIs without hook support, merge the recall/remember guidance into the corre
 | Embeddings | FAISS + OpenAI | Ollama (local, optional) |
 | Deployment | Python library | Single Go binary |
 
-Mnemon retains MAGMA's **architectural skeleton** (four-graph separation, intent-adaptive retrieval, multi-signal fusion) while replacing academic implementation details with production-ready simplifications. The core trade-off is: **use regex/heuristics to handle 80% of automation scenarios, and delegate the 20% requiring deep understanding to the host LLM.**
+Mnemon retains MAGMA's **architectural skeleton** (four-graph separation, intent-adaptive retrieval, multi-signal fusion) while replacing academic implementation details with production-ready simplifications. This two-tier approach — deterministic automation for the majority of cases, LLM judgment for the complex minority — is precisely the pattern validated by the [RLM paper](#24-theoretical-foundations): regex-based filtering plus LLM-driven semantic verification consistently outperforms either approach alone. The core trade-off is: **use regex/heuristics to handle 80% of automation scenarios, and delegate the 20% requiring deep understanding to the host LLM.**

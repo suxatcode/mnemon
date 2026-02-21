@@ -190,9 +190,16 @@ make help           # 显示所有目标
 
 ## 文档
 
-- [设计与架构](DESIGN.md) — 核心概念、四图模型、LLM 监督式架构、算法、集成设计
+- [设计与架构](DESIGN.md) — 核心概念、算法、集成设计
 - [用法与参考](USAGE.md) — CLI 命令、嵌入向量支持、架构概览
 - [架构图](../diagrams/) — 系统架构、记忆/召回流程、四图模型、生命周期管理
+
+## 参考文献
+
+Mnemon 取用了一篇论文的范式和另一篇论文的方法论。详见[理论基础](DESIGN.md#24-理论基础)。
+
+- **RLM** — Zhang, Kraska & Khattab. [Recursive Language Models](https://arxiv.org/abs/2512.24601). 2025. 建立范式：LLM 作为外部环境的 orchestrator 比直接处理数据更有效。
+- **MAGMA** — Zou et al. [A Multi-Graph based Agentic Memory Architecture](https://arxiv.org/abs/2601.03236). 2025. 提供方法论：四图模型（temporal、entity、causal、semantic）+ intent-adaptive retrieval。
 
 ## 许可证
 

@@ -203,10 +203,17 @@ make help           # show all targets
 
 ## Documentation
 
-- [Design & Architecture](docs/DESIGN.md) — philosophy, MAGMA four-graph model, algorithms, integration design
+- [Design & Architecture](docs/DESIGN.md) — philosophy, algorithms, integration design
 - [Usage & Reference](docs/USAGE.md) — CLI commands, embedding support, architecture overview
 - [Architecture Diagrams](docs/diagrams/) — system architecture, pipelines, lifecycle management
 - [中文文档](docs/zh/) — Chinese documentation
+
+## References
+
+Mnemon combines the paradigm of one paper with the methodology of another. See [Theoretical Foundations](docs/DESIGN.md#24-theoretical-foundations) for details.
+
+- **RLM** — Zhang, Kraska & Khattab. [Recursive Language Models](https://arxiv.org/abs/2512.24601). 2025. Establishes the paradigm: LLMs are more effective as orchestrators of external environments than as direct data processors.
+- **MAGMA** — Zou et al. [A Multi-Graph based Agentic Memory Architecture](https://arxiv.org/abs/2601.03236). 2025. Provides the methodology: four-graph model (temporal, entity, causal, semantic) with intent-adaptive retrieval.
 
 ## License
 
