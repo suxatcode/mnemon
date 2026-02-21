@@ -23,3 +23,6 @@ vendor/
 # Test artifacts
 /tmp/
 .testdata/
+
+# GoReleaser
+dist/

@@ -8,12 +8,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// version is set at build time via ldflags.
+var version = "dev"
+
 var dataDir string
 
 var rootCmd = &cobra.Command{
-	Use:   "mnemon",
-	Short: "Memory daemon for LLM agents",
-	Long:  "Mnemon is a standalone memory daemon based on MAGMA's four-graph architecture.",
+	Use:     "mnemon",
+	Version: version,
+	Short:   "Memory daemon for LLM agents",
+	Long:    "Mnemon is a standalone memory daemon based on MAGMA's four-graph architecture.",
 }
 
 func Execute() {

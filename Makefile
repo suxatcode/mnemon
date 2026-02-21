@@ -3,6 +3,8 @@
 # ──────────────────────────────────────────────────────────────────────
 
 BINARY      := mnemon
+VERSION     ?= dev
+LDFLAGS     := -s -w -X github.com/mnemon-dev/mnemon/cmd.version=$(VERSION)
 GOBIN       := $(shell go env GOBIN)
 ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
@@ -15,7 +17,7 @@ endif
 # ── Build ────────────────────────────────────────────────────────────
 
 build: ## Build the mnemon binary
-	go build -o $(BINARY) .
+	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
 
 # ── Install / Uninstall ─────────────────────────────────────────────
 

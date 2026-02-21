@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mnemon
+    main: .
+    binary: mnemon
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/mnemon-dev/mnemon/cmd.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "^Merge"
+
+brews:
+  - repository:
+      owner: mnemon-dev
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/mnemon-dev/mnemon"
+    description: "Persistent memory for LLM agents"
+    license: "MIT"
+    test: |
+      system "#{bin}/mnemon", "--version"
+    install: |
+      bin.install "mnemon"
+
+release:
+  github:
+    owner: mnemon-dev
+    name: mnemon
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
