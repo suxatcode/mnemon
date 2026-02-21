@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/mnemon-dev/mnemon/internal/model"
@@ -115,7 +116,9 @@ func scanEdges(rows interface{ Next() bool; Scan(...interface{}) error }) ([]*mo
 		}
 		e.EdgeType = model.EdgeType(edgeType)
 		e.ParseMetadata(metadata)
-		e.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		if e.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
+			return nil, fmt.Errorf("parse edge created_at (%s→%s): %w", e.SourceID, e.TargetID, err)
+		}
 		results = append(results, &e)
 	}
 	return results, nil

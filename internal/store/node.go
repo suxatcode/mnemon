@@ -195,7 +195,10 @@ func (db *DB) RefreshEffectiveImportance(id string) (float64, error) {
 		return 0, err
 	}
 
-	lastAccess, _ := time.Parse(time.RFC3339, createdAt)
+	lastAccess, parseErr := time.Parse(time.RFC3339, createdAt)
+	if parseErr != nil {
+		return 0, fmt.Errorf("parse created_at for %s: %w", id, parseErr)
+	}
 	if lastAccessedAt.Valid && lastAccessedAt.String != "" {
 		if t, err := time.Parse(time.RFC3339, lastAccessedAt.String); err == nil {
 			lastAccess = t
@@ -253,10 +256,20 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 		i.Source = source
 		i.ParseTags(tags)
 		i.ParseEntities(entities)
-		i.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-		i.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		if i.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
+			rows.Close()
+			return nil, 0, fmt.Errorf("parse created_at for %s: %w", i.ID, err)
+		}
+		if i.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt); err != nil {
+			rows.Close()
+			return nil, 0, fmt.Errorf("parse updated_at for %s: %w", i.ID, err)
+		}
 		if deletedAt.Valid {
-			t, _ := time.Parse(time.RFC3339, deletedAt.String)
+			t, parseErr := time.Parse(time.RFC3339, deletedAt.String)
+			if parseErr != nil {
+				rows.Close()
+				return nil, 0, fmt.Errorf("parse deleted_at for %s: %w", i.ID, parseErr)
+			}
 			i.DeletedAt = &t
 		}
 		la := i.CreatedAt
@@ -316,14 +329,22 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 		}
 	}
 
-	// Batch-update effective_importance in a single transaction.
+	// Batch-update effective_importance in a single transaction (best-effort:
+	// failures don't affect returned candidates since EI is already computed in memory).
 	if len(updates) > 0 {
-		tx, txErr := db.conn.Begin()
-		if txErr == nil {
+		tx, err := db.conn.Begin()
+		if err == nil {
+			var txErr error
 			for _, u := range updates {
-				tx.Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, u.ei, u.id)
+				if _, txErr = tx.Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, u.ei, u.id); txErr != nil {
+					break
+				}
 			}
-			tx.Commit()
+			if txErr != nil {
+				tx.Rollback()
+			} else {
+				tx.Commit()
+			}
 		}
 	}
 
@@ -414,7 +435,9 @@ func (db *DB) autoPrune(maxInsights int, excludeIDs []string) (int, error) {
 			return pruned, fmt.Errorf("prune %s: %w", id, err)
 		}
 		if n, _ := res.RowsAffected(); n > 0 {
-			db.DeleteEdgesByNode(id)
+			if err := db.DeleteEdgesByNode(id); err != nil {
+				return pruned, fmt.Errorf("delete edges for pruned %s: %w", id, err)
+			}
 			pruned++
 		}
 	}
@@ -669,10 +692,17 @@ func scanInsight(row *sql.Row) (*model.Insight, error) {
 	i.Source = source
 	i.ParseTags(tags)
 	i.ParseEntities(entities)
-	i.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-	i.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	if i.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
+		return nil, fmt.Errorf("parse created_at for %s: %w", i.ID, err)
+	}
+	if i.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt); err != nil {
+		return nil, fmt.Errorf("parse updated_at for %s: %w", i.ID, err)
+	}
 	if deletedAt.Valid {
-		t, _ := time.Parse(time.RFC3339, deletedAt.String)
+		t, parseErr := time.Parse(time.RFC3339, deletedAt.String)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parse deleted_at for %s: %w", i.ID, parseErr)
+		}
 		i.DeletedAt = &t
 	}
 	return &i, nil
@@ -695,10 +725,17 @@ func scanInsights(rows *sql.Rows) ([]*model.Insight, error) {
 		i.Source = source
 		i.ParseTags(tags)
 		i.ParseEntities(entities)
-		i.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-		i.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		if i.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
+			return nil, fmt.Errorf("parse created_at for %s: %w", i.ID, err)
+		}
+		if i.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt); err != nil {
+			return nil, fmt.Errorf("parse updated_at for %s: %w", i.ID, err)
+		}
 		if deletedAt.Valid {
-			t, _ := time.Parse(time.RFC3339, deletedAt.String)
+			t, parseErr := time.Parse(time.RFC3339, deletedAt.String)
+			if parseErr != nil {
+				return nil, fmt.Errorf("parse deleted_at for %s: %w", i.ID, parseErr)
+			}
 			i.DeletedAt = &t
 		}
 		results = append(results, &i)
