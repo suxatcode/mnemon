@@ -39,17 +39,33 @@ func OpenClawWriteHook(configDir string) (string, error) {
 }
 
 // OpenClawWritePlugin writes the mnemon plugin to the OpenClaw extensions directory.
-func OpenClawWritePlugin(configDir string) (string, error) {
+// ver is the mnemon version string (e.g. from ldflags); it replaces the
+// embedded manifest's static version field so the installed plugin always
+// reflects the running binary.
+func OpenClawWritePlugin(configDir, ver string) (string, error) {
 	pluginDir := filepath.Join(configDir, "extensions", "mnemon")
 	if err := os.MkdirAll(pluginDir, 0755); err != nil {
 		return "", err
 	}
+
+	// Patch manifest version when a real version is available.
+	manifest := assets.OpenClawPluginManifest
+	if ver != "" && ver != "dev" {
+		var m map[string]any
+		if err := json.Unmarshal(manifest, &m); err == nil {
+			m["version"] = ver
+			if patched, err := json.MarshalIndent(m, "", "  "); err == nil {
+				manifest = append(patched, '\n')
+			}
+		}
+	}
+
 	files := []struct {
 		name string
 		data []byte
 	}{
 		{"package.json", assets.OpenClawPluginPackage},
-		{"openclaw-plugin.json", assets.OpenClawPluginManifest},
+		{"openclaw.plugin.json", manifest},
 		{"index.js", assets.OpenClawPluginIndex},
 	}
 	for _, f := range files {

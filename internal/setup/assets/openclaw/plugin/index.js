@@ -25,34 +25,30 @@ export default function register(api) {
   }
 
   // ── before_prompt_build ───────────────────────────────────────
-  // Injects reminders only — the LLM decides whether to recall/remember.
-  // No direct mnemon execution here (CLI-in-the-loop: LLM drives the CLI).
-  if (remind || nudge || compact) {
-    api.on("before_prompt_build", async () => {
-      const parts = [];
+  // Always load the mnemon skill; optionally inject remind/nudge/compact hints.
+  api.on("before_prompt_build", async () => {
+    const parts = ["[mnemon] load mnemon skill"];
 
-      // Compact flag: was compaction triggered since last turn?
-      if (compact && existsSync(COMPACT_FLAG)) {
-        try { unlinkSync(COMPACT_FLAG); } catch { /* ignore */ }
-        parts.push(
-          "[mnemon] Context compaction starting. Review this session and remember the most valuable insights (up to 5) before context is compressed. Delegate to Task sub-agents now."
-        );
-      }
+    // Compact flag: was compaction triggered since last turn?
+    if (compact && existsSync(COMPACT_FLAG)) {
+      try { unlinkSync(COMPACT_FLAG); } catch { /* ignore */ }
+      parts.push(
+        "[mnemon] Context compaction starting. Review this session and remember the most valuable insights (up to 5) before context is compressed. Delegate to Task sub-agents now."
+      );
+    }
 
-      if (remind) {
-        parts.push(
-          "[mnemon] Evaluate: recall needed? After responding, evaluate: remember needed?"
-        );
-      }
+    if (remind) {
+      parts.push(
+        "[mnemon] Evaluate: recall needed? After responding, evaluate: remember needed?"
+      );
+    }
 
-      if (nudge) {
-        parts.push(
-          "[mnemon] Consider: does this exchange warrant a remember sub-agent?"
-        );
-      }
+    if (nudge) {
+      parts.push(
+        "[mnemon] Consider: does this exchange warrant a remember sub-agent?"
+      );
+    }
 
-      if (parts.length === 0) return;
-      return { prependContext: parts.join("\n\n") };
-    });
-  }
+    return { prependContext: parts.join("\n\n") };
+  });
 }

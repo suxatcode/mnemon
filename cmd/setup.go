@@ -335,7 +335,7 @@ func installOpenClaw(env *setup.Environment) error {
 	fmt.Println("\n[4/4] Plugin")
 	sel := selectOpenClawOptionalHooks()
 
-	if path, err := setup.OpenClawWritePlugin(configDir); err != nil {
+	if path, err := setup.OpenClawWritePlugin(configDir, version); err != nil {
 		setup.StatusError(0, 0, "Plugin", err)
 	} else {
 		setup.StatusOK(0, 0, "Plugin", path)

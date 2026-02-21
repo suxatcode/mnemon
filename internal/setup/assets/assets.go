@@ -32,7 +32,7 @@ var OpenClawHookHandler []byte
 //go:embed openclaw/plugin/package.json
 var OpenClawPluginPackage []byte
 
-//go:embed openclaw/plugin/openclaw-plugin.json
+//go:embed openclaw/plugin/openclaw.plugin.json
 var OpenClawPluginManifest []byte
 
 //go:embed openclaw/plugin/index.js
