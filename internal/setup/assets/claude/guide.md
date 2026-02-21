@@ -34,8 +34,8 @@ Run this decision tree after every substantive response:
 
 **What to store**: conclusions and user-specific context, not raw facts.
 **How to store**: delegate to a Task sub-agent (`subagent_type="Bash"`, `model="sonnet"`).
-Provide what to store — content, category, importance, entities, and create/update intent.
-The sub-agent reads the mnemon skill and executes the correct commands.
+Only provide what to store — content, category, importance, entities, and create/update intent.
+The sub-agent will read the mnemon skill and execute the correct commands itself.
 
-Do NOT run memory writes in the main conversation.
-Do NOT store transient state, git-tracked content, or operational commands.
+Do NOT: write CLI commands or workflow steps in the sub-agent prompt (the sub-agent has access to the skill docs and will use the correct flags).
+Do NOT run memory writes in the main conversation, or remember operational/public/git-tracked/transient info.
