@@ -10,34 +10,6 @@ const (
 	markerEnd   = "<!-- mnemon:end -->"
 )
 
-// InjectMemoryBlock appends the template to filePath if the mnemon marker is absent.
-// Creates the file if it doesn't exist. Returns true if the file was modified.
-func InjectMemoryBlock(filePath string, template []byte) (bool, error) {
-	content, err := os.ReadFile(filePath)
-	if err != nil && !os.IsNotExist(err) {
-		return false, err
-	}
-
-	if strings.Contains(string(content), markerStart) {
-		return false, nil // already present
-	}
-
-	var buf []byte
-	if len(content) > 0 {
-		buf = append(buf, content...)
-		if !strings.HasSuffix(string(content), "\n") {
-			buf = append(buf, '\n')
-		}
-		buf = append(buf, '\n')
-	}
-	buf = append(buf, template...)
-
-	if err := os.WriteFile(filePath, buf, 0644); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
 // EjectMemoryBlock removes everything between <!-- mnemon:start --> and <!-- mnemon:end --> inclusive.
 // Returns true if the file was modified.
 func EjectMemoryBlock(filePath string) (bool, error) {

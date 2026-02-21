@@ -8,13 +8,9 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-SKILL_SRC   := skills/mnemon
-SKILL_DST   := $(HOME)/.claude/skills/mnemon
+ASSETS_DIR := internal/setup/assets/claude
 
-HOOKS_SRC   := scripts/hooks
-HOOKS_DST   := $(HOME)/.claude/hooks/mnemon
-CLAUDE_SETTINGS := $(HOME)/.claude/settings.json
-.PHONY: build install uninstall inject eject inject-hooks eject-hooks setup sync-assets check-assets test clean help
+.PHONY: build install uninstall sync-assets check-assets test clean help
 
 .DEFAULT_GOAL := help
 
@@ -30,72 +26,12 @@ install: build ## Build and install mnemon to $GOBIN
 	cp $(BINARY) $(GOBIN)/$(BINARY)
 	@echo "Installed: $(GOBIN)/$(BINARY)"
 
-uninstall: eject eject-hooks ## Remove binary, skill, and hooks
+uninstall: ## Remove mnemon binary from $GOBIN
 	rm -f $(GOBIN)/$(BINARY)
 	@echo "Removed: $(GOBIN)/$(BINARY)"
-
-# ── Skill ────────────────────────────────────────────────────────────
-
-inject: ## Install mnemon skill to ~/.claude/skills/mnemon/
-	@mkdir -p $(SKILL_DST)
-	cp $(SKILL_SRC)/SKILL.md $(SKILL_DST)/SKILL.md
-	@echo "  Skill → $(SKILL_DST)/SKILL.md"
-
-eject: ## Remove mnemon skill
-	@if [ -d "$(SKILL_DST)" ]; then \
-		rm -rf "$(SKILL_DST)"; \
-		echo "Removed: $(SKILL_DST)"; \
-	else \
-		echo "No mnemon skill found at $(SKILL_DST)"; \
-	fi
-
-# ── Hooks (Claude Code only) ────────────────────────────────────────
-
-define JQ_REMOVE_MNEMON
-def has_mnemon: ((.command? // "") | test("mnemon")) or ((.prompt? // "") | test("mnemon"));
-def no_mnemon: (has_mnemon | not) and ((.hooks? // []) | all(has_mnemon | not));
-.hooks //= {} |
-.hooks.UserPromptSubmit = [(.hooks.UserPromptSubmit // [])[] | select(no_mnemon)] |
-.hooks.Stop = [(.hooks.Stop // [])[] | select(no_mnemon)]
-endef
-export JQ_REMOVE_MNEMON
-
-inject-hooks: ## Install Claude Code hooks for auto-recall/remember
-	@mkdir -p $(HOOKS_DST)
-	@cp $(HOOKS_SRC)/user_prompt.sh $(HOOKS_DST)/user_prompt.sh
-	@cp $(HOOKS_SRC)/stop.sh $(HOOKS_DST)/stop.sh
-	@chmod +x $(HOOKS_DST)/*.sh
-	@if [ ! -f "$(CLAUDE_SETTINGS)" ]; then echo '{}' > "$(CLAUDE_SETTINGS)"; fi
-	@jq "$$JQ_REMOVE_MNEMON" "$(CLAUDE_SETTINGS)" | \
-	jq '.hooks.UserPromptSubmit += [{"hooks": [{"type": "command", "command": "$(HOOKS_DST)/user_prompt.sh"}]}]' | \
-	jq '.hooks.Stop += [{"hooks": [{"type": "command", "command": "$(HOOKS_DST)/stop.sh"}]}]' \
-		> "$(CLAUDE_SETTINGS).tmp" && mv "$(CLAUDE_SETTINGS).tmp" "$(CLAUDE_SETTINGS)"
-	@echo "  Hooks → $(HOOKS_DST)/"
-	@echo "  Config → $(CLAUDE_SETTINGS)"
-
-eject-hooks: ## Remove Claude Code hooks
-	@if [ -d "$(HOOKS_DST)" ]; then rm -rf "$(HOOKS_DST)"; echo "Removed: $(HOOKS_DST)"; fi
-	@if [ -f "$(CLAUDE_SETTINGS)" ]; then \
-		jq "$$JQ_REMOVE_MNEMON" "$(CLAUDE_SETTINGS)" > "$(CLAUDE_SETTINGS).tmp" && \
-		mv "$(CLAUDE_SETTINGS).tmp" "$(CLAUDE_SETTINGS)"; \
-		echo "Cleaned: $(CLAUDE_SETTINGS)"; \
-	fi
-
-# ── Setup (one-command) ─────────────────────────────────────────────
-
-setup: install inject inject-hooks ## Full setup: binary + skill + hooks (deprecated: use 'mnemon setup')
-	@echo ""
-	@echo "Setup complete:"
-	@echo "  Binary → $(GOBIN)/$(BINARY)"
-	@echo "  Skill  → $(SKILL_DST)/SKILL.md"
-	@echo "  Hooks  → $(HOOKS_DST)/"
-	@echo ""
-	@echo "NOTE: 'make setup' is deprecated. Use 'mnemon setup' instead."
-	@echo "Start a new Claude Code session to verify."
+	@echo "Run 'mnemon setup --eject' first to remove integrations."
 
 # ── Asset Sync ──────────────────────────────────────────────────────
-
-ASSETS_DIR := internal/setup/assets/claude
 
 sync-assets: ## Sync source-of-truth files into embedded assets
 	@cp scripts/hooks/user_prompt.sh $(ASSETS_DIR)/user_prompt.sh
