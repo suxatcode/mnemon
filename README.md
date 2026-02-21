@@ -22,6 +22,22 @@ Mnemon gives your agent persistent, cross-session memory — with a single binar
   <sub>A real knowledge graph built by Mnemon — 87 insights, 2150 edges across four graph types.</sub>
 </p>
 
+### Why Mnemon?
+
+Memory has a **compound interest effect** — the longer it accumulates, the greater its value. LLM engines iterate constantly, skill files cost nearly nothing to write, but memory is a private asset that grows with the user. It is the only component in the agent ecosystem worth deep investment.
+
+Mnemon is built on one core belief: **the LLM itself is the best orchestrator.** Rather than embedding a small LLM inside the pipeline, Mnemon lets your host LLM — the one already holding full conversation context — act as supervisor. The binary is the organ (deterministic storage, graph indexing, search, decay); the LLM is the brain (decides what to remember, how to link, when to forget). The skill file is the textbook that teaches the protocol.
+
+This means: **memory management logic moves from prompt to code — deterministic, testable, portable.** The same binary + skill can run on Claude Code, Cursor, or any LLM CLI that reads markdown.
+
+| Pattern | LLM Role | Representative |
+|---|---|---|
+| **LLM-Embedded** | Executor inside the pipeline | Mem0, MAGMA |
+| **MCP Server** | Tool provider via MCP protocol | MemCP |
+| **LLM-Supervised** | External supervisor of a standalone binary | Mnemon |
+
+See [Design & Architecture](docs/DESIGN.md) for details.
+
 ## Quick Start
 
 ### Claude Code
@@ -94,7 +110,8 @@ You don't run mnemon commands yourself. The agent does — driven by hooks and g
 - **LLM-supervised** — the host LLM decides what to remember, update, and forget; no embedded LLM, no API keys
 - **Hook-based integration** — four lifecycle hooks: Prime (load guide), Remind (recall & remember), Nudge (remember), and Compact (save before compression)
 - **Four-graph architecture** — temporal, entity, causal, and semantic edges, not just vector similarity
-- **Built-in deduplication** — duplicates are skipped, conflicts auto-replaced
+- **Intent-aware recall** — graph traversal + optional vector search (RRF fusion), enabled by default for all queries
+- **Built-in deduplication** — `remember` auto-detects duplicates and conflicts; skips or auto-replaces
 - **Retention lifecycle** — importance decay, access-count boosting, and garbage collection
 - **Optional embeddings** — works fully without Ollama; add local [Ollama](https://ollama.ai) for enhanced vector+keyword hybrid search
 
@@ -128,54 +145,6 @@ Edit `~/.mnemon/prompt/guide.md`. This file controls when the agent recalls memo
 **What is sub-agent delegation?**
 Memory writes don't happen in the main conversation. The host LLM (e.g., Opus) decides *what* to remember, then delegates the actual `mnemon remember` execution to a lightweight sub-agent (e.g., Sonnet). This saves tokens and keeps memory operations out of the main context.
 
-## Embedding Support (Optional)
-
-Mnemon works fully without Ollama — all core features (remember, recall, link, graph traversal) function out of the box. Adding Ollama enhances recall precision through vector similarity, but is never required.
-
-### What changes with and without embeddings
-
-| Capability | Without Ollama | With Ollama |
-|---|---|---|
-| **Recall anchors** | Keyword + recency | Keyword + vector + recency (RRF hybrid) |
-| **Semantic edges** | Token overlap (coarser) | Cosine similarity ≥ 0.50 (precise) |
-| **Traversal scoring** | Pure structural | Structural + semantic |
-| **Rerank weights** | Keyword 45%, Entity 25%, Graph 30% | Keyword 30%, Entity 15%, Similarity 35%, Graph 20% |
-
-When Ollama is unavailable, the reranking system automatically redistributes similarity weight to keyword and graph signals — no configuration needed, no degraded mode flag. The system detects Ollama availability at runtime with a 2-second timeout.
-
-### Setup
-
-```bash
-brew install ollama              # or see https://ollama.ai
-ollama pull nomic-embed-text     # download the embedding model
-```
-
-Verify with:
-
-```bash
-mnemon embed --status
-```
-
-```json
-{
-  "total_insights": 87,
-  "embedded": 87,
-  "coverage": "100%",
-  "ollama_available": true,
-  "model": "nomic-embed-text"
-}
-```
-
-### Backfilling existing insights
-
-If you install Ollama after already using mnemon, existing insights won't have embeddings. Backfill them in one command:
-
-```bash
-mnemon embed --all
-```
-
-This generates embeddings for all un-embedded insights and automatically creates semantic edges. You can check coverage before and after with `mnemon embed --status`.
-
 ## Configuration
 
 | Environment Variable | Default | Description |
@@ -205,6 +174,7 @@ make help           # show all targets
 ## Documentation
 
 - [Design & Architecture](docs/DESIGN.md) — philosophy, MAGMA four-graph model, algorithms, integration design
+- [Usage & Reference](docs/USAGE.md) — CLI commands, embedding support, architecture overview
 - [Architecture Diagrams](docs/diagrams/) — system architecture, pipelines, lifecycle management
 - [中文文档](docs/zh/) — Chinese documentation
 

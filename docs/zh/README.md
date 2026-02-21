@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../logo/logo.svg" width="160" height="160" alt="Mnemon Logo" />
+</p>
+
 # Mnemon
 
 **LLM 智能体的持久记忆系统** — LLM 监督式、钩子集成、四图架构。
@@ -11,6 +15,12 @@
 LLM 智能体在会话之间会遗忘一切。上下文压缩丢失关键决策，跨会话知识消失，长对话将早期信息推出窗口。
 
 Mnemon 为你的 LLM 提供持久的跨会话记忆 — 只需一个 Go 二进制文件和一条 setup 命令。
+
+<p align="center">
+  <img src="../diagrams/10-knowledge-graph.png" width="720" alt="知识图谱 — 87 条洞察通过时序、实体、语义和因果边连接" />
+  <br />
+  <sub>Mnemon 构建的真实知识图谱 — 87 条洞察，2150 条边，横跨四种图类型。</sub>
+</p>
 
 ### 为什么选择 Mnemon？
 
@@ -121,84 +131,6 @@ mnemon setup --eject
 
 基础已就绪：一个 `~/.mnemon` 数据库，任何 agent 都可以读写。Claude Code 的钩子集成是参考实现 — 同样的模式（生命周期钩子 + 技能文件 + 行为引导）可以复制到任何支持事件钩子或系统提示的 LLM CLI。
 
-## 用法
-
-### 核心命令
-
-```bash
-# Remember — 存储新洞察（内置 diff：重复跳过，冲突自动替换）
-mnemon remember "选择 Qdrant 而非 Milvus 做向量搜索" \
-  --cat decision --imp 5 --entities "Qdrant,Milvus" --source agent
-
-# Recall — 意图感知的图增强检索（默认）
-mnemon recall "vector database" --limit 10
-
-# Search — 基于 token 评分的关键词搜索
-mnemon search "authentication" --limit 10
-
-# Forget — 软删除洞察
-mnemon forget <id>
-```
-
-### 图操作
-
-```bash
-# Link — 创建类型化边
-mnemon link <source_id> <target_id> --type semantic --weight 0.85
-mnemon link <source_id> <target_id> --type causal --weight 0.8 \
-  --meta '{"sub_type":"causes","reason":"..."}'
-
-# Related — 从某个洞察出发的 BFS 遍历
-mnemon related <id> --edge causal --depth 2
-```
-
-### 生命周期管理
-
-```bash
-# GC — 查看低保留度候选
-mnemon gc --threshold 0.5
-
-# GC keep — 提升某个洞察的保留度
-mnemon gc --keep <id>
-```
-
-### 可观测性
-
-```bash
-mnemon status    # 记忆统计
-mnemon log       # 操作日志
-```
-
-### 可视化
-
-导出知识图谱进行可视化探索：
-
-```bash
-# DOT 格式 — 使用 Graphviz 渲染（brew install graphviz）
-mnemon viz --format dot -o graph.dot
-dot -Tpng graph.dot -o graph.png
-
-# 交互式 HTML — 直接在浏览器中打开（vis.js，无需安装）
-mnemon viz --format html -o graph.html
-open graph.html
-```
-
-节点按分类着色（decision、fact、insight、preference、context），边按类型着色（temporal、semantic、causal、entity）。
-
-### 嵌入向量（可选）
-
-需要 [Ollama](https://ollama.ai) 和 `nomic-embed-text`：
-
-```bash
-ollama pull nomic-embed-text
-
-mnemon embed --status    # 查看嵌入覆盖率
-mnemon embed --all       # 批量生成所有洞察的嵌入
-mnemon embed <id>        # 为单个洞察生成嵌入
-```
-
-嵌入向量可用时，`recall` 自动使用混合向量+关键词搜索（RRF 融合）。
-
 ## 常见问题
 
 **不同会话共享记忆吗？**
@@ -212,30 +144,6 @@ mnemon embed <id>        # 为单个洞察生成嵌入
 
 **什么是 Sub-agent 委派？**
 记忆写入不在主对话中进行。宿主 LLM（如 Opus）决定*记什么*，然后委派实际的 `mnemon remember` 执行给轻量 sub-agent（如 Sonnet）。这节省 token 并保持记忆操作不污染主上下文。
-
-## 架构
-
-```
-┌──────────────────┐     CLI commands      ┌──────────────────┐
-│   LLM Agent      │ ───────────────────── │     Mnemon       │
-│ (Claude Code,    │  remember, recall,    │                  │
-│  Cursor, etc.)   │  link, forget, gc     │  SQLite (WAL)    │
-└──────────────────┘                       │  ┌────────────┐  │
-                                           │  │ Insights   │  │
-        The LLM decides WHAT               │  ├────────────┤  │
-        to remember and link.              │  │ 4 Edge     │  │
-                                           │  │ Types:     │  │
-        Mnemon handles HOW                 │  │ temporal   │  │
-        to store, index, and               │  │ entity     │  │
-        retrieve.                          │  │ causal     │  │
-                                           │  │ semantic   │  │
-      ┌──────────────────┐                 │  ├────────────┤  │
-      │  Ollama          │  (optional)     │  │ Embeddings │  │
-      │  nomic-embed-text│ ◄───────────── │  └────────────┘  │
-      └──────────────────┘                 └──────────────────┘
-```
-
-受 [MAGMA](https://arxiv.org/abs/2601.03236) 四图模型启发。详见[设计与架构](DESIGN.md)。
 
 ## 配置
 
@@ -265,6 +173,7 @@ make help           # 显示所有目标
 ## 文档
 
 - [设计与架构](DESIGN.md) — 核心概念、四图模型、LLM 监督式架构、算法、集成设计
+- [用法与参考](USAGE.md) — CLI 命令、嵌入向量支持、架构概览
 - [架构图](../diagrams/) — 系统架构、记忆/召回流程、四图模型、生命周期管理
 
 ## 许可证
