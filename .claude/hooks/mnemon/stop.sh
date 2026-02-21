@@ -2,6 +2,7 @@
 # mnemon Stop hook — lightweight memory reminder (suggestion mode).
 # Non-blocking: outputs a reminder that the model sees but is not forced to act on.
 # The model's CLAUDE.md instructions handle the actual memory evaluation.
+# Optional dependency: jq (for smart silence). Without jq, the nudge always fires.
 
 INPUT=$(cat)
 

@@ -17,7 +17,7 @@ metadata:
    - Output includes `action` (added/updated/skipped), `semantic_candidates`, `causal_candidates`.
 2. **Link** (evaluate candidates from step 1 — use judgment, not mechanical rules):
    - Review `causal_candidates`: does a genuine cause-effect relationship exist? `causal_signal` is regex-based and prone to false positives — only link if the memories are truly causally related.
-   - Review `semantic_candidates`: are these memories meaningfully related? High `token_similarity` alone is not sufficient — skip candidates that share keywords but discuss unrelated topics.
+   - Review `semantic_candidates`: are these memories meaningfully related? High `similarity` alone is not sufficient — skip candidates that share keywords but discuss unrelated topics.
    - Syntax: `mnemon link <id> <candidate> --type <causal|semantic> --weight <0-1> [--meta '<json>']`
 3. **Recall**: `mnemon recall "<query>" --limit 10`
 

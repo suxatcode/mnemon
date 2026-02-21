@@ -282,9 +282,14 @@ CREATE INDEX IF NOT EXISTS idx_oplog_created ON oplog(created_at);
 		return fmt.Errorf("remove narrative edges: %w", err)
 	}
 
-	// Clean up narrative category insights from existing databases
-	if _, err := db.conn.Exec(`UPDATE insights SET deleted_at = datetime('now') WHERE category = 'narrative' AND deleted_at IS NULL`); err != nil {
-		return fmt.Errorf("clean narrative insights: %w", err)
+	// One-time cleanup: soft-delete narrative category insights from legacy databases.
+	// Only runs the UPDATE when narrative insights actually exist (avoids needless writes).
+	var narrativeCount int
+	_ = db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE category = 'narrative' AND deleted_at IS NULL`).Scan(&narrativeCount)
+	if narrativeCount > 0 {
+		if _, err := db.conn.Exec(`UPDATE insights SET deleted_at = datetime('now') WHERE category = 'narrative' AND deleted_at IS NULL`); err != nil {
+			return fmt.Errorf("clean narrative insights: %w", err)
+		}
 	}
 
 	return nil

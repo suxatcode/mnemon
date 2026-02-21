@@ -190,7 +190,7 @@ func renderHTML(insights []*model.Insight, edges []*model.Edge) string {
 		}
 		edgesJS.WriteString(fmt.Sprintf(
 			`{from:"%s",to:"%s",label:"%s",color:{color:"%s"},arrows:"to",font:{color:"%s",size:10}}`,
-			e.SourceID, e.TargetID, edgeLabel, color, color))
+			e.SourceID, e.TargetID, html.EscapeString(edgeLabel), color, color))
 	}
 
 	return fmt.Sprintf(htmlTemplate, nodes.String(), edgesJS.String())

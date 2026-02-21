@@ -8,6 +8,7 @@
 
 [![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![CI](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mnemon-dev/mnemon)](https://goreportcard.com/report/github.com/mnemon-dev/mnemon)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -67,6 +68,12 @@ git clone https://github.com/mnemon-dev/mnemon.git && cd mnemon
 make install
 ```
 
+**Verify installation**:
+
+```bash
+mnemon --version
+```
+
 ### Claude Code
 
 ```bash
@@ -75,7 +82,7 @@ mnemon setup
 
 `mnemon setup` auto-detects Claude Code, then interactively deploys skill, hooks, and behavioral guide. Start a new session — memory just works.
 
-### OpenClaw
+### [OpenClaw](https://github.com/openclaw/openclaw)
 
 ```bash
 mnemon setup --target openclaw

@@ -30,11 +30,11 @@ const maxAutoSemanticEdges = 3
 // When AutoLinked is true, the edge was already created automatically (high confidence).
 // When false, the candidate is in the review zone and needs LLM judgment.
 type SemanticCandidate struct {
-	ID              string  `json:"id"`
-	Content         string  `json:"content"`
-	Category        string  `json:"category"`
-	TokenSimilarity float64 `json:"token_similarity"`
-	AutoLinked      bool    `json:"auto_linked"`
+	ID         string  `json:"id"`
+	Content    string  `json:"content"`
+	Category   string  `json:"category"`
+	Similarity float64 `json:"similarity"`
+	AutoLinked bool    `json:"auto_linked"`
 }
 
 // CreateSemanticEdges auto-creates semantic edges for insights with high
@@ -196,7 +196,7 @@ func findCandidatesByEmbedding(db *store.DB, insight *model.Insight) []SemanticC
 			ID:              c.id,
 			Content:         c.content,
 			Category:        c.category,
-			TokenSimilarity: c.similarity, // actually cosine, but same JSON field
+			Similarity: c.similarity, // actually cosine, but same JSON field
 			AutoLinked:      c.similarity >= autoSemanticThreshold,
 		}
 	}
@@ -240,7 +240,7 @@ func findCandidatesByTokenOverlap(db *store.DB, insight *model.Insight) []Semant
 			ID:              c.insight.ID,
 			Content:         c.insight.Content,
 			Category:        string(c.insight.Category),
-			TokenSimilarity: c.similarity,
+			Similarity: c.similarity,
 		}
 	}
 	return result
