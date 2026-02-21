@@ -32,8 +32,8 @@ This means: **memory management logic moves from prompt to code — deterministi
 
 | Pattern | LLM Role | Representative |
 |---|---|---|
-| **LLM-Embedded** | Executor inside the pipeline | Mem0, MAGMA |
-| **MCP Server** | Tool provider via MCP protocol | MemCP |
+| **LLM-Embedded** | Executor inside the pipeline | Mem0, Letta |
+| **MCP Server** | Tool provider via MCP protocol | claude-mem |
 | **LLM-Supervised** | External supervisor of a standalone binary | Mnemon |
 
 <p align="center">
