@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-02-22
+
+### Added
+- OpenClaw full integration: internal hook (`agent:bootstrap`) + plugin (`before_prompt_build`)
+- `mnemon setup --target openclaw` now auto-deploys skill, hook, plugin, and config
+- Optional hook selection for OpenClaw (remind, nudge, compact) matching Claude Code parity
+- Plugin version patching from binary ldflags
+- LLM-supervised tagline in README
+
+### Changed
+- README restructured: technical differentiator (comparison table) moved above value proposition
+- OpenClaw setup no longer requires manual plugin configuration
+
 ## [0.1.0] - 2026-02-21
 
 Initial public release.
@@ -28,5 +41,6 @@ Initial public release.
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - Comprehensive documentation with Chinese translations
 
-[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mnemon-dev/mnemon/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mnemon-dev/mnemon/releases/tag/v0.1.0
