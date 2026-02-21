@@ -2,6 +2,8 @@ package store
 
 import (
 	"math"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -546,5 +548,145 @@ func TestIncrementAccessCount(t *testing.T) {
 	got, _ := db.GetInsightByID("acc-1")
 	if got.AccessCount != 2 {
 		t.Errorf("want access_count=2, got %d", got.AccessCount)
+	}
+}
+
+// --- Store management ---
+
+func TestValidStoreName(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{"default", true},
+		{"my-store", true},
+		{"work_2024", true},
+		{"A", true},
+		{"a1", true},
+		{"", false},
+		{"-bad", false},
+		{"_bad", false},
+		{"has space", false},
+		{"has/slash", false},
+		{"has.dot", false},
+		{".hidden", false},
+	}
+	for _, tt := range tests {
+		got := ValidStoreName(tt.name)
+		if got != tt.want {
+			t.Errorf("ValidStoreName(%q) = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestReadWriteActive(t *testing.T) {
+	base := t.TempDir()
+
+	// No active file → default
+	if got := ReadActive(base); got != DefaultStoreName {
+		t.Errorf("ReadActive empty: got %q, want %q", got, DefaultStoreName)
+	}
+
+	// Write and read back
+	if err := WriteActive(base, "work"); err != nil {
+		t.Fatalf("WriteActive: %v", err)
+	}
+	if got := ReadActive(base); got != "work" {
+		t.Errorf("ReadActive after write: got %q, want %q", got, "work")
+	}
+}
+
+func TestListStores(t *testing.T) {
+	base := t.TempDir()
+
+	// Empty → nil
+	names, err := ListStores(base)
+	if err != nil {
+		t.Fatalf("ListStores empty: %v", err)
+	}
+	if len(names) != 0 {
+		t.Errorf("want empty, got %v", names)
+	}
+
+	// Create stores
+	db1, _ := Open(StoreDir(base, "alpha"))
+	db1.Close()
+	db2, _ := Open(StoreDir(base, "beta"))
+	db2.Close()
+
+	names, err = ListStores(base)
+	if err != nil {
+		t.Fatalf("ListStores: %v", err)
+	}
+	if len(names) != 2 || names[0] != "alpha" || names[1] != "beta" {
+		t.Errorf("want [alpha beta], got %v", names)
+	}
+}
+
+func TestStoreExists(t *testing.T) {
+	base := t.TempDir()
+
+	if StoreExists(base, "nope") {
+		t.Error("should not exist")
+	}
+
+	db, _ := Open(StoreDir(base, "yes"))
+	db.Close()
+	if !StoreExists(base, "yes") {
+		t.Error("should exist after Open")
+	}
+}
+
+func TestMigrateIfNeeded(t *testing.T) {
+	base := t.TempDir()
+
+	// Create a legacy DB
+	db, err := Open(base)
+	if err != nil {
+		t.Fatalf("open legacy: %v", err)
+	}
+	db.InsertInsight(makeInsight("mig-1", "legacy data", 3))
+	db.Close()
+
+	// Run migration
+	if err := MigrateIfNeeded(base); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	// Old file should be gone
+	if _, err := os.Stat(filepath.Join(base, "mnemon.db")); !os.IsNotExist(err) {
+		t.Error("old mnemon.db should be moved")
+	}
+
+	// New location should work
+	db2, err := Open(StoreDir(base, DefaultStoreName))
+	if err != nil {
+		t.Fatalf("open migrated: %v", err)
+	}
+	defer db2.Close()
+	ins, err := db2.GetInsightByID("mig-1")
+	if err != nil || ins.Content != "legacy data" {
+		t.Errorf("migrated data lost: err=%v", err)
+	}
+}
+
+func TestMigrateIfNeeded_AlreadyMigrated(t *testing.T) {
+	base := t.TempDir()
+
+	// Create new-layout DB directly
+	db, _ := Open(StoreDir(base, DefaultStoreName))
+	db.Close()
+
+	// Should be a no-op
+	if err := MigrateIfNeeded(base); err != nil {
+		t.Fatalf("migrate no-op: %v", err)
+	}
+}
+
+func TestMigrateIfNeeded_NoLegacy(t *testing.T) {
+	base := t.TempDir()
+	// Nothing to migrate
+	if err := MigrateIfNeeded(base); err != nil {
+		t.Fatalf("migrate empty: %v", err)
 	}
 }

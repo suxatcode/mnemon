@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Named memory stores for data isolation (`mnemon store list|create|set|remove`)
+- `MNEMON_STORE` environment variable and `--store` CLI flag for store selection
+- Automatic migration of legacy `~/.mnemon/mnemon.db` to `~/.mnemon/data/default/`
+- `mnemon setup` now initializes the default store automatically
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - `--version` flag
 - CONTRIBUTING.md, CHANGELOG.md

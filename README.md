@@ -152,7 +152,18 @@ The foundation is in place: a single `~/.mnemon` database that any agent can rea
 ## FAQ
 
 **Do different sessions share memory?**
-Yes. All sessions use the same `~/.mnemon` database — a decision remembered in one session is available in every future session.
+Yes. By default, all sessions use the same `default` store — a decision remembered in one session is available in every future session.
+
+**Can I isolate memory per project or agent?**
+Yes. Use named stores to separate memory:
+
+```bash
+mnemon store create work        # create a new store
+mnemon store set work           # set as default
+MNEMON_STORE=work mnemon recall "query"  # or use env var per-process
+```
+
+Different agents/processes can use different stores via the `MNEMON_STORE` environment variable — no global state contention.
 
 **Local or global mode?**
 `mnemon setup` defaults to **local** (project-scoped `.claude/`), recommended for most users. **Global** (`mnemon setup --global`, installed to `~/.claude/`) activates mnemon across all projects — convenient if you want other frameworks (e.g., OpenClaw) to share memory by forwarding requests through Claude Code CLI, but may add maintenance overhead.
@@ -167,7 +178,8 @@ Memory writes don't happen in the main conversation. The host LLM (e.g., Opus) d
 
 | Environment Variable | Default | Description |
 |---|---|---|
-| `MNEMON_DATA_DIR` | `~/.mnemon` | Database directory |
+| `MNEMON_DATA_DIR` | `~/.mnemon` | Base data directory |
+| `MNEMON_STORE` | *(active file or `default`)* | Named memory store for data isolation |
 
 **Ollama-specific** (only relevant if using embeddings):
 

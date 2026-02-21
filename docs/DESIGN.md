@@ -194,7 +194,7 @@ The four edge types form the foundation of the MAGMA four-graph model, detailed 
 
 ### 3.3 Database Schema
 
-All data is stored in a single SQLite file (`~/.mnemon/mnemon.db`), using WAL mode to support concurrent reads:
+Each named store has its own SQLite file under `~/.mnemon/data/<store>/mnemon.db`, using WAL mode to support concurrent reads. The default store is `default`; additional stores can be created for data isolation (see [Store Management](../USAGE.md#store-management)).
 
 ```sql
 -- Memory nodes
@@ -248,7 +248,8 @@ Mnemon's architecture is divided into five layers:
 ```
 mnemon/
 ├── cmd/                       # CLI commands (Cobra)
-│   ├── root.go                # Root command, global flags
+│   ├── root.go                # Root command, global flags, store resolution
+│   ├── store.go               # Store management (list, create, set, remove)
 │   ├── remember.go            # Store insight + auto-create edges
 │   ├── recall.go              # Retrieval (smart graph-enhanced, default)
 │   ├── diff.go                # Standalone dedup/conflict check
@@ -278,7 +279,7 @@ mnemon/
 │   │   ├── intent.go          # Intent detection
 │   │   └── keyword.go         # Token-level keyword scoring
 │   ├── store/                 # SQLite persistence
-│   │   ├── db.go              # Database initialization, transactions
+│   │   ├── db.go              # Database initialization, transactions, store management
 │   │   ├── node.go            # Insight CRUD, lifecycle
 │   │   ├── edge.go            # Edge CRUD
 │   │   └── oplog.go           # Operation log
@@ -943,11 +944,11 @@ For CLIs without hook support, merge the recall/remember guidance into the corre
 
 ### Why SQLite WAL Instead of an Embedded Graph Database?
 
-- **Single-file deployment**: `~/.mnemon/mnemon.db` — one file is everything
+- **Single-file deployment**: one `.db` file per store — easy to manage and backup
 - **ACID transactions**: Atomicity guarantee for the remember pipeline
 - **WAL concurrency**: Supports simultaneous hook reads and CLI writes
 - **Zero external dependencies**: No Redis/Neo4j/Qdrant required
-- **Easy backup**: Just copy one file
+- **Store isolation**: Named stores (`~/.mnemon/data/<name>/mnemon.db`) provide lightweight data isolation via `MNEMON_STORE` env var
 
 ### Why Beam Search Instead of Full BFS?
 

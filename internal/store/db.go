@@ -5,10 +5,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 
 	_ "modernc.org/sqlite"
 )
+
+// DefaultStoreName is the fallback store when none is specified.
+const DefaultStoreName = "default"
+
+var validStoreNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 // dbExecer abstracts sql.DB and sql.Tx so store methods work in both contexts.
 type dbExecer interface {
@@ -55,6 +62,108 @@ func (db *DB) InTransaction(fn func() error) error {
 func DefaultDataDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".mnemon")
+}
+
+// ValidStoreName returns true if name matches [a-zA-Z0-9][a-zA-Z0-9_-]*.
+func ValidStoreName(name string) bool {
+	return validStoreNameRe.MatchString(name)
+}
+
+// StoreDir returns <baseDir>/data/<name>.
+func StoreDir(baseDir, name string) string {
+	return filepath.Join(baseDir, "data", name)
+}
+
+// ActiveFile returns the path to <baseDir>/active.
+func ActiveFile(baseDir string) string {
+	return filepath.Join(baseDir, "active")
+}
+
+// ReadActive reads the active store name from <baseDir>/active.
+// Returns DefaultStoreName if the file doesn't exist or is empty.
+func ReadActive(baseDir string) string {
+	data, err := os.ReadFile(ActiveFile(baseDir))
+	if err != nil {
+		return DefaultStoreName
+	}
+	name := strings.TrimSpace(string(data))
+	if name == "" {
+		return DefaultStoreName
+	}
+	return name
+}
+
+// WriteActive writes the active store name to <baseDir>/active.
+func WriteActive(baseDir, name string) error {
+	if err := os.MkdirAll(baseDir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(ActiveFile(baseDir), []byte(name+"\n"), 0o644)
+}
+
+// ListStores returns sorted names of all stores under <baseDir>/data/.
+func ListStores(baseDir string) ([]string, error) {
+	dataDir := filepath.Join(baseDir, "data")
+	entries, err := os.ReadDir(dataDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// StoreExists checks whether the named store directory exists.
+func StoreExists(baseDir, name string) bool {
+	fi, err := os.Stat(StoreDir(baseDir, name))
+	return err == nil && fi.IsDir()
+}
+
+// MigrateIfNeeded moves a legacy ~/.mnemon/mnemon.db into the new
+// data/default/ layout. It is safe to call multiple times.
+func MigrateIfNeeded(baseDir string) error {
+	oldDB := filepath.Join(baseDir, "mnemon.db")
+	newDir := StoreDir(baseDir, DefaultStoreName)
+	newDB := filepath.Join(newDir, "mnemon.db")
+
+	// Also check for WAL/SHM files
+	oldWAL := oldDB + "-wal"
+	oldSHM := oldDB + "-shm"
+
+	// Already migrated or fresh install
+	if _, err := os.Stat(oldDB); os.IsNotExist(err) {
+		return nil
+	}
+	// If new layout already exists, don't overwrite
+	if _, err := os.Stat(newDB); err == nil {
+		return nil
+	}
+
+	if err := os.MkdirAll(newDir, 0o755); err != nil {
+		return fmt.Errorf("create default store dir: %w", err)
+	}
+	if err := os.Rename(oldDB, newDB); err != nil {
+		return fmt.Errorf("migrate database: %w", err)
+	}
+
+	// Move WAL and SHM if they exist
+	if _, err := os.Stat(oldWAL); err == nil {
+		os.Rename(oldWAL, newDB+"-wal")
+	}
+	if _, err := os.Stat(oldSHM); err == nil {
+		os.Rename(oldSHM, newDB+"-shm")
+	}
+
+	fmt.Fprintf(os.Stderr, "mnemon: migrated database to %s\n", newDB)
+	return nil
 }
 
 // Open opens (or creates) the SQLite database at the given directory.

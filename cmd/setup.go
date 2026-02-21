@@ -6,6 +6,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/internal/setup"
 	"github.com/mnemon-dev/mnemon/internal/setup/assets"
+	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -120,11 +121,33 @@ func runInstallFlow(envs []setup.Environment) error {
 }
 
 func installEnv(env *setup.Environment) error {
+	var err error
 	switch env.Name {
 	case "claude-code":
-		return installClaudeCode(env)
+		err = installClaudeCode(env)
 	case "openclaw":
-		return installOpenClaw(env)
+		err = installOpenClaw(env)
+	}
+	if err != nil {
+		return err
+	}
+	return initDefaultStore()
+}
+
+// initDefaultStore migrates a legacy DB if present, then ensures the
+// default store exists so the data directory is ready to use.
+func initDefaultStore() error {
+	if err := store.MigrateIfNeeded(dataDir); err != nil {
+		fmt.Printf("  Warning: migration failed: %v\n", err)
+	}
+	if !store.StoreExists(dataDir, store.DefaultStoreName) {
+		dir := store.StoreDir(dataDir, store.DefaultStoreName)
+		db, err := store.Open(dir)
+		if err != nil {
+			return fmt.Errorf("init default store: %w", err)
+		}
+		db.Close()
+		fmt.Printf("  Initialized default store at %s\n", dir)
 	}
 	return nil
 }

@@ -29,6 +29,10 @@ mnemon gc --threshold 0.4
 mnemon gc --keep <id>
 mnemon status
 mnemon log
+mnemon store list
+mnemon store create <name>
+mnemon store set <name>
+mnemon store remove <name>
 ```
 
 ## Guardrails

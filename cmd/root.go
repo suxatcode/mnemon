@@ -11,7 +11,10 @@ import (
 // version is set at build time via ldflags.
 var version = "dev"
 
-var dataDir string
+var (
+	dataDir   string
+	storeName string
+)
 
 var rootCmd = &cobra.Command{
 	Use:     "mnemon",
@@ -28,10 +31,28 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&dataDir, "data-dir", store.DefaultDataDir(), "data directory for mnemon database")
+	rootCmd.PersistentFlags().StringVar(&dataDir, "data-dir", store.DefaultDataDir(), "base data directory")
+	rootCmd.PersistentFlags().StringVar(&storeName, "store", "", "named memory store (overrides MNEMON_STORE and active file)")
+}
+
+// resolveStoreName returns the effective store name.
+// Priority: --store flag > MNEMON_STORE env > active file > "default".
+func resolveStoreName() string {
+	if storeName != "" {
+		return storeName
+	}
+	if env := os.Getenv("MNEMON_STORE"); env != "" {
+		return env
+	}
+	return store.ReadActive(dataDir)
 }
 
 // openDB is a helper used by subcommands.
 func openDB() (*store.DB, error) {
-	return store.Open(dataDir)
+	if err := store.MigrateIfNeeded(dataDir); err != nil {
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	name := resolveStoreName()
+	dir := store.StoreDir(dataDir, name)
+	return store.Open(dir)
 }

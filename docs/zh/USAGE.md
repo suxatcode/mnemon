@@ -45,6 +45,33 @@ mnemon gc --threshold 0.5
 mnemon gc --keep <id>
 ```
 
+### 记忆体管理
+
+Mnemon 支持命名记忆体（store）进行数据隔离。每个记忆体拥有独立的数据库。
+
+```bash
+# 列出所有记忆体（* 标记当前活跃的）
+mnemon store list
+
+# 创建新记忆体
+mnemon store create work
+
+# 切换默认活跃记忆体
+mnemon store set work
+
+# 删除记忆体（不可删除当前活跃的）
+mnemon store remove old-project
+```
+
+**记忆体解析优先级**（从高到低）：
+
+1. `--store <name>` CLI 标志
+2. `MNEMON_STORE` 环境变量
+3. `~/.mnemon/active` 文件
+4. 回退到 `"default"`
+
+不同 agent 或进程可通过 `MNEMON_STORE` 环境变量使用不同记忆体 — 无全局状态竞争。旧版数据库（`~/.mnemon/mnemon.db`）在首次运行时自动迁移到 `~/.mnemon/data/default/`。
+
 ### 可观测性
 
 ```bash

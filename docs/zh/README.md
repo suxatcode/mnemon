@@ -140,7 +140,18 @@ mnemon setup --eject
 ## 常见问题
 
 **不同会话共享记忆吗？**
-是的。所有会话使用同一个 `~/.mnemon` 数据库 — 一个会话中记住的决策在所有未来会话中可用。
+是的。默认情况下，所有会话使用同一个 `default` 记忆体 — 一个会话中记住的决策在所有未来会话中可用。
+
+**能否按项目或 agent 隔离记忆？**
+可以。使用命名记忆体（store）隔离数据：
+
+```bash
+mnemon store create work        # 创建新记忆体
+mnemon store set work           # 设为默认
+MNEMON_STORE=work mnemon recall "query"  # 或按进程使用环境变量
+```
+
+不同 agent/进程可通过 `MNEMON_STORE` 环境变量使用不同的记忆体 — 无全局状态竞争。
 
 **本地模式还是全局模式？**
 `mnemon setup` 默认**本地**（项目级 `.claude/`），适合大多数用户。**全局**（`mnemon setup --global`，安装到 `~/.claude/`）在所有项目中激活 mnemon — 如果想让其他框架（如 OpenClaw）通过 Claude Code CLI 共享记忆很方便，但可能增加维护开销。
@@ -155,11 +166,12 @@ mnemon setup --eject
 
 | 环境变量 | 默认值 | 说明 |
 |---------|-------|------|
-| `MNEMON_DATA_DIR` | `~/.mnemon` | 数据库目录 |
+| `MNEMON_DATA_DIR` | `~/.mnemon` | 基础数据目录 |
+| `MNEMON_STORE` | *（active 文件或 `default`）* | 命名记忆体，用于数据隔离 |
 | `MNEMON_EMBED_ENDPOINT` | `http://localhost:11434` | Ollama API 端点 |
 | `MNEMON_EMBED_MODEL` | `nomic-embed-text` | 嵌入模型名称 |
 
-或在任何命令上使用 `--data-dir` 标志。
+也可在命令上使用 `--data-dir` 或 `--store` 标志覆盖。
 
 ## 开发
 

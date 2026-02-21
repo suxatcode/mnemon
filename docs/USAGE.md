@@ -45,6 +45,33 @@ mnemon gc --threshold 0.5
 mnemon gc --keep <id>
 ```
 
+### Store Management
+
+Mnemon supports named stores for data isolation. Each store has its own independent database.
+
+```bash
+# List all stores (* marks the active one)
+mnemon store list
+
+# Create a new store
+mnemon store create work
+
+# Switch the default active store
+mnemon store set work
+
+# Remove a store (cannot remove the active store)
+mnemon store remove old-project
+```
+
+**Store resolution priority** (highest to lowest):
+
+1. `--store <name>` CLI flag
+2. `MNEMON_STORE` environment variable
+3. `~/.mnemon/active` file
+4. Falls back to `"default"`
+
+Different agents or processes can use different stores via the `MNEMON_STORE` environment variable — no global state contention. Legacy databases (`~/.mnemon/mnemon.db`) are automatically migrated to `~/.mnemon/data/default/` on first run.
+
 ### Observability
 
 ```bash

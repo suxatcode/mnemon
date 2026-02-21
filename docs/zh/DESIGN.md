@@ -194,7 +194,7 @@ Edge 连接两个 insight，代表它们之间的关系。每条边包含：
 
 ### 3.3 数据库模式
 
-所有数据存储在单个 SQLite 文件中（`~/.mnemon/mnemon.db`），使用 WAL 模式支持并发读取：
+每个命名记忆体拥有独立的 SQLite 文件，位于 `~/.mnemon/data/<store>/mnemon.db`，使用 WAL 模式支持并发读取。默认记忆体为 `default`；可创建额外记忆体进行数据隔离（参见[记忆体管理](USAGE.md#记忆体管理)）。
 
 ```sql
 -- 记忆节点
@@ -248,7 +248,8 @@ Mnemon 的架构分为五层：
 ```
 mnemon/
 ├── cmd/                       # CLI 命令（Cobra）
-│   ├── root.go                # 根命令，全局 flags
+│   ├── root.go                # 根命令，全局 flags，记忆体解析
+│   ├── store.go               # 记忆体管理（list、create、set、remove）
 │   ├── remember.go            # 存储 insight + 自动建边
 │   ├── recall.go              # 检索（智能图增强，默认）
 │   ├── diff.go                # 独立去重/冲突检查
@@ -278,7 +279,7 @@ mnemon/
 │   │   ├── intent.go          # 意图检测
 │   │   └── keyword.go         # Token 级关键词评分
 │   ├── store/                 # SQLite 持久化
-│   │   ├── db.go              # 数据库初始化、事务
+│   │   ├── db.go              # 数据库初始化、事务、记忆体管理
 │   │   ├── node.go            # Insight CRUD、生命周期
 │   │   ├── edge.go            # Edge CRUD
 │   │   └── oplog.go           # 操作日志
@@ -943,11 +944,11 @@ Prime 钩子始终安装。Remind、Nudge、Compact 钩子可选（Remind 和 Nu
 
 ### 为什么选择 SQLite WAL 而非嵌入式图数据库？
 
-- **单文件部署**：`~/.mnemon/mnemon.db` 一个文件就是全部
+- **单文件部署**：每个记忆体一个 `.db` 文件 — 易于管理和备份
 - **ACID 事务**：remember 管线的原子性保证
 - **WAL 并发**：支持 hook 读取和 CLI 写入同时进行
 - **零外部依赖**：不需要 Redis/Neo4j/Qdrant
-- **方便备份**：复制一个文件即可
+- **记忆体隔离**：命名记忆体（`~/.mnemon/data/<name>/mnemon.db`）通过 `MNEMON_STORE` 环境变量提供轻量数据隔离
 
 ### 为什么用 Beam Search 而非完整 BFS？
 
