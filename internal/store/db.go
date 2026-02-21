@@ -241,6 +241,7 @@ CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
 CREATE INDEX IF NOT EXISTS idx_insights_importance ON insights(importance);
 CREATE INDEX IF NOT EXISTS idx_insights_created ON insights(created_at);
 CREATE INDEX IF NOT EXISTS idx_insights_deleted ON insights(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_insights_source ON insights(source);
 CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id);
 CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_id);
 CREATE INDEX IF NOT EXISTS idx_edges_type ON edges(edge_type);

@@ -99,9 +99,14 @@ func tokenOverlap(a, b map[string]bool) float64 {
 	if len(a) == 0 || len(b) == 0 {
 		return 0
 	}
+	// Iterate the smaller set for efficiency.
+	small, big := a, b
+	if len(a) > len(b) {
+		small, big = b, a
+	}
 	intersection := 0
-	for k := range a {
-		if b[k] {
+	for k := range small {
+		if big[k] {
 			intersection++
 		}
 	}

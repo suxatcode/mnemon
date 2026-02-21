@@ -1,7 +1,7 @@
 package search
 
 import (
-	"sort"
+	"container/heap"
 	"strings"
 	"unicode"
 
@@ -14,27 +14,46 @@ type ScoredInsight struct {
 	Score   float64        `json:"score"`
 }
 
+// scoredHeap implements a min-heap for top-k ScoredInsight selection.
+// Lowest score (weakest candidate) sits at the root for efficient eviction.
+type scoredHeap []ScoredInsight
+
+func (h scoredHeap) Len() int { return len(h) }
+func (h scoredHeap) Less(i, j int) bool {
+	if h[i].Score != h[j].Score {
+		return h[i].Score < h[j].Score
+	}
+	return h[i].Insight.Importance < h[j].Insight.Importance
+}
+func (h scoredHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *scoredHeap) Push(x interface{}) { *h = append(*h, x.(ScoredInsight)) }
+func (h *scoredHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	*h = old[:n-1]
+	return item
+}
+
 // KeywordSearch scores insights by token overlap with the query.
 // Score = |intersection(query_tokens, content_tokens)| / |query_tokens|
 func KeywordSearch(insights []*model.Insight, query string, limit int) []ScoredInsight {
+	return keywordSearchCached(insights, query, limit, nil)
+}
+
+// keywordSearchCached is the internal implementation that optionally populates a token cache.
+// If tokenCache is non-nil, it stores each insight's combined token set keyed by ID.
+func keywordSearchCached(insights []*model.Insight, query string, limit int, tokenCache map[string]map[string]bool) []ScoredInsight {
 	queryTokens := Tokenize(query)
 	if len(queryTokens) == 0 {
 		return nil
 	}
 
-	var scored []ScoredInsight
+	h := &scoredHeap{}
 	for _, ins := range insights {
-		contentTokens := Tokenize(ins.Content)
-		// Also include tags and entities as tokens
-		for _, tag := range ins.Tags {
-			for t := range Tokenize(tag) {
-				contentTokens[t] = true
-			}
-		}
-		for _, ent := range ins.Entities {
-			for t := range Tokenize(ent) {
-				contentTokens[t] = true
-			}
+		contentTokens := insightTokens(ins)
+		if tokenCache != nil {
+			tokenCache[ins.ID] = contentTokens
 		}
 
 		intersection := 0
@@ -47,20 +66,37 @@ func KeywordSearch(insights []*model.Insight, query string, limit int) []ScoredI
 			continue
 		}
 		score := float64(intersection) / float64(len(queryTokens))
-		scored = append(scored, ScoredInsight{Insight: ins, Score: score})
-	}
 
-	sort.Slice(scored, func(i, j int) bool {
-		if scored[i].Score != scored[j].Score {
-			return scored[i].Score > scored[j].Score
+		if limit <= 0 || h.Len() < limit {
+			heap.Push(h, ScoredInsight{Insight: ins, Score: score})
+		} else if score > (*h)[0].Score || (score == (*h)[0].Score && ins.Importance > (*h)[0].Insight.Importance) {
+			(*h)[0] = ScoredInsight{Insight: ins, Score: score}
+			heap.Fix(h, 0)
 		}
-		return scored[i].Insight.Importance > scored[j].Insight.Importance
-	})
-
-	if limit > 0 && len(scored) > limit {
-		scored = scored[:limit]
 	}
-	return scored
+
+	// Extract results in descending order (highest score first).
+	result := make([]ScoredInsight, h.Len())
+	for i := len(result) - 1; i >= 0; i-- {
+		result[i] = heap.Pop(h).(ScoredInsight)
+	}
+	return result
+}
+
+// insightTokens returns the combined token set from an insight's content, tags, and entities.
+func insightTokens(ins *model.Insight) map[string]bool {
+	tokens := Tokenize(ins.Content)
+	for _, tag := range ins.Tags {
+		for t := range Tokenize(tag) {
+			tokens[t] = true
+		}
+	}
+	for _, ent := range ins.Entities {
+		for t := range Tokenize(ent) {
+			tokens[t] = true
+		}
+	}
+	return tokens
 }
 
 // stopwords contains common English words that are filtered from token sets

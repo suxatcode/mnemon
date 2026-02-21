@@ -207,7 +207,10 @@ func (db *DB) RefreshEffectiveImportance(id string) (float64, error) {
 	daysSince := time.Now().UTC().Sub(lastAccess).Hours() / 24.0
 
 	var edgeCount int
-	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM edges WHERE source_id = ? OR target_id = ?`, id, id).Scan(&edgeCount); err != nil {
+	if err := db.execer().QueryRow(
+		`SELECT (SELECT COUNT(*) FROM edges WHERE source_id = ?) +
+		        (SELECT COUNT(*) FROM edges WHERE target_id = ?)`,
+		id, id).Scan(&edgeCount); err != nil {
 		return 0, fmt.Errorf("count edges for %s: %w", id, err)
 	}
 

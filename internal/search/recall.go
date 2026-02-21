@@ -158,8 +158,9 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64,
 	}
 	anchorMap := make(map[string]*anchor)
 
-	// Signal 1: Keyword search
-	keywordAnchors := KeywordSearch(all, query, anchorTopK)
+	// Signal 1: Keyword search (populates tokenCache for reranking reuse)
+	tokenCache := make(map[string]map[string]bool, len(all))
+	keywordAnchors := keywordSearchCached(all, query, anchorTopK, tokenCache)
 	for rank, a := range keywordAnchors {
 		anchorMap[a.Insight.ID] = &anchor{
 			insight: a.Insight,
@@ -303,18 +304,11 @@ func IntentAwareRecall(db *store.DB, query string, queryVec []float64,
 	for i := range candidates {
 		c := &candidates[i]
 
-		// keyword_score: token overlap
+		// keyword_score: token overlap (reuses pre-computed tokens from KeywordSearch)
 		if len(queryTokens) > 0 {
-			contentTokens := Tokenize(c.ins.Content)
-			for _, tag := range c.ins.Tags {
-				for t := range Tokenize(tag) {
-					contentTokens[t] = true
-				}
-			}
-			for _, ent := range c.ins.Entities {
-				for t := range Tokenize(ent) {
-					contentTokens[t] = true
-				}
+			contentTokens := tokenCache[c.id]
+			if contentTokens == nil {
+				contentTokens = insightTokens(c.ins)
 			}
 			intersection := 0
 			for t := range queryTokens {
@@ -444,32 +438,23 @@ func causalTopologicalSort(db *store.DB, results []RecallResult) []RecallResult 
 		}
 	}
 
-	// Kahn's algorithm with score-based tie-breaking
-	var queue []string
+	// Kahn's algorithm with score-based tie-breaking via max-heap
+	pq := &kahnMaxHeap{}
 	for _, r := range results {
 		if inDegree[r.Insight.ID] == 0 {
-			queue = append(queue, r.Insight.ID)
+			heap.Push(pq, kahnItem{id: r.Insight.ID, score: idToResult[r.Insight.ID].Score})
 		}
 	}
-	// Sort initial queue by score descending for stable ordering
-	sort.Slice(queue, func(i, j int) bool {
-		return idToResult[queue[i]].Score > idToResult[queue[j]].Score
-	})
 
 	ordered := make([]RecallResult, 0, len(results))
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		ordered = append(ordered, idToResult[id])
+	for pq.Len() > 0 {
+		item := heap.Pop(pq).(kahnItem)
+		ordered = append(ordered, idToResult[item.id])
 
-		for _, target := range adj[id] {
+		for _, target := range adj[item.id] {
 			inDegree[target]--
 			if inDegree[target] == 0 {
-				queue = append(queue, target)
-				// Re-sort to maintain score-based tie-breaking
-				sort.Slice(queue, func(i, j int) bool {
-					return idToResult[queue[i]].Score > idToResult[queue[j]].Score
-				})
+				heap.Push(pq, kahnItem{id: target, score: idToResult[target].Score})
 			}
 		}
 	}
@@ -614,10 +599,46 @@ func (h *beamHeap) Pop() interface{} {
 	return item
 }
 
+// kahnItem is a node in Kahn's topological sort priority queue.
+type kahnItem struct {
+	id    string
+	score float64
+}
+
+// kahnMaxHeap implements a max-heap for Kahn's algorithm (highest score first).
+type kahnMaxHeap []kahnItem
+
+func (h kahnMaxHeap) Len() int            { return len(h) }
+func (h kahnMaxHeap) Less(i, j int) bool  { return h[i].score > h[j].score }
+func (h kahnMaxHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *kahnMaxHeap) Push(x interface{}) { *h = append(*h, x.(kahnItem)) }
+func (h *kahnMaxHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	*h = old[:n-1]
+	return item
+}
+
 // vectorHit is a vector search result.
 type vectorHit struct {
 	id         string
 	similarity float64
+}
+
+// vectorHitMinHeap implements a min-heap for top-k vector search (lowest similarity at root).
+type vectorHitMinHeap []vectorHit
+
+func (h vectorHitMinHeap) Len() int            { return len(h) }
+func (h vectorHitMinHeap) Less(i, j int) bool  { return h[i].similarity < h[j].similarity }
+func (h vectorHitMinHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *vectorHitMinHeap) Push(x interface{}) { *h = append(*h, x.(vectorHit)) }
+func (h *vectorHitMinHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	*h = old[:n-1]
+	return item
 }
 
 // vectorSearch performs brute-force cosine similarity search, loading embeddings from DB.
@@ -637,24 +658,29 @@ func vectorSearch(db *store.DB, queryVec []float64, limit int) []vectorHit {
 }
 
 // vectorSearchFromCache performs cosine similarity search over pre-loaded embeddings.
+// Uses a min-heap to maintain the top-k results in O(n log k) instead of O(n log n).
 func vectorSearchFromCache(embedCache map[string][]float64, queryVec []float64, limit int) []vectorHit {
-	var hits []vectorHit
+	h := &vectorHitMinHeap{}
 	for id, vec := range embedCache {
 		sim := embed.CosineSimilarity(queryVec, vec)
-		if sim > 0.1 {
-			hits = append(hits, vectorHit{id: id, similarity: sim})
+		if sim <= 0.1 {
+			continue
+		}
+		if limit <= 0 || h.Len() < limit {
+			heap.Push(h, vectorHit{id: id, similarity: sim})
+		} else if sim > (*h)[0].similarity {
+			(*h)[0] = vectorHit{id: id, similarity: sim}
+			heap.Fix(h, 0)
 		}
 	}
-	if len(hits) == 0 {
+	if h.Len() == 0 {
 		return nil
 	}
 
-	sort.Slice(hits, func(i, j int) bool {
-		return hits[i].similarity > hits[j].similarity
-	})
-
-	if limit > 0 && len(hits) > limit {
-		hits = hits[:limit]
+	// Extract results in descending order (highest similarity first).
+	result := make([]vectorHit, h.Len())
+	for i := len(result) - 1; i >= 0; i-- {
+		result[i] = heap.Pop(h).(vectorHit)
 	}
-	return hits
+	return result
 }
