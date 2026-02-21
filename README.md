@@ -25,7 +25,7 @@ go install github.com/mnemon-dev/mnemon@latest
 mnemon setup
 ```
 
-`mnemon setup` deploys skill, hooks, and behavioral guide automatically. Start a new session — memory just works.
+`mnemon setup` auto-detects Claude Code, then interactively deploys skill, hooks, and behavioral guide. Start a new session — memory just works.
 
 ### OpenClaw
 
@@ -53,18 +53,36 @@ mnemon setup --eject
 
 ## How it works
 
-Once set up, memory operates transparently — you use your LLM CLI as usual:
+Once set up, memory operates transparently — you use your LLM CLI as usual. Mnemon integrates via Claude Code's [hook system](https://docs.anthropic.com/en/docs/claude-code/hooks), injecting memory operations at key lifecycle points:
 
-1. **You send a message** — the agent automatically recalls relevant memories from past sessions
-2. **The agent responds** — drawing on both current context and recalled knowledge
-3. **After responding** — the agent evaluates whether anything from this exchange is worth remembering for the future
+```
+Session starts
+    │
+    ▼
+  SessionStart hook ─── prime.sh ──→ load behavioral guide, show memory status
+    │
+    ▼
+  User sends message
+    │
+    ▼
+  UserPromptSubmit hook ─── user_prompt.sh ──→ auto-recall relevant memories
+    │
+    ▼
+  LLM generates response (guided by skill + behavioral rules)
+    │
+    ▼
+  Stop hook ─── stop.sh ──→ "Consider: remember sub-agent?"
+```
 
-You don't run mnemon commands yourself. The agent does — guided by the skill file (command reference) and the behavioral guide (when to recall, what to remember).
+**Hooks** handle the plumbing — auto-recall on every message, memory reminders after each response, behavioral guide injection at session start. **The skill file** teaches the agent command syntax. **The behavioral guide** (`~/.mnemon/prompt/guide.md`) defines when to recall, what to remember, and how to delegate memory writes to a sub-agent.
+
+You don't run mnemon commands yourself. The agent does — driven by hooks and guided by the skill and behavioral guide.
 
 ## Features
 
-- **Zero user-side operation** — install once, memory runs in the background
+- **Zero user-side operation** — install once, memory runs in the background via hooks
 - **LLM-supervised** — the host LLM decides what to remember, update, and forget; no embedded LLM, no API keys
+- **Hook-based integration** — `mnemon setup` deploys lifecycle hooks (SessionStart, UserPromptSubmit, Stop) plus an optional Compact hook for context compression
 - **Four-graph architecture** — temporal, entity, causal, and semantic edges, not just vector similarity
 - **Built-in deduplication** — duplicates are skipped, conflicts auto-replaced
 - **Retention lifecycle** — importance decay, access-count boosting, and garbage collection
@@ -84,7 +102,7 @@ All your local agentic AIs — across sessions and frameworks — sharing one po
   Gemini CLI ───┘
 ```
 
-The foundation is in place: a single `~/.mnemon` database that any agent can read and write.
+The foundation is in place: a single `~/.mnemon` database that any agent can read and write. Claude Code's hook integration is the reference implementation — the same pattern (lifecycle hooks + skill + behavioral guide) can be replicated for any LLM CLI that supports event hooks or system prompts.
 
 ## FAQ
 
@@ -93,6 +111,12 @@ Yes. All sessions use the same `~/.mnemon` database — a decision remembered in
 
 **Local or global mode?**
 `mnemon setup` defaults to **local** (project-scoped `.claude/`), recommended for most users. **Global** (`mnemon setup --global`, installed to `~/.claude/`) activates mnemon across all projects — convenient if you want other frameworks (e.g., OpenClaw) to share memory by forwarding requests through Claude Code CLI, but may add maintenance overhead.
+
+**How do I customize the behavior?**
+Edit `~/.mnemon/prompt/guide.md`. This file controls when the agent recalls memories and what it considers worth remembering. The skill file (`SKILL.md`) is auto-deployed and should not need manual editing.
+
+**What is sub-agent delegation?**
+Memory writes don't happen in the main conversation. The host LLM (e.g., Opus) decides *what* to remember, then delegates the actual `mnemon remember` execution to a lightweight sub-agent (e.g., Sonnet). This saves tokens and keeps memory operations out of the main context.
 
 ## Configuration
 

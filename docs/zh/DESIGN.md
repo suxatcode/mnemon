@@ -227,7 +227,7 @@ Mnemon 的架构分为五层：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Integration Layer    Hook / CLAUDE.md / Skill              │
+│  Integration Layer    Hook / Skill / Guide                   │
 ├─────────────────────────────────────────────────────────────┤
 │  CLI Layer            remember, recall, diff, link, gc ...  │
 ├─────────────────────────────────────────────────────────────┤
@@ -241,6 +241,8 @@ Mnemon 的架构分为五层：
 │  External (Optional)  Ollama (localhost:11434)               │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+<!-- TODO: 更新 01-system-architecture.jpg — 集成层标签应改为 "Hook / Skill / Guide" -->
 
 **项目代码结构：**
 
@@ -257,9 +259,14 @@ mnemon/
 │   ├── embed.go               # 管理 embedding
 │   ├── forget.go              # 软删除 insight
 │   ├── gc.go                  # 垃圾回收
+│   ├── setup.go               # 部署集成（钩子、技能、引导）
+│   ├── prime.go               # 会话健康检查
+│   ├── viz.go                 # 知识图谱可视化
 │   ├── status.go              # 统计信息
 │   └── log.go                 # 操作日志
 ├── internal/
+│   ├── config/                # 配置管理
+│   │   └── config.go          # 环境变量、默认值
 │   ├── model/                 # 数据结构
 │   │   ├── node.go            # Insight 定义
 │   │   └── edge.go            # Edge 定义
@@ -279,17 +286,34 @@ mnemon/
 │   │   ├── node.go            # Insight CRUD、生命周期
 │   │   ├── edge.go            # Edge CRUD
 │   │   └── oplog.go           # 操作日志
-│   └── embed/                 # 嵌入向量支持
-│       ├── ollama.go          # Ollama HTTP 客户端
-│       └── vector.go          # 向量序列化、余弦相似度
+│   ├── embed/                 # 嵌入向量支持
+│   │   ├── ollama.go          # Ollama HTTP 客户端
+│   │   └── vector.go          # 向量序列化、余弦相似度
+│   └── setup/                 # LLM CLI 集成部署
+│       ├── claude.go          # Claude Code 部署逻辑
+│       ├── openclaw.go        # OpenClaw 部署逻辑
+│       ├── detect.go          # 环境检测
+│       ├── prompt.go          # 提示文件部署（guide.md）
+│       ├── settings.go        # 钩子注册到 settings.json
+│       ├── markdown.go        # Markdown 注入/移除
+│       └── assets/            # 嵌入模板（从源文件同步）
+│           ├── claude/        # Claude Code 资产
+│           │   ├── SKILL.md, guide.md
+│           │   ├── prime.sh, user_prompt.sh
+│           │   ├── stop.sh, compact.sh
+│           └── openclaw/      # OpenClaw 资产
+│               └── SKILL.md
 ├── scripts/
-│   ├── hooks/user_prompt.sh   # Claude Code 自动召回钩子
-│   ├── hooks/stop.sh          # 记忆提醒钩子（回复后）
-│   └── claude_memory.md       # 记忆行为引导文本
+│   ├── hooks/                 # 钩子脚本源文件
+│   │   ├── prime.sh           # SessionStart：健康检查 + 加载引导
+│   │   ├── user_prompt.sh     # UserPromptSubmit：自动召回记忆
+│   │   ├── stop.sh            # Stop：记忆提醒
+│   │   └── compact.sh         # PreCompact：压缩前保存洞察
+│   └── e2e_test.sh            # 端到端测试套件
 ├── skills/mnemon/SKILL.md     # 命令参考（Skill 格式）
 ├── main.go                    # 入口
-├── CLAUDE.md                  # 项目级行为引导
-└── Makefile                   # 构建、安装、集成
+├── CLAUDE.md                  # 项目级开发指南
+└── Makefile                   # 构建、安装、资产同步
 ```
 
 ---
@@ -750,59 +774,143 @@ mnemon embed <id>               # 生成单条
 
 ## 11. LLM CLI 集成
 
-![Three-Layer Integration](../diagrams/08-three-layer-integration.jpg)
+<!-- TODO: 更新 08-three-layer-integration.jpg — 应展示 4 个钩子事件 + guide.md + SKILL.md 架构 -->
+![集成架构](../diagrams/08-three-layer-integration.jpg)
 
-Mnemon 通过三层机制与 LLM CLI（如 Claude Code）集成，确保记忆在对话中自然流动。
+Mnemon 通过生命周期钩子、技能文件和行为引导与 LLM CLI 集成。Claude Code 的[钩子系统](https://docs.anthropic.com/en/docs/claude-code/hooks)是参考实现 — 所有组件通过 `mnemon setup` 自动部署。
 
-### 11.1 三层架构
+### 11.1 集成架构
 
 ```
-用户消息
+会话启动
     │
     ▼
-  Hook (recall) ─── 自动召回 ──→ [Past memory] 注入到 LLM 上下文
+  SessionStart 钩子 ─── prime.sh ──→ 健康检查，加载行为引导
     │
     ▼
-  CLAUDE.md ── "使用过去的记忆；评估是否需要记住"
+  用户发送消息
     │
     ▼
-  Skill ── "命令语法：mnemon remember --cat ...（diff 内置）"
+  UserPromptSubmit 钩子 ─── user_prompt.sh ──→ 自动召回 → [Past memory]
     │
     ▼
-  LLM 生成回复
+  Skill (SKILL.md) ── 命令语法参考（自动发现）
     │
     ▼
-  Hook (stop) ─── 记忆提醒 ──→ "考虑是否有值得记忆的内容"
+  LLM 生成回复（遵循 guide.md 行为规则）
+    │
+    ▼
+  Stop 钩子 ─── stop.sh ──→ "考虑：是否需要 remember sub-agent？"
+    │
+    ▼
+  （可选）PreCompact 钩子 ─── compact.sh ──→ 压缩前保存洞察
 ```
 
-**Layer 1: Hooks（自动召回 + 记忆提醒）**
+三层协同工作：
 
-两个钩子安装到 `~/.claude/hooks/`：
+| 层 | 内容 | 位置 | 职责 |
+|---|------|------|------|
+| **钩子** | Claude Code 生命周期事件触发的 Shell 脚本 | `.claude/hooks/mnemon/` | 管道 — 自动召回、记忆提醒、引导注入 |
+| **技能** | `SKILL.md` — Claude Code 技能格式的命令参考 | `.claude/skills/mnemon/` | 教 LLM *怎么*使用 mnemon 命令 |
+| **引导** | `guide.md` — 行为指令 | `~/.mnemon/prompt/` | 教 LLM *何时*召回、*什么*值得记住 |
+
+### 11.2 钩子详情
+
+Claude Code 在特定生命周期事件触发钩子。Mnemon 注册最多四个：
+
+**SessionStart — `prime.sh`**
+
+会话启动时运行一次。检查记忆系统健康状态并加载行为引导：
 
 ```bash
-# scripts/hooks/user_prompt.sh — 每条用户消息时运行
-mnemon recall "$USER_MESSAGE" --limit 5
-
-# scripts/hooks/stop.sh — 每次 LLM 回复后运行
-# 提醒 LLM 考虑是否需要记忆有价值的信息
+mnemon prime --status
+[ -f ~/.mnemon/prompt/guide.md ] && cat ~/.mnemon/prompt/guide.md
 ```
 
-recall 钩子以 `[Past memory]` 标记将结果注入到 LLM 上下文中。stop 钩子在回复后提醒评估是否有值得记忆的新信息。
+引导内容出现在 LLM 的系统上下文中，为整个会话建立 recall/remember 行为。
 
-**Layer 2: CLAUDE.md（行为引导）**
+**UserPromptSubmit — `user_prompt.sh`**
 
-项目级指令，告诉 LLM 何时使用记忆、何时创建记忆：
+每条用户消息时运行。从 Claude Code 的 JSON stdin 读取提示，运行 `mnemon recall`，注入相关记忆：
 
-- **Recall**：看到 `[Past memory]` 时引用相关记忆
-- **Remember**：每次回复后自问"如果我忘了这个，用户是否需要重复？"
-- **三种值得记忆的内容**：用户指令、推理结论、观察到的状态
-- **Sub-agent 委派**：主 agent（Opus）决定记什么，然后委派给 Task sub-agent（Sonnet），sub-agent 读取 SKILL.md 并执行正确的命令
+```bash
+INPUT=$(cat)
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null)
+RESULT=$(mnemon recall "$PROMPT" --limit 5 2>/dev/null)
+if [ -n "$RESULT" ]; then
+  echo "[Past memory] $RESULT"
+fi
+```
 
-**Layer 3: Skill（命令参考）**
+`[Past memory]` 标记告诉 LLM 召回的记忆已在上下文中可用。
 
-纯命令语法文档，教 LLM 如何使用 mnemon 命令。与行为引导分离，保持职责清晰。技能文件包含基于判断的 Link 评估——sub-agent 基于判断而非机械规则评估候选。
+**Stop — `stop.sh`**
 
-### 11.2 Sub-Agent 委派
+每次 LLM 回复后运行。检查 LLM 是否已提及记忆操作；如果没有，发出温和提醒：
+
+```bash
+MSG=$(echo "$INPUT" | jq -r '.last_assistant_message // ""' 2>/dev/null)
+if echo "$MSG" | grep -qi "mnemon remember\|sub-agent.*remember\|Stored.*imp="; then
+  exit 0  # 已处理
+fi
+echo "[mnemon] Consider: does this exchange warrant a remember sub-agent?"
+```
+
+**PreCompact — `compact.sh`（可选）**
+
+上下文窗口压缩前触发。提示 LLM 在上下文丢失前保存关键洞察：
+
+```bash
+echo "[mnemon] Context compaction starting. Review this session and remember
+the most valuable insights (up to 5) before context is compressed."
+```
+
+### 11.3 自动化 Setup
+
+`mnemon setup` 自动处理所有部署：
+
+```
+$ mnemon setup
+
+Detecting LLM CLI environments...
+  ✓ Claude Code (v1.x)    .claude/
+
+Select environment: Claude Code
+Install scope: Local — this project only (.claude/)
+
+[1/3] Skill
+  ✓ Skill     .claude/skills/mnemon/SKILL.md
+
+[2/3] Prompts
+  ✓ Prompts   ~/.mnemon/prompt/ (guide.md, skill.md)
+
+[3/3] Optional hooks
+  Select hooks to enable:
+    [x] Recall  — 每条消息自动召回（推荐）
+    [x] Nudge   — 会话结束时提醒记忆
+    [ ] Compact — 上下文压缩前保存洞察
+
+Setup complete!
+  Hooks   prime, recall, nudge
+  Prompts ~/.mnemon/prompt/ (guide.md, skill.md)
+
+Start a new Claude Code session to activate.
+Edit ~/.mnemon/prompt/guide.md to customize behavior.
+Run 'mnemon setup --eject' to remove.
+```
+
+关键 setup 选项：
+
+| 标志 | 效果 |
+|------|------|
+| `--global` | 安装到 `~/.claude/`（所有项目）而非 `.claude/`（项目级） |
+| `--target claude-code` | 非交互式，仅 Claude Code |
+| `--eject` | 移除所有 mnemon 集成 |
+| `--yes` | 自动确认所有提示（CI 友好） |
+
+`prime.sh` 钩子始终安装。Recall、nudge、compact 钩子可选（recall 和 nudge 默认启用）。
+
+### 11.4 Sub-Agent 委派
 
 记忆写入不在主对话中进行。宿主 LLM 将其委派给轻量 sub-agent：
 
@@ -834,12 +942,15 @@ recall 钩子以 `[Past memory]` 标记将结果注入到 LLM 上下文中。sto
 - **上下文隔离**：记忆处理不会污染主对话上下文
 - **模型效率**：Sonnet 处理常规执行，Opus 专注高层决策
 
-### 11.3 适配其他 LLM CLI
+### 11.5 适配其他 LLM CLI
 
-对于非 Claude Code 的工具，将三层内容合并到对应的系统提示文件中：
+对于支持钩子的 CLI，复制 Claude Code 模式：注册调用 mnemon 命令的生命周期钩子，部署技能文件，提供行为引导。
+
+对于不支持钩子的 CLI，将 recall/remember 引导合并到对应的系统提示文件中：
 
 - Cursor → `.cursorrules`
 - Windsurf → `RULES.md`
+- OpenClaw → `mnemon setup --target openclaw` 部署技能 + 引导，但钩子需手动配置插件
 - 其他 → 系统提示 / 规则文件
 
 ---

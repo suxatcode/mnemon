@@ -227,7 +227,7 @@ Mnemon's architecture is divided into five layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Integration Layer    Hook / CLAUDE.md / Skill              │
+│  Integration Layer    Hook / Skill / Guide                   │
 ├─────────────────────────────────────────────────────────────┤
 │  CLI Layer            remember, recall, diff, link, gc ...  │
 ├─────────────────────────────────────────────────────────────┤
@@ -241,6 +241,8 @@ Mnemon's architecture is divided into five layers:
 │  External (Optional)  Ollama (localhost:11434)               │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+<!-- TODO: Update 01-system-architecture.jpg — Integration Layer label should read "Hook / Skill / Guide" -->
 
 **Project code structure:**
 
@@ -257,9 +259,14 @@ mnemon/
 │   ├── embed.go               # Manage embeddings
 │   ├── forget.go              # Soft-delete insight
 │   ├── gc.go                  # Garbage collection
+│   ├── setup.go               # Deploy integrations (hooks, skill, guide)
+│   ├── prime.go               # Session health check
+│   ├── viz.go                 # Knowledge graph visualization
 │   ├── status.go              # Statistics
 │   └── log.go                 # Operation log
 ├── internal/
+│   ├── config/                # Configuration management
+│   │   └── config.go          # Environment variables, defaults
 │   ├── model/                 # Data structures
 │   │   ├── node.go            # Insight definition
 │   │   └── edge.go            # Edge definition
@@ -279,17 +286,34 @@ mnemon/
 │   │   ├── node.go            # Insight CRUD, lifecycle
 │   │   ├── edge.go            # Edge CRUD
 │   │   └── oplog.go           # Operation log
-│   └── embed/                 # Embedding support
-│       ├── ollama.go          # Ollama HTTP client
-│       └── vector.go          # Vector serialization, cosine similarity
+│   ├── embed/                 # Embedding support
+│   │   ├── ollama.go          # Ollama HTTP client
+│   │   └── vector.go          # Vector serialization, cosine similarity
+│   └── setup/                 # LLM CLI integration setup
+│       ├── claude.go          # Claude Code deployment logic
+│       ├── openclaw.go        # OpenClaw deployment logic
+│       ├── detect.go          # Environment detection
+│       ├── prompt.go          # Prompt file deployment (guide.md)
+│       ├── settings.go        # Hook registration in settings.json
+│       ├── markdown.go        # Markdown injection/ejection
+│       └── assets/            # Embedded templates (synced from source)
+│           ├── claude/        # Claude Code assets
+│           │   ├── SKILL.md, guide.md
+│           │   ├── prime.sh, user_prompt.sh
+│           │   ├── stop.sh, compact.sh
+│           └── openclaw/      # OpenClaw assets
+│               └── SKILL.md
 ├── scripts/
-│   ├── hooks/user_prompt.sh   # Claude Code auto-recall hook
-│   ├── hooks/stop.sh          # Memory reminder hook (post-response)
-│   └── claude_memory.md       # Memory behavior guidance text
+│   ├── hooks/                 # Source-of-truth hook scripts
+│   │   ├── prime.sh           # SessionStart: health check + load guide
+│   │   ├── user_prompt.sh     # UserPromptSubmit: auto-recall memories
+│   │   ├── stop.sh            # Stop: memory reminder
+│   │   └── compact.sh         # PreCompact: save insights before compression
+│   └── e2e_test.sh            # End-to-end test suite
 ├── skills/mnemon/SKILL.md     # Command reference (Skill format)
 ├── main.go                    # Entry point
-├── CLAUDE.md                  # Project-level behavior guidance
-└── Makefile                   # Build, install, integration
+├── CLAUDE.md                  # Project-level development guidelines
+└── Makefile                   # Build, install, asset sync
 ```
 
 ---
@@ -750,59 +774,143 @@ mnemon embed <id>               # Generate for a single insight
 
 ## 11. LLM CLI Integration
 
-![Three-Layer Integration](diagrams/08-three-layer-integration.jpg)
+<!-- TODO: Update 08-three-layer-integration.jpg — should show 4 hook events + guide.md + SKILL.md architecture -->
+![Integration Architecture](diagrams/08-three-layer-integration.jpg)
 
-Mnemon integrates with LLM CLIs (such as Claude Code) through a three-layer mechanism, ensuring memory flows naturally within conversations.
+Mnemon integrates with LLM CLIs through lifecycle hooks, a skill file, and a behavioral guide. Claude Code's [hook system](https://docs.anthropic.com/en/docs/claude-code/hooks) is the reference implementation — all components are deployed automatically via `mnemon setup`.
 
-### 11.1 Three-Layer Architecture
+### 11.1 Integration Architecture
 
 ```
-User message
+Session starts
     │
     ▼
-  Hook (recall) ─── auto-recall ──→ [Past memory] injected into LLM context
+  SessionStart hook ─── prime.sh ──→ health check, load behavioral guide
     │
     ▼
-  CLAUDE.md ── "Use past memories; evaluate whether to remember"
+  User sends message
     │
     ▼
-  Skill ── "Command syntax: mnemon remember --cat ... (diff built-in)"
+  UserPromptSubmit hook ─── user_prompt.sh ──→ auto-recall → [Past memory]
     │
     ▼
-  LLM generates response
+  Skill (SKILL.md) ── command syntax reference (auto-discovered)
     │
     ▼
-  Hook (stop) ─── memory reminder ──→ "Consider remembering if valuable"
+  LLM generates response (following guide.md behavioral rules)
+    │
+    ▼
+  Stop hook ─── stop.sh ──→ "Consider: remember sub-agent?"
+    │
+    ▼
+  (optional) PreCompact hook ─── compact.sh ──→ save insights before compression
 ```
 
-**Layer 1: Hooks (Auto-Recall + Memory Reminder)**
+Three layers work together:
 
-Two hooks installed at `~/.claude/hooks/`:
+| Layer | What | Where | Role |
+|-------|------|-------|------|
+| **Hooks** | Shell scripts triggered by Claude Code lifecycle events | `.claude/hooks/mnemon/` | Plumbing — auto-recall, memory reminders, guide injection |
+| **Skill** | `SKILL.md` — command reference in Claude Code skill format | `.claude/skills/mnemon/` | Teaches the LLM *how* to use mnemon commands |
+| **Guide** | `guide.md` — behavioral instructions | `~/.mnemon/prompt/` | Teaches the LLM *when* to recall and *what* to remember |
+
+### 11.2 Hook Details
+
+Claude Code fires hooks at specific lifecycle events. Mnemon registers up to four:
+
+**SessionStart — `prime.sh`**
+
+Runs once when a Claude Code session starts. Checks memory system health and loads the behavioral guide:
 
 ```bash
-# scripts/hooks/user_prompt.sh — runs on every user message
-mnemon recall "$USER_MESSAGE" --limit 5
-
-# scripts/hooks/stop.sh — runs after each LLM response
-# Reminds the LLM to consider remembering valuable information
+mnemon prime --status
+[ -f ~/.mnemon/prompt/guide.md ] && cat ~/.mnemon/prompt/guide.md
 ```
 
-The recall hook injects results into the LLM context with a `[Past memory]` marker. The stop hook serves as a post-response nudge to evaluate whether new information is worth remembering.
+The guide content appears in the LLM's system context, establishing recall/remember behavior for the entire session.
 
-**Layer 2: CLAUDE.md (Behavior Guidance)**
+**UserPromptSubmit — `user_prompt.sh`**
 
-Project-level instructions that tell the LLM when to use memories and when to create them:
+Runs on every user message. Reads the prompt from Claude Code's JSON stdin, runs `mnemon recall`, and injects relevant memories:
 
-- **Recall**: Reference relevant memories when `[Past memory]` is present
-- **Remember**: After each response, ask yourself "if I forget this, will the user need to repeat it?"
-- **Three types worth remembering**: User directives, reasoning conclusions, observed state
-- **Sub-agent delegation**: The main agent (Opus) decides WHAT to remember, then delegates to a Task sub-agent (Sonnet) which reads SKILL.md and executes the correct commands
+```bash
+INPUT=$(cat)
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null)
+RESULT=$(mnemon recall "$PROMPT" --limit 5 2>/dev/null)
+if [ -n "$RESULT" ]; then
+  echo "[Past memory] $RESULT"
+fi
+```
 
-**Layer 3: Skill (Command Reference)**
+The `[Past memory]` marker tells the LLM that recalled memories are available in context.
 
-A pure command syntax document that teaches the LLM how to use mnemon commands. Separated from behavior guidance to maintain clear separation of concerns. The skill includes judgment-based link evaluation — the sub-agent evaluates candidates with judgment, not mechanical rules.
+**Stop — `stop.sh`**
 
-### 11.2 Sub-Agent Delegation
+Runs after each LLM response. Checks whether the LLM already mentioned memory operations; if not, emits a gentle reminder:
+
+```bash
+MSG=$(echo "$INPUT" | jq -r '.last_assistant_message // ""' 2>/dev/null)
+if echo "$MSG" | grep -qi "mnemon remember\|sub-agent.*remember\|Stored.*imp="; then
+  exit 0  # Already handled
+fi
+echo "[mnemon] Consider: does this exchange warrant a remember sub-agent?"
+```
+
+**PreCompact — `compact.sh` (optional)**
+
+Fires before context window compression. Prompts the LLM to save key insights before context is lost:
+
+```bash
+echo "[mnemon] Context compaction starting. Review this session and remember
+the most valuable insights (up to 5) before context is compressed."
+```
+
+### 11.3 Automated Setup
+
+`mnemon setup` handles all deployment automatically:
+
+```
+$ mnemon setup
+
+Detecting LLM CLI environments...
+  ✓ Claude Code (v1.x)    .claude/
+
+Select environment: Claude Code
+Install scope: Local — this project only (.claude/)
+
+[1/3] Skill
+  ✓ Skill     .claude/skills/mnemon/SKILL.md
+
+[2/3] Prompts
+  ✓ Prompts   ~/.mnemon/prompt/ (guide.md, skill.md)
+
+[3/3] Optional hooks
+  Select hooks to enable:
+    [x] Recall  — auto-recall on each message (recommended)
+    [x] Nudge   — remind about memory on session end
+    [ ] Compact — save insights before context compaction
+
+Setup complete!
+  Hooks   prime, recall, nudge
+  Prompts ~/.mnemon/prompt/ (guide.md, skill.md)
+
+Start a new Claude Code session to activate.
+Edit ~/.mnemon/prompt/guide.md to customize behavior.
+Run 'mnemon setup --eject' to remove.
+```
+
+Key setup options:
+
+| Flag | Effect |
+|------|--------|
+| `--global` | Install to `~/.claude/` (all projects) instead of `.claude/` (project-local) |
+| `--target claude-code` | Non-interactive, Claude Code only |
+| `--eject` | Remove all mnemon integrations |
+| `--yes` | Auto-confirm all prompts (CI-friendly) |
+
+The `prime.sh` hook is always installed. Recall, nudge, and compact hooks are optional (recall and nudge enabled by default).
+
+### 11.4 Sub-Agent Delegation
 
 Memory writes don't happen in the main conversation. Instead, the host LLM delegates to a lightweight sub-agent:
 
@@ -834,12 +942,15 @@ This separation means:
 - **Context isolation**: Memory processing doesn't pollute the main conversation context
 - **Model efficiency**: Sonnet handles routine execution while Opus focuses on high-level decisions
 
-### 11.3 Adapting to Other LLM CLIs
+### 11.5 Adapting to Other LLM CLIs
 
-For non-Claude Code tools, merge the three layers into the corresponding system prompt file:
+For CLIs with hook support, replicate the Claude Code pattern: register lifecycle hooks that call mnemon commands, deploy the skill file, and provide the behavioral guide.
+
+For CLIs without hook support, merge the recall/remember guidance into the corresponding system prompt file:
 
 - Cursor -> `.cursorrules`
 - Windsurf -> `RULES.md`
+- OpenClaw -> `mnemon setup --target openclaw` deploys skill + guide, but hooks require manual plugin configuration
 - Others -> System prompt / rules file
 
 ---
