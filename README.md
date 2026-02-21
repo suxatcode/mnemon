@@ -4,7 +4,7 @@
 
 # Mnemon
 
-**Persistent memory for LLM agents.**
+**LLM-supervised persistent memory for AI agents.**
 
 [![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![CI](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml)
@@ -15,32 +15,30 @@
 
 LLM agents forget everything between sessions. Context compaction drops critical decisions, cross-session knowledge vanishes, and long conversations push early information out of the window.
 
-Mnemon gives your agent persistent, cross-session memory — with a single binary and one setup command.
-
-<p align="center">
-  <img src="docs/diagrams/10-knowledge-graph.jpg" width="720" alt="Knowledge Graph — 87 insights connected by temporal, entity, semantic, and causal edges" />
-  <br />
-  <sub>A real knowledge graph built by Mnemon — 87 insights, 2150 edges across four graph types.</sub>
-</p>
+Mnemon gives your agent persistent, cross-session memory — a four-graph knowledge store with intent-aware recall, importance decay, and automatic deduplication. Single binary, zero API keys, one setup command.
 
 ### Why Mnemon?
 
-Memory has a **compound interest effect** — the longer it accumulates, the greater its value. LLM engines iterate constantly, skill files cost nearly nothing to write, but memory is a private asset that grows with the user. It is the only component in the agent ecosystem worth deep investment.
-
-Mnemon is built on one core belief: **the LLM itself is the best orchestrator.** Rather than embedding a small LLM inside the pipeline, Mnemon lets your host LLM — the one already holding full conversation context — act as supervisor. The binary is the organ (deterministic storage, graph indexing, search, decay); the LLM is the brain (decides what to remember, how to link, when to forget). The skill file is the textbook that teaches the protocol.
-
-This means: **memory management logic moves from prompt to code — deterministic, testable, portable.** The same binary + skill can run on Claude Code, Cursor, or any LLM CLI that reads markdown.
+Most memory tools embed their own LLM inside the pipeline. Mnemon takes a different approach: **your host LLM is the supervisor.** The binary handles deterministic computation (storage, graph indexing, search, decay); the LLM makes judgment calls (what to remember, how to link, when to forget). No middleman, no extra inference cost.
 
 | Pattern | LLM Role | Representative |
 |---|---|---|
 | **LLM-Embedded** | Executor inside the pipeline | Mem0, Letta |
 | **MCP Server** | Tool provider via MCP protocol | claude-mem |
-| **LLM-Supervised** | External supervisor of a standalone binary | Mnemon |
+| **LLM-Supervised** | External supervisor of a standalone binary | **Mnemon** |
 
 <p align="center">
   <img src="docs/diagrams/llm-supervised-concept.jpg" width="720" alt="LLM-Supervised Architecture — three patterns compared, with detailed Mnemon implementation showing hooks, brain/organ split, and sub-agent delegation" />
   <br />
   <sub>The LLM-Supervised pattern: hooks drive the lifecycle, the host LLM makes judgment calls, the binary handles deterministic computation.</sub>
+</p>
+
+Memory has a **compound interest effect** — the longer it accumulates, the greater its value. LLM engines iterate constantly, skill files cost nearly nothing to write, but memory is a private asset that grows with the user. It is the only component in the agent ecosystem worth deep investment.
+
+<p align="center">
+  <img src="docs/diagrams/10-knowledge-graph.jpg" width="720" alt="Knowledge Graph — 87 insights connected by temporal, entity, semantic, and causal edges" />
+  <br />
+  <sub>A real knowledge graph built by Mnemon — 87 insights, 2150 edges across four graph types.</sub>
 </p>
 
 See [Design & Architecture](docs/DESIGN.md) for details.
