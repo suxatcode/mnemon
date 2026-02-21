@@ -669,8 +669,12 @@ func (db *DB) ScanEmbeddings(fn func(id string, blob []byte) bool) error {
 
 // EmbeddingStats returns total insights and how many have embeddings.
 func (db *DB) EmbeddingStats() (total int, embedded int, err error) {
-	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total)
-	db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL AND embedding IS NOT NULL`).Scan(&embedded)
+	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total); err != nil {
+		return 0, 0, fmt.Errorf("count active insights: %w", err)
+	}
+	if err := db.execer().QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL AND embedding IS NOT NULL`).Scan(&embedded); err != nil {
+		return 0, 0, fmt.Errorf("count embedded insights: %w", err)
+	}
 	return total, embedded, nil
 }
 

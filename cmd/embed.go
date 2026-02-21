@@ -36,7 +36,10 @@ Modes:
 
 		// Status mode
 		if embedStatus {
-			total, embedded, _ := db.EmbeddingStats()
+			total, embedded, err := db.EmbeddingStats()
+			if err != nil {
+				return fmt.Errorf("embedding stats: %w", err)
+			}
 			output := map[string]interface{}{
 				"total_insights":    total,
 				"embedded":          embedded,
