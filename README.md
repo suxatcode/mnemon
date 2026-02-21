@@ -36,14 +36,40 @@ This means: **memory management logic moves from prompt to code — deterministi
 | **MCP Server** | Tool provider via MCP protocol | MemCP |
 | **LLM-Supervised** | External supervisor of a standalone binary | Mnemon |
 
+<p align="center">
+  <img src="docs/diagrams/llm-supervised-concept.png" width="720" alt="LLM-Supervised Architecture — three patterns compared, with detailed Mnemon implementation showing hooks, brain/organ split, and sub-agent delegation" />
+  <br />
+  <sub>The LLM-Supervised pattern: hooks drive the lifecycle, the host LLM makes judgment calls, the binary handles deterministic computation.</sub>
+</p>
+
 See [Design & Architecture](docs/DESIGN.md) for details.
 
 ## Quick Start
 
-### Claude Code
+### Install
+
+**Homebrew** (macOS / Linux):
+
+```bash
+brew install mnemon-dev/tap/mnemon
+```
+
+**Go install**:
 
 ```bash
 go install github.com/mnemon-dev/mnemon@latest
+```
+
+**From source**:
+
+```bash
+git clone https://github.com/mnemon-dev/mnemon.git && cd mnemon
+make install
+```
+
+### Claude Code
+
+```bash
 mnemon setup
 ```
 
@@ -52,20 +78,12 @@ mnemon setup
 ### OpenClaw
 
 ```bash
-go install github.com/mnemon-dev/mnemon@latest
 mnemon setup --target openclaw
 ```
 
 This installs the skill and deploys a behavioral guide to `~/.mnemon/prompt/guide.md`. Since hook integration is not yet automated for OpenClaw, provide the guide to your agent and let it self-configure:
 
 > Read `~/.mnemon/prompt/guide.md` and configure yourself to follow its recall/remember workflow.
-
-### From source
-
-```bash
-git clone https://github.com/mnemon-dev/mnemon.git && cd mnemon
-make install && mnemon setup
-```
 
 ### Uninstall
 
