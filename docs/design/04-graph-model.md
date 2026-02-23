@@ -1,10 +1,119 @@
-# Graph as the Native Storage Model for LLMs
+# 4. Graph Model & Theory
 
-## Core Thesis
+[< Back to Design Overview](../DESIGN.md)
 
-Graph databases are not merely "suitable" for LLMs — they are structurally isomorphic to how LLMs organize information. This document captures the key insights from architectural analysis.
+---
 
-## 1. Structural Isomorphism
+Within the [RLM paradigm](02-philosophy.md#25-theoretical-foundations), MAGMA provides the specific data structure for the external environment that the LLM orchestrates. The core idea of the MAGMA paper is: **a single edge type (such as pure vector similarity) is insufficient to capture the multidimensional relationships between memories.** Different query intents require different relational perspectives — asking "why" requires causal chains, asking "when" requires timelines, asking "about X" requires entity associations.
+
+Mnemon implements four graphs, each capturing one dimension of relationships:
+
+![MAGMA Four-Graph Model](../diagrams/04-magma-four-graph.jpg)
+
+## 5.1 Temporal Graph
+
+**Purpose**: Capture the chronological order of memories, building a temporal skeleton of the knowledge flow.
+
+**Automatically created edges**:
+
+- **Backbone**: New insight → most recent insight from the same source (bidirectional)
+  - Ensures memories from each source (user/agent) form a continuous timeline
+- **Proximity**: New insight <-> insights within a 24-hour window (bidirectional)
+  - Weight formula: `w = 1 / (1 + hours_diff)`
+  - Up to 10 proximity edges
+
+```
+Insight A (2h ago) ←── backbone ──→ Insight B (1h ago) ←── backbone ──→ Insight C (now)
+     ↑                                     ↑
+     └──────── proximity (w=0.33) ─────────┘
+```
+
+**Metadata**: `{"sub_type": "backbone"|"proximity", "hours_diff": "2.34"}`
+
+## 5.2 Entity Graph
+
+**Purpose**: Link insights that mention the same entities.
+
+**Entity extraction (hybrid approach)**:
+1. **Regex patterns**: CamelCase (`HttpServer`), ALL_CAPS (`API`), file paths (`./cmd/root.go`), URLs, @-mentions, Chinese book title marks
+2. **Technical dictionary**: 200+ common terms (Go, React, SQLite, Kubernetes...)
+3. **User-provided**: `--entities` flag for direct specification
+
+**Automatically created edges**: New insight <-> up to 5 existing insights per shared entity (bidirectional), weight 1.0.
+
+```
+                   ┌─── "Qdrant" ───┐
+                   │                │
+Insight A ←── entity ──→ Insight B ←── entity ──→ Insight C
+("Chose Qdrant")         ("Qdrant perf test")     ("Qdrant deployment config")
+```
+
+**Metadata**: `{"entity": "Qdrant"}`
+
+## 5.3 Causal Graph
+
+**Purpose**: Capture the reasons behind decisions and cause-effect relationships.
+
+**Automatic detection**:
+1. Content contains causal keywords (`because`, `therefore`, `due to`, `caused by`, `as a result`, etc.)
+2. Token overlap with recent insights >= 15%
+3. Direction inference: causal direction is determined based on whether the causal keyword appears in the new or existing insight
+
+**LLM-assisted evaluation**:
+- `remember` outputs a causal candidate list (discovered via 2-hop BFS)
+- The host LLM evaluates these candidates and decides whether to establish connections via `link --type causal`
+- Supports sub-type hints: `causes` (direct cause), `enables` (enabling condition), `prevents` (preventing factor)
+
+```
+Insight A ──── causal ────→ Insight B
+("Team lacks Redis exp.")   ("Chose SQLite as storage")
+  sub_type: "causes"
+  weight: 0.75
+```
+
+This is a quintessential example of the LLM-Supervised philosophy: Binary handles low-cost candidate discovery (regex + token overlap), while the LLM handles high-value causal judgment.
+
+## 5.4 Semantic Graph
+
+**Purpose**: Connect semantically similar insights based on meaning.
+
+**Two-tier confidence system**:
+
+| Tier | Cosine Similarity | Behavior |
+|------|-------------------|----------|
+| **Auto-link** | >= 0.80 | Automatically create bidirectional edges (high confidence), up to 3 |
+| **Candidate review** | 0.40 ~ 0.79 | Output to LLM for evaluation; LLM decides whether to link |
+| **Ignore** | < 0.40 | No action |
+
+**Fallback** (without embeddings): Token overlap rate is used instead of cosine similarity.
+
+```
+Insight A ←── semantic (auto, cos=0.92) ──→ Insight B
+
+Insight C ←── semantic (LLM review) ──→ Insight D
+                cos=0.65, manually linked after LLM judged "related"
+```
+
+## 5.5 Four-Graph Synergy: Intent-Adaptive Weighting
+
+Different query intents activate different graph traversal weights:
+
+| Intent | Causal | Temporal | Entity | Semantic |
+|--------|--------|----------|--------|----------|
+| **WHY** | **0.70** | 0.20 | 0.05 | 0.05 |
+| **WHEN** | 0.15 | **0.65** | 0.10 | 0.10 |
+| **ENTITY** | 0.10 | 0.05 | **0.55** | 0.30 |
+| **GENERAL** | 0.25 | 0.25 | 0.25 | 0.25 |
+
+When asking "why was SQLite chosen," the causal edge weight is highest, so the system traces decision rationale along causal chains. When asking for "memories related to React," the entity edge weight is highest, so the system finds all insights mentioning React.
+
+---
+
+# Graph-LLM Theoretical Foundations
+
+The following sections establish the theoretical basis for why graph databases are the native storage model for LLMs, and why `remember / link / recall` constitutes a universal protocol for agent memory systems.
+
+## Structural Isomorphism
 
 LLM attention, graph data models, and natural language all describe the same thing: weighted associations between entities.
 
@@ -16,7 +125,7 @@ Natural Language:  subject ←predicate→ object
 
 Relational databases force network relationships into tables. Vector databases retain only one relationship type (similarity). Only graphs preserve full relational semantics.
 
-## 2. The Three-Step Paradigm: Extract → Candidate → Associate
+## The Three-Step Paradigm: Extract → Candidate → Associate
 
 Graph construction engines universally decompose into three steps:
 
@@ -38,7 +147,7 @@ The three-step model is a spectrum — the more semantically rich the data model
 | **Vector** | Text → embedding | ANN dedup | Metadata only (single relation type) |
 | **KV** | Key:value | Key existence check | _(nearly none)_ |
 
-## 3. Read-Write Symmetry (Unique to Graphs)
+## Read-Write Symmetry (Unique to Graphs)
 
 On graph databases, the read and write paths mirror each other using the same three-step model:
 
@@ -60,7 +169,7 @@ This symmetry does NOT hold for other database types — relational write is sch
 
 **Implication**: An LLM needs to master only one cognitive pattern to handle both graph reads and writes.
 
-## 4. From the LLM Perspective: Query → Reason
+## From the LLM Perspective: Query → Reason
 
 Regardless of the underlying database, LLM interactions on the read side collapse to two steps:
 
@@ -74,7 +183,7 @@ This is the RAG paradigm applied to any data store. The variation lies in the tr
 - **Text-to-Cypher**: must understand graph structure
 - **Text-to-Vector**: encode only, near-zero translation
 
-## 5. Other Storage Types as Degenerate Graphs
+## Other Storage Types as Degenerate Graphs
 
 | Storage Type | What's Lost Compared to Graph |
 |-------------|------------------------------|
@@ -85,7 +194,7 @@ This is the RAG paradigm applied to any data store. The variation lies in the tr
 
 A vector database can answer "what is **similar** to what" but cannot answer "what **caused** what" or "what **belongs to** what". Graphs can.
 
-## 6. remember / link / recall as Universal Algebra
+## remember / link / recall as Universal Algebra
 
 The three-step paradigm (Extract → Candidate → Associate) maps directly to three primitive operations: **remember**, **link**, **recall**. This is not an implementation detail of mnemon — it is the minimal complete interface for any agent memory system.
 
@@ -129,7 +238,7 @@ Native RAG      link absent entirely
 
 The more degenerate the `link` operation, the more burden falls on the LLM at recall time to infer associations that were never stored.
 
-## 7. The Protocol Gap: LLM ↔ Database
+## The Protocol Gap: LLM ↔ Database
 
 ### The Missing Layer
 
@@ -167,7 +276,7 @@ This is equivalent to every web application inventing its own HTTP. The result: 
 
 ### remember / link / recall as Protocol Primitives
 
-The three primitives derived from our analysis (Section 6) are not just a taxonomy — they are the specification of an **LLM-to-Database interaction protocol**, analogous to MCP:
+The three primitives derived from our analysis are not just a taxonomy — they are the specification of an **LLM-to-Database interaction protocol**, analogous to MCP:
 
 ```
 MCP:  LLM ↔ Tool
@@ -240,7 +349,7 @@ MemGPT──┘                         │── SQLite adapter (mnemon current
 - **Not competing with Mem0** on product features (it is a product bound to its implementation)
 - **Analogous to MCP** — MCP connected LLMs to the tool ecosystem; this protocol connects LLMs to the database ecosystem
 
-## 8. Academic Landscape and Positioning
+## Academic Landscape and Positioning
 
 ### Prior Art Assessment
 
@@ -292,7 +401,7 @@ Original contributions (no prior formulation found)
 - Transformers are Graph Neural Networks (arXiv 2506.22084, Jun 2025)
 - A Generalization of Transformer Networks to Graphs (arXiv 2012.09699, 2020)
 
-## 9. Validation: mnemon Architecture
+## Validation: mnemon Architecture
 
 mnemon's design directly reflects these insights:
 
