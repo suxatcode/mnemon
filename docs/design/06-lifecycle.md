@@ -8,7 +8,7 @@ Mnemon is not an append-only system. Effective memory management requires import
 
 ![Lifecycle & Retention](../diagrams/06-lifecycle-retention.jpg)
 
-## 9.1 Effective Importance (EI)
+## 6.1 Effective Importance (EI)
 
 EI combines base importance, access frequency, time decay, and graph connectivity:
 
@@ -27,13 +27,13 @@ Interpretation:
 - **Long period without access** -> exponential decay (halves every 30 days)
 - **Rich graph connections** -> indicates relevance to other knowledge, bonus applied
 
-## 9.2 Immunity Rules
+## 6.2 Immunity Rules
 
 The following insights are exempt from automatic cleanup:
 - `importance >= 4` (high-value memories)
 - `access_count >= 3` (frequently retrieved)
 
-## 9.3 Auto-Pruning
+## 6.3 Auto-Pruning
 
 Triggered when the total number of active insights exceeds **1000**:
 
@@ -43,7 +43,7 @@ Triggered when the total number of active insights exceeds **1000**:
 4. Soft-delete (set `deleted_at`)
 5. Cascade-delete related edges
 
-## 9.4 GC Command
+## 6.4 GC Command
 
 Manual lifecycle management tool:
 
@@ -57,11 +57,11 @@ mnemon gc --keep <id>
 
 ---
 
-## 10. Embedding Support
+## 6.5 Embedding Support
 
 Embedding vectors are an optional enhancement. Without embeddings, Mnemon operates entirely on keywords and graph structure; with embeddings, semantic retrieval capabilities are significantly enhanced.
 
-### 10.1 Ollama Integration
+### Ollama Integration
 
 Via the local Ollama service (no external API required):
 
@@ -75,11 +75,11 @@ Mnemon ──HTTP──→ Ollama (localhost:11434)
 - **Graceful degradation**: Automatically falls back to token overlap when Ollama is unavailable
 - **Zero new dependencies**: Pure stdlib `net/http`
 
-### 10.2 Vector Storage
+### Vector Storage
 
 Vectors are serialized as little-endian float64 BLOBs stored in the `insights.embedding` column (768 x 8 = 6144 bytes/insight).
 
-### 10.3 Usage Scenarios
+### Usage Scenarios
 
 | Scenario | Without Embedding | With Embedding |
 |----------|------------------|----------------|
@@ -88,7 +88,7 @@ Vectors are serialized as little-endian float64 BLOBs stored in the `insights.em
 | recall -> traversal | Pure structural score | Structural + semantic similarity |
 | recall -> re-ranking | KW + Entity + Graph | KW + Entity + Similarity + Graph |
 
-### 10.4 Management Commands
+### Management Commands
 
 ```bash
 ollama pull nomic-embed-text    # Install the model

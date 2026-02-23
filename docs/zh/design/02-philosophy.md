@@ -4,7 +4,7 @@
 
 # 2. 设计哲学
 
-### 2.1 LLM-Supervised：Binary 是器官，LLM 是监督者
+## 2.1 LLM-Supervised：Binary 是器官，LLM 是监督者
 
 传统的 LLM 记忆系统（如 Mem0、MAGMA 原始实现）在管线内部嵌入一个小型 LLM 来处理记忆操作——实体提取、冲突检测、因果推理。这是 **LLM-Embedded** 模式。
 
@@ -30,7 +30,7 @@ Mnemon 采用 **LLM-Supervised** 模式：
 - **更强的判断能力**：Opus 级别的 LLM 评估候选链接，而非 gpt-4o-mini
 - **LLM 可替换**：同一套 Binary + Skill 可在 Claude Code、Cursor、任何 LLM CLI 中使用
 
-### 2.2 Tools are Organs, Skills are Textbooks
+## 2.2 Tools are Organs, Skills are Textbooks
 
 这一哲学可以用游戏开发的类比来理解：
 
@@ -46,7 +46,7 @@ Mnemon 采用 **LLM-Supervised** 模式：
 
 Binary 封装了所有不需要 LLM 的逻辑，Skill 只教 LLM 做需要智能判断的部分。**记忆管理逻辑从 prompt 变成代码——确定性、可测试、可移植。**
 
-### 2.3 记忆网关：协议而非数据库
+## 2.3 记忆网关：协议而非数据库
 
 大多数 Agent 记忆项目将两个不同的问题混为一体：**如何存储和检索记忆**（存储引擎问题）和**LLM 如何决定何时写入、查询什么、如何解读结果**（交互协议问题）。Mem0 在写入路径中嵌入 LLM 调用——存储逻辑和 LLM 逻辑交织在一起。MemGPT 发明了 OS 式的内存分页，上下文管理策略与存储模型不可分离。OpenViking 构建了自己的虚拟文件系统抽象。每个项目都从头重造 LLM 到数据库的交互层——等同于每个 Web 应用重新发明 HTTP。
 
@@ -83,7 +83,7 @@ Mnemon 将这两者视为刻意分离的两层：
 
 这与 Claude Code 的核心设计洞察一脉相承：**将工程问题与 LLM 问题分离。** Claude Code 不重新发明终端——它让 LLM 通过 bash 操作 Unix 几十年积累的工具链。Mnemon 遵循同样的原则：为记忆图谱构建专用存储引擎，并通过干净的协议边界将其暴露给 LLM。DB 优化归 DB，LLM 交互归协议层。
 
-### 2.4 核心洞察
+## 2.4 核心洞察
 
 - **引擎层不需要自己建**——大厂持续优化 LLM 和 CLI 工具，开发者只需引入即用
 - **Skill 层边际成本极低**——写 markdown 即可定义 agent 行为，类似游戏蓝图让非程序员也能参与
@@ -91,7 +91,7 @@ Mnemon 将这两者视为刻意分离的两层：
 - **LLM 本身就是最好的编排器**——不需要 Python DAG 编排调用链，LLM 读了 Skill 就知道该怎么做
 - **存储与协议分离**——记忆如何存储和检索（引擎）与 LLM 如何与之交互（协议）是不同的问题，有不同的优化策略。保持解耦让两侧各自独立演进
 
-### 2.5 理论基础
+## 2.5 理论基础
 
 Mnemon 的设计取用了一篇论文的**范式**和另一篇论文的**方法论**，并在两者之间做出了自己的工程选择。
 

@@ -4,7 +4,7 @@
 
 ---
 
-## 12. Design Decisions & Trade-offs
+## 8.1 Design Decisions & Trade-offs
 
 ### Why LLM-Supervised Instead of an Embedded LLM?
 
@@ -51,7 +51,7 @@ Mnemon retains MAGMA's **architectural skeleton** (four-graph separation, intent
 
 ---
 
-## 13. Future Direction
+## 8.2 Future Direction
 
 The [two-layer architecture](02-philosophy.md#23-memory-gateway-protocol-not-database) has achieved agent-side pluggability — any LLM CLI can interact with Mnemon through the protocol surface today. The remaining work is on the other side.
 

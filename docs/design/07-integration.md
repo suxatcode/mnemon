@@ -8,7 +8,7 @@
 
 Mnemon integrates with LLM CLIs through lifecycle hooks, a skill file, and a behavioral guide. Claude Code's [hook system](https://docs.anthropic.com/en/docs/claude-code/hooks) is the reference implementation — all components are deployed automatically via `mnemon setup`.
 
-## 11.1 Integration Architecture
+## 7.1 Integration Architecture
 
 Four hooks drive the memory lifecycle:
 
@@ -46,7 +46,7 @@ Three layers work together:
 | **Skill** | `SKILL.md` — command reference in Claude Code skill format | `.claude/skills/mnemon/` | Teaches the LLM *how* to use mnemon commands |
 | **Guide** | `guide.md` — detailed execution manual for recall, remember, and delegation | `~/.mnemon/prompt/` | Teaches the LLM *when* to recall, *what* to remember, and *how* to delegate |
 
-## 11.2 Hook Details
+## 7.2 Hook Details
 
 Claude Code fires hooks at specific lifecycle events. Mnemon registers up to four, each with a distinct role in the memory lifecycle:
 
@@ -97,7 +97,7 @@ Fires before context window compression. Instructs the agent to extract the most
 echo "[mnemon] Context compaction starting. Review this session and remember the most valuable insights (up to 5) before context is compressed. Delegate to Task sub-agents now."
 ```
 
-## 11.3 Automated Setup
+## 7.3 Automated Setup
 
 `mnemon setup` handles all deployment automatically:
 
@@ -142,7 +142,7 @@ Key setup options:
 
 The Prime hook is always installed. Remind, Nudge, and Compact hooks are optional (Remind and Nudge enabled by default).
 
-## 11.4 Sub-Agent Delegation
+## 7.4 Sub-Agent Delegation
 
 Memory writes don't happen in the main conversation. Instead, the host LLM delegates to a lightweight sub-agent:
 
@@ -174,7 +174,7 @@ This separation means:
 - **Context isolation**: Memory processing doesn't pollute the main conversation context
 - **Model efficiency**: Sonnet handles routine execution while Opus focuses on high-level decisions
 
-## 11.5 Adapting to Other LLM CLIs
+## 7.5 Adapting to Other LLM CLIs
 
 For CLIs with hook support, replicate the Claude Code pattern: register lifecycle hooks that call mnemon commands, deploy the skill file, and provide the behavioral guide.
 

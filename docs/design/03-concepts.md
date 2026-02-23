@@ -93,7 +93,7 @@ oplog (
 
 ---
 
-## 4. System Architecture
+## 3.4 System Architecture
 
 Mnemon's architecture is divided into five layers:
 
@@ -178,7 +178,7 @@ mnemon/
 └── Makefile                   # Build, install, test
 ```
 
-## 4.1 Data Directory Layout
+## 3.5 Data Directory Layout
 
 ```
 ~/.mnemon/
@@ -197,7 +197,7 @@ mnemon/
 
 **Isolation boundary**: Each store contains an independent `mnemon.db` — insights, edges, and oplog are fully isolated. Prompt files (`guide.md`, `skill.md`) are shared — behavioral rules are universal, memory data is private.
 
-## 4.2 Store Isolation
+## 3.6 Store Isolation
 
 Mnemon supports named stores for lightweight data isolation between different agents, projects, or scenarios.
 

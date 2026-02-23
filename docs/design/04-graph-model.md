@@ -10,7 +10,7 @@ Mnemon implements four graphs, each capturing one dimension of relationships:
 
 ![MAGMA Four-Graph Model](../diagrams/04-magma-four-graph.jpg)
 
-## 5.1 Temporal Graph
+## 4.1 Temporal Graph
 
 **Purpose**: Capture the chronological order of memories, building a temporal skeleton of the knowledge flow.
 
@@ -30,7 +30,7 @@ Insight A (2h ago) ←── backbone ──→ Insight B (1h ago) ←── bac
 
 **Metadata**: `{"sub_type": "backbone"|"proximity", "hours_diff": "2.34"}`
 
-## 5.2 Entity Graph
+## 4.2 Entity Graph
 
 **Purpose**: Link insights that mention the same entities.
 
@@ -50,7 +50,7 @@ Insight A ←── entity ──→ Insight B ←── entity ──→ Insigh
 
 **Metadata**: `{"entity": "Qdrant"}`
 
-## 5.3 Causal Graph
+## 4.3 Causal Graph
 
 **Purpose**: Capture the reasons behind decisions and cause-effect relationships.
 
@@ -73,7 +73,7 @@ Insight A ──── causal ────→ Insight B
 
 This is a quintessential example of the LLM-Supervised philosophy: Binary handles low-cost candidate discovery (regex + token overlap), while the LLM handles high-value causal judgment.
 
-## 5.4 Semantic Graph
+## 4.4 Semantic Graph
 
 **Purpose**: Connect semantically similar insights based on meaning.
 
@@ -94,7 +94,7 @@ Insight C ←── semantic (LLM review) ──→ Insight D
                 cos=0.65, manually linked after LLM judged "related"
 ```
 
-## 5.5 Four-Graph Synergy: Intent-Adaptive Weighting
+## 4.5 Four-Graph Synergy: Intent-Adaptive Weighting
 
 Different query intents activate different graph traversal weights:
 
@@ -109,11 +109,11 @@ When asking "why was SQLite chosen," the causal edge weight is highest, so the s
 
 ---
 
-# Graph-LLM Theoretical Foundations
+## 4.6 Graph-LLM Theoretical Foundations
 
 The following sections establish the theoretical basis for why graph databases are the native storage model for LLMs, and why `remember / link / recall` constitutes a universal protocol for agent memory systems.
 
-## Structural Isomorphism
+### Structural Isomorphism
 
 LLM attention, graph data models, and natural language all describe the same thing: weighted associations between entities.
 
@@ -125,7 +125,7 @@ Natural Language:  subject ←predicate→ object
 
 Relational databases force network relationships into tables. Vector databases retain only one relationship type (similarity). Only graphs preserve full relational semantics.
 
-## The Three-Step Paradigm: Extract → Candidate → Associate
+### The Three-Step Paradigm: Extract → Candidate → Associate
 
 Graph construction engines universally decompose into three steps:
 
@@ -147,7 +147,7 @@ The three-step model is a spectrum — the more semantically rich the data model
 | **Vector** | Text → embedding | ANN dedup | Metadata only (single relation type) |
 | **KV** | Key:value | Key existence check | _(nearly none)_ |
 
-## Read-Write Symmetry (Unique to Graphs)
+### Read-Write Symmetry (Unique to Graphs)
 
 On graph databases, the read and write paths mirror each other using the same three-step model:
 
@@ -169,7 +169,7 @@ This symmetry does NOT hold for other database types — relational write is sch
 
 **Implication**: An LLM needs to master only one cognitive pattern to handle both graph reads and writes.
 
-## From the LLM Perspective: Query → Reason
+### From the LLM Perspective: Query → Reason
 
 Regardless of the underlying database, LLM interactions on the read side collapse to two steps:
 
@@ -183,7 +183,7 @@ This is the RAG paradigm applied to any data store. The variation lies in the tr
 - **Text-to-Cypher**: must understand graph structure
 - **Text-to-Vector**: encode only, near-zero translation
 
-## Other Storage Types as Degenerate Graphs
+### Other Storage Types as Degenerate Graphs
 
 | Storage Type | What's Lost Compared to Graph |
 |-------------|------------------------------|
@@ -194,7 +194,7 @@ This is the RAG paradigm applied to any data store. The variation lies in the tr
 
 A vector database can answer "what is **similar** to what" but cannot answer "what **caused** what" or "what **belongs to** what". Graphs can.
 
-## remember / link / recall as Universal Algebra
+### remember / link / recall as Universal Algebra
 
 The three-step paradigm (Extract → Candidate → Associate) maps directly to three primitive operations: **remember**, **link**, **recall**. This is not an implementation detail of mnemon — it is the minimal complete interface for any agent memory system.
 
@@ -238,7 +238,7 @@ Native RAG      link absent entirely
 
 The more degenerate the `link` operation, the more burden falls on the LLM at recall time to infer associations that were never stored.
 
-## The Protocol Gap: LLM ↔ Database
+### The Protocol Gap: LLM ↔ Database
 
 ### The Missing Layer
 
@@ -349,7 +349,7 @@ MemGPT──┘                         │── SQLite adapter (mnemon current
 - **Not competing with Mem0** on product features (it is a product bound to its implementation)
 - **Analogous to MCP** — MCP connected LLMs to the tool ecosystem; this protocol connects LLMs to the database ecosystem
 
-## Academic Landscape and Positioning
+### Academic Landscape and Positioning
 
 ### Prior Art Assessment
 
@@ -401,7 +401,7 @@ Original contributions (no prior formulation found)
 - Transformers are Graph Neural Networks (arXiv 2506.22084, Jun 2025)
 - A Generalization of Transformer Networks to Graphs (arXiv 2012.09699, 2020)
 
-## Validation: mnemon Architecture
+### Validation: mnemon Architecture
 
 mnemon's design directly reflects these insights:
 
@@ -413,7 +413,7 @@ recall   → Extract + Candidate + Associate (intent detection → multi-signal 
 
 Five edge types preserve five distinct relational semantics. Degenerating to pure vector retrieval would retain only `semantic` — losing ~80% of relational information. MAGMA ablation studies confirm: removing causal edges drops accuracy 3-5%, removing temporal edges drops it further.
 
-## Summary
+### Summary
 
 - **Extract → Candidate → Associate** is the universal paradigm for graph construction engines
 - This three-step model achieves its **most complete expression** on graphs and degenerates toward KV

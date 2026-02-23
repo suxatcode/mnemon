@@ -4,13 +4,13 @@
 
 ---
 
-## 6. Write Pipeline: Remember
+## 5.1 Write Pipeline: Remember
 
 `mnemon remember` is the core command for writing memories. It includes a built-in diff step that automatically detects duplicates and conflicts before storage. The write transaction executes atomically within a single SQLite transaction.
 
 ![Remember Pipeline](../diagrams/02-remember-pipeline.jpg)
 
-### 6.1 Detailed Flow
+### Detailed Flow
 
 ```
 mnemon remember "Chose Qdrant as the vector database" \
@@ -84,13 +84,13 @@ After receiving this output, the LLM can evaluate candidates and establish edges
 
 ---
 
-## 7. Read Pipeline: Smart Recall (Default)
+## 5.2 Read Pipeline: Smart Recall
 
 `mnemon recall` is Mnemon's core retrieval algorithm. Smart recall is the default mode for all queries. It combines intent detection, multi-signal anchor selection, Beam Search graph traversal, and multi-factor re-ranking to achieve intent-aware graph-enhanced retrieval. Use `--basic` for legacy SQL LIKE fallback.
 
 ![Smart Recall Pipeline](../diagrams/03-smart-recall-pipeline.jpg)
 
-### 7.1 Step 1: Intent Detection
+### Step 1: Intent Detection
 
 Query intent is automatically identified via regex matching:
 
@@ -103,7 +103,7 @@ Query intent is automatically identified via regex matching:
 
 Supports the `--intent` flag to manually override automatic detection.
 
-### 7.2 Step 2: Multi-Signal Anchor Selection (RRF Fusion)
+### Step 2: Multi-Signal Anchor Selection (RRF Fusion)
 
 Multiple signals run in parallel and are merged via Reciprocal Rank Fusion:
 
@@ -119,7 +119,7 @@ RRF Score = Σ  1 / (k + rank_i + 1)    (k = 60)
 
 Each insight may rank differently across signals; RRF fusion produces a robust composite ranking.
 
-### 7.3 Step 3: Beam Search Graph Traversal
+### Step 3: Beam Search Graph Traversal
 
 Starting from each anchor, Beam Search is performed across the four graphs:
 
@@ -153,7 +153,7 @@ for each anchor:
 
 WHY queries use a wider beam and deeper traversal because causal chains typically span multiple hops.
 
-### 7.4 Step 4: Multi-Factor Re-Ranking
+### Step 4: Multi-Factor Re-Ranking
 
 For all collected candidates, a four-dimensional score is computed and combined via weighted sum:
 
@@ -175,11 +175,11 @@ Weights vary by intent:
 | ENTITY | 0.20 | **0.40** | 0.20 | 0.20 |
 | GENERAL | 0.25 | 0.25 | 0.25 | 0.25 |
 
-### 7.5 Step 5: WHY Post-Processing — Causal Topological Sort
+### Step 5: WHY Post-Processing — Causal Topological Sort
 
 If the intent is WHY, an additional topological sort using Kahn's algorithm is performed: results are arranged along causal edges so that **causes come first, effects follow**.
 
-### 7.6 Signal Transparency
+### Signal Transparency
 
 Each retrieval result includes a detailed signal breakdown:
 
@@ -202,7 +202,7 @@ This is a unique innovation in Mnemon: **exposing the retrieval pipeline's inter
 
 ---
 
-## 8. Deduplication & Conflict Detection: Diff
+## 5.3 Deduplication & Conflict Detection: Diff
 
 ![Diff & Dedup Pipeline](../diagrams/07-diff-dedup-pipeline.jpg)
 
@@ -221,7 +221,7 @@ When `remember` is called, the built-in diff runs before the transaction:
 
 The `--no-diff` flag disables this check for cases where the caller wants unconditional insertion.
 
-### 8.1 Typical Workflow
+### Typical Workflow
 
 A single `remember` call handles everything:
 

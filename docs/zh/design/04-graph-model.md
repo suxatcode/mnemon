@@ -10,7 +10,7 @@ Mnemon 实现了四种图，每种捕捉一个维度的关系：
 
 ![MAGMA Four-Graph Model](../../diagrams/04-magma-four-graph.jpg)
 
-## 5.1 Temporal Graph（时序图）
+## 4.1 Temporal Graph（时序图）
 
 **目的**：捕捉记忆的时间顺序，构建知识流的时间骨架。
 
@@ -30,7 +30,7 @@ Insight A (2h ago) ←── backbone ──→ Insight B (1h ago) ←── bac
 
 **元数据**：`{"sub_type": "backbone"|"proximity", "hours_diff": "2.34"}`
 
-## 5.2 Entity Graph（实体图）
+## 4.2 Entity Graph（实体图）
 
 **目的**：将提及相同实体的 insight 关联起来。
 
@@ -50,7 +50,7 @@ Insight A ←── entity ──→ Insight B ←── entity ──→ Insigh
 
 **元数据**：`{"entity": "Qdrant"}`
 
-## 5.3 Causal Graph（因果图）
+## 4.3 Causal Graph（因果图）
 
 **目的**：捕捉决策背后的原因、前因后果关系。
 
@@ -73,7 +73,7 @@ Insight A ──── causal ────→ Insight B
 
 这是 LLM-Supervised 理念的典型体现：Binary 负责低成本的候选发现（正则 + token 重叠），LLM 负责高价值的因果判断。
 
-## 5.4 Semantic Graph（语义图）
+## 4.4 Semantic Graph（语义图）
 
 **目的**：基于语义含义连接相似的 insight。
 
@@ -94,7 +94,7 @@ Insight C ←── semantic (LLM review) ──→ Insight D
                 cos=0.65, LLM判断"相关"后手动链接
 ```
 
-## 5.5 四图协同：意图自适应权重
+## 4.5 四图协同：意图自适应权重
 
 不同查询意图会激活不同的图遍历权重：
 
@@ -109,11 +109,11 @@ Insight C ←── semantic (LLM review) ──→ Insight D
 
 ---
 
-# Graph-LLM 理论基础
+## 4.6 Graph-LLM 理论基础
 
 以下章节建立了图数据库作为 LLM 原生存储模型的理论基础，并阐明为什么 `remember / link / recall` 构成了 agent 记忆系统的通用协议。
 
-## 结构同构
+### 结构同构
 
 LLM 注意力、图数据模型和自然语言描述的是同一件事——实体间的带权关联：
 
@@ -125,7 +125,7 @@ LLM 注意力：     token ←weight→ token
 
 关系型数据库将网络关系强制压入表结构。向量数据库仅保留一种关系类型（相似度）。只有图能保留完整的关系语义。
 
-## 三步范式：Extract → Candidate → Associate
+### 三步范式：Extract → Candidate → Associate
 
 图构建引擎普遍分解为三个步骤：
 
@@ -147,7 +147,7 @@ LLM 注意力：     token ←weight→ token
 | **向量** | Text → embedding | ANN 去重 | 仅元数据（单一关系类型） |
 | **KV** | Key:value | Key 存在检查 | _（几乎没有）_ |
 
-## 读写对称性（图独有的性质）
+### 读写对称性（图独有的性质）
 
 在图数据库上，读路径和写路径使用相同的三步模型互为镜像：
 
@@ -169,7 +169,7 @@ LLM 注意力：     token ←weight→ token
 
 **含义**：LLM 只需掌握一种认知模式，即可同时处理图的读和写操作。
 
-## 从 LLM 视角看：Query → Reason
+### 从 LLM 视角看：Query → Reason
 
 无论底层数据库是什么，LLM 在读取侧的交互都归结为两步：
 
@@ -183,7 +183,7 @@ LLM 注意力：     token ←weight→ token
 - **Text-to-Cypher**：必须理解图结构
 - **Text-to-Vector**：仅需编码，几乎零翻译
 
-## 其他存储类型是图的退化形式
+### 其他存储类型是图的退化形式
 
 | 存储类型 | 相比图丢失了什么 |
 |---------|----------------|
@@ -194,7 +194,7 @@ LLM 注意力：     token ←weight→ token
 
 向量数据库能回答"什么跟什么**像**"，但不能回答"什么**导致**什么"或"什么**属于**什么"。图可以。
 
-## remember / link / recall 作为通用代数
+### remember / link / recall 作为通用代数
 
 三步范式（Extract → Candidate → Associate）直接映射到三个原语操作：**remember**、**link**、**recall**。这不是 mnemon 的实现细节——它是任何 agent 记忆系统的最小完备接口。
 
@@ -238,7 +238,7 @@ Letta/MemGPT    link 退化为层级放置
 
 `link` 操作越退化，LLM 在 recall 时推断未存储关联的负担就越重。
 
-## 协议空白：LLM ↔ Database
+### 协议空白：LLM ↔ Database
 
 ### 缺失的层
 
@@ -349,7 +349,7 @@ MemGPT──┘                         │── SQLite adapter（当前）
 - **不跟 Mem0 比产品功能**（它是绑定自身存储实现的产品）
 - **与 MCP 类比**——MCP 将 LLM 接入了工具生态，这个协议将 LLM 接入数据库生态
 
-## 学术版图与定位
+### 学术版图与定位
 
 ### 先行工作评估
 
@@ -401,7 +401,7 @@ MemGPT──┘                         │── SQLite adapter（当前）
 - Transformers are Graph Neural Networks（arXiv 2506.22084, Jun 2025）
 - A Generalization of Transformer Networks to Graphs（arXiv 2012.09699, 2020）
 
-## 验证：mnemon 架构
+### 验证：mnemon 架构
 
 mnemon 的设计直接反映了这些洞察：
 
@@ -413,7 +413,7 @@ recall   → Extract + Candidate + Associate（意图检测 → 多信号检索 
 
 五种边类型保留了五种不同的关系语义。退化为纯向量检索将仅保留 `semantic` —— 丢失约 80% 的关系信息。MAGMA 消融研究确认：移除因果边使准确率下降 3-5%，移除时序边使其进一步下降。
 
-## 总结
+### 总结
 
 - **Extract → Candidate → Associate** 是图构建引擎的通用范式
 - 这一三步模型在图上达到**最完整的表达**，并向 KV 方向退化

@@ -2,13 +2,11 @@
 
 # 6. 生命周期与嵌入
 
-## 9. 生命周期管理
-
 Mnemon 不是只增不减的系统。有效的记忆管理需要让重要的记忆持久保留，让过时的记忆自然衰减。
 
 ![Lifecycle & Retention](../../diagrams/06-lifecycle-retention.jpg)
 
-### 9.1 有效重要度（Effective Importance）
+## 6.1 有效重要度（Effective Importance）
 
 EI 综合基础重要度、访问频率、时间衰减和图连接度：
 
@@ -27,13 +25,13 @@ edge_factor:   1.0 + 0.1 × min(edge_count, 5)     // 最多 +0.5
 - **长期未访问** → 指数衰减（30 天减半）
 - **图连接丰富** → 说明与其他知识相关，加分
 
-### 9.2 免疫规则
+## 6.2 免疫规则
 
 以下 insight 不会被自动清理：
 - `importance ≥ 4`（高价值记忆）
 - `access_count ≥ 3`（频繁被检索）
 
-### 9.3 自动剪枝（Auto-Prune）
+## 6.3 自动剪枝（Auto-Prune）
 
 当活跃 insight 总数超过 **1000** 时触发：
 
@@ -43,7 +41,7 @@ edge_factor:   1.0 + 0.1 × min(edge_count, 5)     // 最多 +0.5
 4. 软删除（设置 `deleted_at`）
 5. 级联删除相关边
 
-### 9.4 GC 命令
+## 6.4 GC 命令
 
 手动的生命周期管理工具：
 
@@ -57,11 +55,11 @@ mnemon gc --keep <id>
 
 ---
 
-## 10. 嵌入向量支持
+## 6.5 嵌入向量支持
 
 嵌入向量是可选的增强功能。没有 embedding 时，Mnemon 完全基于关键词和图结构工作；有 embedding 时，语义检索能力大幅增强。
 
-### 10.1 Ollama 集成
+### Ollama 集成
 
 通过本地 Ollama 服务（无需外部 API）：
 
@@ -75,11 +73,11 @@ Mnemon ──HTTP──→ Ollama (localhost:11434)
 - **优雅降级**：Ollama 不可用时自动切换到 token 重叠
 - **零新依赖**：纯 stdlib `net/http`
 
-### 10.2 向量存储
+### 向量存储
 
 向量序列化为 little-endian float64 的 BLOB 存储在 `insights.embedding` 列中（768 × 8 = 6144 bytes/insight）。
 
-### 10.3 使用场景
+### 使用场景
 
 | 场景 | 无 embedding | 有 embedding |
 |------|-------------|-------------|
@@ -88,7 +86,7 @@ Mnemon ──HTTP──→ Ollama (localhost:11434)
 | recall → 遍历 | 纯结构分 | 结构 + 语义相似度 |
 | recall → 重排 | KW + Entity + Graph | KW + Entity + Similarity + Graph |
 
-### 10.4 管理命令
+### 管理命令
 
 ```bash
 ollama pull nomic-embed-text    # 安装模型
