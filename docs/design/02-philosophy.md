@@ -104,6 +104,27 @@ The [Recursive Language Models](https://arxiv.org/abs/2512.24601) paper (Zhang, 
 
 The RLM paper's own implementation uses **code generation + Python REPL** as the interaction mechanism: the LLM writes Python code, a sandbox executes it, and results feed back. Mnemon shares the paradigm but takes a different path at the protocol level (see below).
 
+**RLM Corollary: Why Memory Protocols Must Be Intent-Native**
+
+The three RLM findings above are not just about LLM capability — they constrain what a memory protocol must look like. If the LLM is an orchestrator, the protocol must speak at the orchestrator's level: **intent and semantics**, not mechanism and syntax.
+
+| RLM Finding | Protocol Implication | Anti-Pattern It Explains |
+|-------------|---------------------|--------------------------|
+| LLM as orchestrator, not data processor | Protocol should let the LLM express *what it needs* (intent), not *how to get it* (mechanism) | Embedding an LLM to do entity extraction demotes it from orchestrator to data processor |
+| Constant-size metadata over raw data | Protocol output should be semantic summaries with signal transparency, not database rows | Systems that return raw query results force the LLM to re-derive meaning from data |
+| Two-stage pipeline outperforms single-pass | Deterministic filtering and LLM judgment must be separated into distinct stages | Mixing both inside an embedded LLM call is the single-pass pattern RLM disproves |
+
+Many existing projects embed LLM calls into the memory pipeline — for entity extraction, conflict detection, causal reasoning. This reveals a diagnostic pattern: **when a protocol cannot express semantic intent, the system compensates by injecting an LLM to bridge the gap.** The embedded LLM is doing two jobs simultaneously: **semantic compensation** (the protocol lacks expressiveness, so the LLM translates between intent and mechanism) and **intelligent judgment** (genuinely requires LLM reasoning). Mnemon separates these concerns: raise the protocol's expressiveness to handle the first, and delegate the second to the host LLM as supervisor.
+
+RLM's own implementation choice offers indirect support. The paper chose code generation + Python REPL because no domain-specific semantic protocol existed for structured data interaction — Python is the universal fallback. But for the memory domain, code generation is over-generic: the LLM must translate its intent ("find causally related memories") into Python code (`graph.query(type='causal', ...)`), introducing a translation step that is both an information-loss point and an error surface. A domain-specific protocol eliminates this translation:
+
+```
+Code generation (RLM):    intent → Python code → execute → result → interpret
+Semantic protocol (Mnemon): intent → mnemon recall "..." --intent causal → result
+```
+
+The fewer translation steps between LLM intent and system action, the more faithful the interaction. This is why the protocol surface uses `remember` instead of INSERT, `link` instead of CREATE EDGE, `recall` instead of SELECT — **command names are semantic, not syntactic**, mapping directly to the LLM's cognitive vocabulary rather than the database's operational vocabulary.
+
 **MAGMA Methodology: Four-Graph Memory Architecture**
 
 The [MAGMA](https://arxiv.org/abs/2601.03236) paper provides the concrete methodology for **what the external environment should contain**. Its key contribution: a single edge type (e.g., vector similarity) is insufficient for memory — different query intents require different relational perspectives. MAGMA's four-graph architecture (temporal, entity, causal, semantic) with intent-adaptive retrieval and multi-signal fusion gives Mnemon its data model and retrieval algorithms.
@@ -145,6 +166,7 @@ None of these theoretical sources address how to connect an LLM orchestrator to 
 | Layer | Source | Choice |
 |---|---|---|
 | **Paradigm** — who orchestrates? | RLM | The host LLM, not an embedded model |
+| **Protocol semantics** — why intent-native? | RLM | LLM expresses intent, not mechanism; two-stage validates the separation |
 | **Methodology** — what's in the environment? | MAGMA | Four-graph with intent-adaptive retrieval |
 | **Protocol algebra** — why this shape? | Graph-LLM Insight | remember/link/recall as universal primitives; read-write symmetry |
 | **Protocol** — how do they talk? | Mnemon | CLI commands + structured JSON (not code generation) |
