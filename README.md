@@ -28,8 +28,11 @@ Most memory tools embed their own LLM inside the pipeline. Mnemon takes a differ
 | Pattern | LLM Role | Representative |
 |---|---|---|
 | **LLM-Embedded** | Executor inside the pipeline | Mem0, Letta |
+| **File Injection** | None — reads file at session start | Claude Code Memory |
 | **MCP Server** | Tool provider via MCP protocol | claude-mem |
 | **LLM-Supervised** | External supervisor of a standalone binary | **Mnemon** |
+
+Mnemon also addresses a gap in the protocol stack. MCP standardizes how LLMs discover and invoke tools. ODBC/JDBC standardizes how applications access databases. But how LLMs interact with databases using memory semantics — this layer has no protocol. Mnemon's three primitives — `remember`, `link`, `recall` — form an intent-native protocol: command names map to the LLM's cognitive vocabulary (`remember` not INSERT, `recall` not SELECT), and output is structured JSON with signal transparency rather than raw database rows.
 
 <p align="center">
   <img src="docs/diagrams/llm-supervised-concept.jpg" width="720" alt="LLM-Supervised Architecture — three patterns compared, with detailed Mnemon implementation showing hooks, brain/organ split, and sub-agent delegation" />
@@ -145,6 +148,7 @@ You don't run mnemon commands yourself. The agent does — driven by hooks and g
 - **LLM-supervised** — the host LLM decides what to remember, update, and forget; no embedded LLM, no API keys
 - **Hook-based integration** — four lifecycle hooks: Prime (load guide), Remind (recall & remember), Nudge (remember), and Compact (save before compression)
 - **Four-graph architecture** — temporal, entity, causal, and semantic edges, not just vector similarity
+- **Intent-native protocol** — three primitives (`remember`, `link`, `recall`) map to the LLM's cognitive vocabulary, not database syntax; structured JSON output with signal transparency
 - **Intent-aware recall** — graph traversal + optional vector search (RRF fusion), enabled by default for all queries
 - **Built-in deduplication** — `remember` auto-detects duplicates and conflicts; skips or auto-replaces
 - **Retention lifecycle** — importance decay, access-count boosting, and garbage collection
@@ -167,6 +171,8 @@ All your local agentic AIs — across sessions and frameworks — sharing one po
 ```
 
 The foundation is in place: a single `~/.mnemon` database that any agent can read and write. Claude Code's hook integration is the reference implementation; OpenClaw uses a plugin-based approach; NanoClaw integrates via container skills and volume mounts. The same pattern can be replicated for any LLM CLI that supports event hooks or system prompts.
+
+The longer-term direction is a **memory gateway**: protocol decoupled from storage engine. The current SQLite backend is the first adapter; the protocol surface (`remember / link / recall`) can sit on top of PostgreSQL, Neo4j, or any graph database. Agent-side optimization (when to recall, what to remember) and storage-side optimization (indexing, graph algorithms) evolve independently. See [Future Direction](docs/design/08-decisions.md#82-future-direction) for details.
 
 ## FAQ
 
@@ -228,10 +234,11 @@ make help           # show all targets
 
 ## References
 
-Mnemon combines the paradigm of one paper with the methodology of another. See [Theoretical Foundations](docs/DESIGN.md#24-theoretical-foundations) for details.
+Mnemon combines the paradigm of one paper with the methodology of another, grounded in the structural insight that graph memory is isomorphic to LLM attention. See [Theoretical Foundations](docs/DESIGN.md#25-theoretical-foundations) for details.
 
 - **RLM** — Zhang, Kraska & Khattab. [Recursive Language Models](https://arxiv.org/abs/2512.24601). 2025. Establishes the paradigm: LLMs are more effective as orchestrators of external environments than as direct data processors.
 - **MAGMA** — Zou et al. [A Multi-Graph based Agentic Memory Architecture](https://arxiv.org/abs/2601.03236). 2025. Provides the methodology: four-graph model (temporal, entity, causal, semantic) with intent-adaptive retrieval.
+- **Graph-LLM Structural Insight** — Joshi & Zhu. [Building Powerful GNNs from Transformers](https://arxiv.org/abs/2506.22084). 2025; and the Graph-based Agent Memory survey (Chang Yang et al., 2026). Confirms that LLM attention is computationally equivalent to GNN operations — graph memory is a structural match, not an engineering convenience.
 
 ## License
 
