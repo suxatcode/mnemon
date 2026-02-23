@@ -13,6 +13,7 @@ Mnemon 采用 **LLM-Supervised** 模式：
 | 模式 | LLM 在哪 | LLM 做什么 | 代表 |
 |------|---------|-----------|------|
 | **LLM-Embedded** | 管线内部 | 执行者（提取、分类、推理） | Mem0, MAGMA |
+| **File Injection** | 会话启动时读取文件 | 无——静态文件加载到 context window | Claude Code CLAUDE.md |
 | **MCP Server** | 通过 MCP 协议提供工具 | 将记忆操作暴露为 MCP 工具，供宿主 LLM 调用 | MemCP |
 | **LLM-Supervised** | 管线外部 | 监督者（审查候选、做判断、决策取舍） | Mnemon |
 

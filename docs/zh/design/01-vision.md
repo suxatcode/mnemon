@@ -38,11 +38,12 @@ Mnemon 的目标是：**让 LLM 像有经验的助手一样，记住你的决策
 
 ### 1.5 方案对比
 
-| 维度 | Mem0 | Letta/MemGPT | MemCP | **Mnemon** |
-|------|------|-------------|-------|-----------|
-| **架构** | SDK 嵌入调用链 | Agent 框架内 | MCP Plugin | 独立 Binary |
-| **LLM 角色** | 内部提取函数 | Agent 自主管理 | Sub-agent 编排 | 外部监督者 |
-| **图谱** | Neo4j 单一关系边 | 无 | MAGMA 四图 | MAGMA 四图 |
+| 维度 | Mem0 | Letta/MemGPT | Claude Code Memory | **Mnemon** |
+|------|------|-------------|-------------------|-----------|
+| **架构** | SDK 嵌入调用链 | Agent 框架内 | CLAUDE.md 文件注入 | 独立 Binary |
+| **LLM 角色** | 内部提取函数 | Agent 自主管理 | 无（静态文件加载） | 外部监督者 |
+| **图谱** | Neo4j 单一关系边 | 无 | 无 | MAGMA 四图 |
+| **检索** | 向量相似度 | 向量相似度 | 全文加载到上下文 | 意图自适应多信号融合 |
 | **外部依赖** | PostgreSQL + LLM API | PostgreSQL + LLM API | 零 | 零 |
-| **LLM 可替换** | 绑定 OpenAI | 绑定框架 | 绑定 Claude Code | 任意 LLM CLI |
-| **记忆生命周期** | 规则引擎 | 无内置衰减 | 3-区 (Active/Archive/Purge) | EI 衰减 + GC + 免疫 |
+| **LLM 可替换** | 绑定 OpenAI | 绑定框架 | 仅 Claude Code | 任意 LLM CLI |
+| **记忆生命周期** | 规则引擎 | 无内置衰减 | 手动 / 自动追加 | EI 衰减 + GC + 免疫 |

@@ -83,8 +83,8 @@ SQLite        INSERT row      INSERT edge table     multi-signal query
          （产品思路）                    （平台思路）
 
 Mem0  ──┐                         ┌── Neo4j adapter
-memcp ──┤ 每个项目各自             │── TigerGraph adapter
-Viking──┤ 重造存储引擎             │── Milvus adapter
+CC Mem──┤ 每个项目各自             │── TigerGraph adapter
+Viking──┤ 重造存储层               │── Milvus adapter
 MemGPT──┘                         │── SQLite adapter（当前）
                                    └── PostgreSQL adapter
 

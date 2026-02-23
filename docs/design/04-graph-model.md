@@ -256,7 +256,7 @@ The existing protocol stack has a gap between LLMs and databases:
 
 MCP standardizes how LLMs discover and invoke tools. ODBC/JDBC standardizes how applications access databases. But **how LLMs interact with databases using memory semantics** — this layer has no protocol.
 
-Every project reinvents this layer independently: Mem0 builds its own, OpenViking builds its own, memcp builds its own. Each conflates two fundamentally different problems:
+Every project reinvents this layer independently: Mem0 builds its own, OpenViking builds its own, Claude Code's CLAUDE.md builds its own (by bypassing the problem entirely with file injection). Each conflates two fundamentally different problems:
 
 1. **LLM-DB interaction protocol** (how to read and write) — an LLM problem
 2. **DB engine optimization** (how to store and query efficiently) — a database problem
@@ -266,10 +266,10 @@ Every project reinvents this layer independently: Mem0 builds its own, OpenVikin
 Current agent memory systems are monoliths that couple protocol and storage:
 
 ```
-Mem0       = protocol + custom storage engine
-memcp      = protocol + SQLite graph engine
-OpenViking = protocol + virtual filesystem engine
-MemGPT     = protocol + tiered memory manager
+Mem0             = protocol + custom storage engine
+Claude Code Mem  = no protocol (file injection into context window)
+OpenViking       = protocol + virtual filesystem engine
+MemGPT           = protocol + tiered memory manager
 ```
 
 This is equivalent to every web application inventing its own HTTP. The result: no interoperability, no backend portability, no leverage of the existing database ecosystem.
@@ -334,8 +334,8 @@ This reframes mnemon's position in the ecosystem:
          (product approach)              (platform approach)
 
 Mem0  ──┐                         ┌── Neo4j adapter
-memcp ──┤ Each reinvents its      │── TigerGraph adapter
-Viking──┤ own DB engine           │── Milvus adapter
+CC Mem──┤ Each reinvents its      │── TigerGraph adapter
+Viking──┤ own storage layer       │── Milvus adapter
 MemGPT──┘                         │── SQLite adapter (mnemon current)
                                    └── PostgreSQL adapter
 

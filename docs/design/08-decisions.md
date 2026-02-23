@@ -85,8 +85,8 @@ When both boundaries are decoupled, Mnemon becomes a true memory gateway — any
          (product approach)              (platform approach)
 
 Mem0  ──┐                         ┌── Neo4j adapter
-memcp ──┤ Each reinvents its      │── TigerGraph adapter
-Viking──┤ own storage engine      │── Milvus adapter
+CC Mem──┤ Each reinvents its      │── TigerGraph adapter
+Viking──┤ own storage layer       │── Milvus adapter
 MemGPT──┘                         │── SQLite adapter (current)
                                    └── PostgreSQL adapter
 

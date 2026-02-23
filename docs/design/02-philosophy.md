@@ -13,6 +13,7 @@ Mnemon adopts the **LLM-Supervised** pattern:
 | Pattern | Where is the LLM | What does the LLM do | Representative |
 |---------|------------------|---------------------|----------------|
 | **LLM-Embedded** | Inside the pipeline | Executor (extraction, classification, reasoning) | Mem0, MAGMA |
+| **File Injection** | Reads file at session start | None — static file loaded into context window | Claude Code CLAUDE.md |
 | **MCP Server** | Tool provider via MCP protocol | Exposes memory operations as MCP tools for the host LLM | MemCP |
 | **LLM-Supervised** | Outside the pipeline | Supervisor (reviews candidates, makes judgments, decides trade-offs) | Mnemon |
 

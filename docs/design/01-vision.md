@@ -38,11 +38,12 @@ It is not a library or plugin embedded within an agent framework, but a standalo
 
 ## 1.5 Comparison with Alternatives
 
-| Dimension | Mem0 | Letta/MemGPT | MemCP | **Mnemon** |
-|-----------|------|-------------|-------|-----------|
-| **Architecture** | SDK embedded in call chain | Within agent framework | MCP Plugin | Standalone Binary |
-| **LLM Role** | Internal extraction function | Agent self-managed | Sub-agent orchestration | External supervisor |
-| **Graph** | Neo4j single relation edges | None | MAGMA four-graph | MAGMA four-graph |
+| Dimension | Mem0 | Letta/MemGPT | Claude Code Memory | **Mnemon** |
+|-----------|------|-------------|-------------------|-----------|
+| **Architecture** | SDK embedded in call chain | Within agent framework | CLAUDE.md file injection | Standalone Binary |
+| **LLM Role** | Internal extraction function | Agent self-managed | None (static file load) | External supervisor |
+| **Graph** | Neo4j single relation edges | None | None | MAGMA four-graph |
+| **Retrieval** | Vector similarity | Vector similarity | Full-text loaded into context | Intent-adaptive multi-signal fusion |
 | **External Deps** | PostgreSQL + LLM API | PostgreSQL + LLM API | None | None |
-| **LLM Swappable** | Tied to OpenAI | Tied to framework | Tied to Claude Code | Any LLM CLI |
-| **Memory Lifecycle** | Rules engine | No built-in decay | 3-zone (Active/Archive/Purge) | EI decay + GC + immunity |
+| **LLM Swappable** | Tied to OpenAI | Tied to framework | Claude Code only | Any LLM CLI |
+| **Memory Lifecycle** | Rules engine | No built-in decay | Manual / auto-append | EI decay + GC + immunity |

@@ -12,7 +12,7 @@ Mnemon is a persistent memory system designed for LLM agents. It adopts the **LL
 
 ### [1. Vision & Problem](design/01-vision.md)
 
-Why Mnemon exists — the amnesia problem in LLM agents, structural bottlenecks of traditional approaches, and a comparison with existing solutions (Mem0, MemGPT, memcp).
+Why Mnemon exists — the amnesia problem in LLM agents, structural bottlenecks of traditional approaches, and a comparison with existing solutions (Mem0, MemGPT, Claude Code Memory).
 
 ### [2. Design Philosophy](design/02-philosophy.md)
 

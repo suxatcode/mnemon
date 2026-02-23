@@ -12,7 +12,7 @@ Mnemon 是一个为 LLM agent 设计的持久化记忆系统。它采用 **LLM-S
 
 ### [1. 愿景与问题](design/01-vision.md)
 
-Mnemon 存在的原因 — LLM agent 的失忆问题、传统方案的结构性瓶颈，以及与现有方案（Mem0、MemGPT、memcp）的对比。
+Mnemon 存在的原因 — LLM agent 的失忆问题、传统方案的结构性瓶颈，以及与现有方案（Mem0、MemGPT、Claude Code Memory）的对比。
 
 ### [2. 设计哲学](design/02-philosophy.md)
 
