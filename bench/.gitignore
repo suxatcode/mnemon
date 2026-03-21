@@ -1,0 +1,16 @@
+# Dataset (2.8MB, download separately)
+testdata/locomo/locomo10.json
+
+# Cached LLM extractions
+testdata/locomo/ingested/
+
+# Benchmark outputs
+outputs/
+
+# Isolated mnemon stores for benchmarking
+.mnemon_bench/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
