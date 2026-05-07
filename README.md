@@ -252,6 +252,7 @@ See [Development and Deployment](docs/DEPLOYMENT.md) for Docker, Compose, Ollama
 - [Mnemon Memory Harness](docs/framework/HARNESS.md) — skill-first memory harness design and installation guideline
 - [Harness Install Guide](docs/framework/INSTALL.md) — agent-facing installation contract
 - [Memory Guideline](docs/framework/GUIDELINE.md) — recall/writeback judgment policy
+- [Agent Systems Research](docs/research/agent-systems/README.md) — Chinese research notes on memory and self-evolution in Claude Code, Codex, OpenClaw, Hermes, ALMA, Agno, and Letta
 - [Design & Architecture](docs/DESIGN.md) — current engine architecture, algorithms, integration design
 - [Usage & Reference](docs/USAGE.md) — CLI commands, embedding support, architecture overview
 - [Architecture Diagrams](docs/diagrams/) — system architecture, pipelines, lifecycle management
