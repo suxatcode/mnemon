@@ -6,20 +6,33 @@
 
 | 系统 | 文档 | 研究重点 |
 |---|---|---|
-| Claude Code | [架构](claude-code/01-architecture.md), [记忆与 Markdown](claude-code/02-memory-evolution-markdown-prompts.md) | `CLAUDE.md`、settings、hooks、subagents、skills、commands |
-| Codex | [架构](codex/01-architecture.md), [记忆与 Markdown](codex/02-memory-evolution-markdown-prompts.md) | `AGENTS.md`、hooks、skills、memories、本地源码结构 |
-| OpenClaw | [架构](openclaw/01-architecture.md), [记忆与 Markdown](openclaw/02-memory-evolution-markdown-prompts.md) | memory-core、active-memory、memory-wiki、dreaming、plugin hooks |
-| Hermes | [架构](hermes/01-architecture.md), [记忆与 Markdown](hermes/02-memory-evolution-markdown-prompts.md) | `MEMORY.md`/`USER.md`、skills、session search、self-evolution |
-| ALMA | [概览](alma/01-overview.md), [记忆与演化](alma/02-memory-evolution-markdown-prompts.md) | ALMA meta-learning memory design 与 ALMA-memory library 两条线 |
-| Agno | [概览](agno/01-overview.md), [记忆与 Markdown](agno/02-memory-evolution-markdown-prompts.md) | MemoryManager、agentic memory、session summary、knowledge markdown |
-| Letta | [概览](letta/01-overview.md), [记忆与 Markdown](letta/02-memory-evolution-markdown-prompts.md) | MemGPT memory hierarchy、core/archival/recall memory、memory tools |
+| Claude Code | [架构](claude-code/01-architecture.md), [记忆与 Markdown](claude-code/02-memory-evolution-markdown-prompts.md), [生命周期详表](claude-code/03-memory-lifecycle-details.md) | `CLAUDE.md`、settings、hooks、subagents、skills、commands |
+| Codex | [架构](codex/01-architecture.md), [记忆与 Markdown](codex/02-memory-evolution-markdown-prompts.md), [生命周期详表](codex/03-memory-lifecycle-details.md) | `AGENTS.md`、hooks、skills、memories、本地源码结构 |
+| OpenClaw | [架构](openclaw/01-architecture.md), [记忆与 Markdown](openclaw/02-memory-evolution-markdown-prompts.md), [生命周期详表](openclaw/03-memory-lifecycle-details.md) | memory-core、active-memory、memory-wiki、dreaming、plugin hooks |
+| Hermes | [架构](hermes/01-architecture.md), [记忆与 Markdown](hermes/02-memory-evolution-markdown-prompts.md), [生命周期详表](hermes/03-memory-lifecycle-details.md) | `MEMORY.md`/`USER.md`、skills、session search、self-evolution |
+| ALMA | [概览](alma/01-overview.md), [记忆与演化](alma/02-memory-evolution-markdown-prompts.md), [生命周期详表](alma/03-memory-lifecycle-details.md) | ALMA meta-learning memory design 与 ALMA-memory library 两条线 |
+| Agno | [概览](agno/01-overview.md), [记忆与 Markdown](agno/02-memory-evolution-markdown-prompts.md), [生命周期详表](agno/03-memory-lifecycle-details.md) | MemoryManager、agentic memory、session summary、knowledge markdown |
+| Letta | [概览](letta/01-overview.md), [记忆与 Markdown](letta/02-memory-evolution-markdown-prompts.md), [生命周期详表](letta/03-memory-lifecycle-details.md) | MemGPT memory hierarchy、core/archival/recall memory、memory tools |
 
 补充资料：[社区讨论与外部文章索引](community-discussions.md) 汇总 Reddit、博客、论文和第三方文章，只作为实践信号，不作为规范事实。
+
+## 生命周期横向速览
+
+| 系统 | 长度/容量控制 | 超出处理 | 整理/定时机制 |
+|---|---|---|---|
+| Claude Code | `CLAUDE.md` 无公开字符硬上限；skill body compaction 后每个 5,000 tokens、总 25,000 tokens | `/compact` 或自动 compaction；root 指令和 auto memory 从磁盘重注入，path-scoped 内容需再次触发 | 人工/agent 整理 Markdown；scheduled tasks 是通用自动化，不是专门 memory scheduler |
+| Codex | raw memories consolidation 默认 256、cap 4096；rollouts/startup 默认 16、cap 128；有 project doc/history/tool output 限制 | idle/age/rate-limit eligibility；history compaction；工具输出 token budget | 后台 thread extraction + global consolidation，不是 cron；required rules 仍进 `AGENTS.md` |
+| OpenClaw | active-memory summary 220 chars；partial transcript 32,000 chars；read 2,000 lines/50MB；search query 480 chars | auto-compaction 默认开；compaction 前可 silent memory flush | Dreaming opt-in，cron 默认 `0 3 * * *`；light/REM/deep promotion |
+| Hermes | `MEMORY.md` 2,200 chars；`USER.md` 1,375 chars；skills 目标 <=15KB | add 超限返回错误和现有 entries，agent 需 replace/remove/consolidate | 超过 80% 建议 consolidation；Autonomous Curator 默认 7-day cycle |
+| ALMA | `BudgetConfig(max_tokens=4000)`；MemoryStack prompt 默认 2,000 tokens；多种 retrieval top_k | budget-aware retrieval 排除超预算项；MemoryStack 到预算后截断 | explicit consolidate/forget/checkpoint；alma-meta 是实验 driver，无核心 cron |
+| Agno | 无全局 memory char hard cap；Markdown chunk 默认 5,000 chars；默认 history 3 runs | 关闭 auto context injection；50+ memories 或高成本操作前 optimize | run 内后台 memory update；`optimize_memories` 显式合并；SchedulerTools 是通用调度 |
+| Letta | block metadata limit；源码常量 persona/human 20,000 chars、core block 100,000 chars；context 默认 128,000 tokens | 自动 compaction；sliding window 默认总结约 30%，不够则更激进 | core 事件/溢出驱动；Letta Code MemFS 可用 step count 或 compaction event 触发 reflection |
 
 ## 方法边界
 
 - 源码优先：对开源系统优先读取本地源码快照，记录关键文件路径。
 - 官方文档优先：对 Codex 和 Claude Code，使用官方文档核验当前行为。
+- 生命周期详表：对每个系统单独检查记忆长度/容量限制、超出处理、整理/合并方式、后台或定时任务、读写路径和安全边界。
 - 社区讨论只作信号：Reddit、博客、第三方文章用于观察实践倾向，不作为规范事实。
 - 不处理泄漏源码：Claude Code 架构分析只基于公开文档、公开可见行为和社区实践。
 
@@ -68,9 +81,9 @@ experience
 官方与公开资料：
 
 - OpenAI Codex docs: [AGENTS.md](https://developers.openai.com/codex/guides/agents-md), [Memories](https://developers.openai.com/codex/memories), [Hooks](https://developers.openai.com/codex/hooks), [Config reference](https://developers.openai.com/codex/config-reference)
-- Claude Code docs: [Memory](https://code.claude.com/docs/en/memory), [Subagents](https://code.claude.com/docs/en/sub-agents), [Hooks](https://code.claude.com/docs/en/hooks), [Skills / custom commands](https://code.claude.com/docs/en/slash-commands), [Settings](https://code.claude.com/docs/en/settings)
+- Claude Code docs: [Memory](https://code.claude.com/docs/en/memory), [Context window](https://code.claude.com/docs/en/context-window), [Scheduled tasks](https://code.claude.com/docs/en/scheduled-tasks), [Subagents](https://code.claude.com/docs/en/sub-agents), [Hooks](https://code.claude.com/docs/en/hooks), [Skills / custom commands](https://code.claude.com/docs/en/slash-commands), [Settings](https://code.claude.com/docs/en/settings)
 - Hermes public site: [hermes-ai.net](https://hermes-ai.net/)
-- OpenClaw docs: [Active memory](https://docs.openclaw.ai/concepts/active-memory), local `docs/concepts/memory.md`, local `docs/concepts/dreaming.md`
-- Letta docs: [Stateful agents](https://docs.letta.com/guides/core-concepts/stateful-agents), [Memory blocks](https://docs.letta.com/guides/core-concepts/memory/memory-blocks), [Archival memory](https://docs.letta.com/guides/core-concepts/memory/archival-memory), [MemGPT paper](https://arxiv.org/abs/2310.08560)
+- OpenClaw docs: [Memory overview](https://docs.openclaw.ai/concepts/memory), [Dreaming](https://docs.openclaw.ai/concepts/dreaming), [Compaction](https://docs.openclaw.ai/concepts/compaction), [Active memory](https://docs.openclaw.ai/concepts/active-memory), local `docs/concepts/memory.md`, local `docs/concepts/dreaming.md`
+- Letta docs: [Stateful agents](https://docs.letta.com/guides/core-concepts/stateful-agents), [Memory blocks](https://docs.letta.com/guides/core-concepts/memory/memory-blocks), [Compaction](https://docs.letta.com/guides/core-concepts/messages/compaction), [Letta Code Memory](https://docs.letta.com/letta-code/memory/), [Archival memory](https://docs.letta.com/guides/core-concepts/memory/archival-memory), [MemGPT paper](https://arxiv.org/abs/2310.08560)
 - ALMA paper page: [Learning to Continually Learn via Meta-learning Agentic Memory Designs](https://arxiv.org/abs/2602.07755)
-- Agno docs: [Memory](https://docs-v1.agno.com/agents/memory), [Agent reference](https://docs.agno.com/reference/agents/agent)
+- Agno docs: [Working with Memories](https://docs.agno.com/memory/working-with-memories/overview), [Memory](https://docs-v1.agno.com/agents/memory), [Agent reference](https://docs.agno.com/reference/agents/agent)
