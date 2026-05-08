@@ -1,86 +1,204 @@
-# 02. 安装契约
+# 02. Hook-Based Agent-Agnostic Installation
 
-## 安装流程
-
-安装不是运行 adapter，而是生成 host-specific binding。
+Installation is not an adapter and not a host-specific runtime. Installation means:
 
 ```text
-read harness.yaml
-  -> detect host
-  -> sense existing host templates
-  -> choose capability level
-  -> create/update `.mnemon` canonical filesystem
-  -> build install plan
-  -> dry-run report
-  -> user approval if needed
-  -> merge instruction snippet / managed block
-  -> register/copy/symlink skill projections
-  -> install hook templates if host supports hooks
-  -> write projection metadata
-  -> initialize memory/state/report dirs
-  -> write state/install.json
-  -> verify
+host agent reads INSTALL.md
+  -> understands the semantic hook contract
+  -> maps host lifecycle events to recall / observe / reflect / curate
+  -> exposes the core skills
+  -> points host instructions at .mnemon
+  -> records the binding
 ```
 
-安装必须幂等。重复安装不能重复插入 instruction snippet，不能重置 memory/state，不能覆盖用户修改。
+The first installation path should be agent-executed. Any capable agent can read `INSTALL.md`, inspect its own host environment, and bind the harness using the host's native instruction, skill, hook, and scheduler surfaces. Later scripts may automate the same steps, but scripts do not define a second authority.
+
+## Core Principle
+
+The harness defines semantic hooks. The host chooses how to implement them.
+
+| Harness concept | Host-specific realization |
+|---|---|
+| `recall` | session start, user prompt submit, pre-model call, or manual skill |
+| `observe` | pre-tool, post-tool, approval result, error handler, or session summary |
+| `reflect` | post-answer, stop, session end, conversation close, or manual skill |
+| `curate` | idle task, scheduled task, cron, manual skill, or optional runner tick |
+
+The contract is semantic, not API-specific. A host with native hooks can install L2/L3 behavior. A host with only Markdown can still install L0/L1 by exposing the same operations as manual skills.
+
+## What Gets Installed
+
+The minimal installed surface is small:
+
+```text
+.mnemon/
+  INSTALL.md
+  GUIDELINE.md
+  harness.yaml
+  fs.yaml
+  skills/core/
+    install/SKILL.md
+    recall/SKILL.md
+    observe/SKILL.md
+    reflect/SKILL.md
+    curate/SKILL.md
+  hooks/
+    recall.md
+    observe.md
+    reflect.md
+    curate.md
+  memory/
+  state/
+  reports/
+  bindings/
+```
+
+Host-native files should only receive pointers, managed blocks, hook bindings, or projected skill entries. Long memory, long guidelines, and durable state stay in `.mnemon`.
+
+## Semantic Hook Contract
+
+Every hook receives a bounded event envelope and returns either a bounded result, a report, or a proposal.
+
+```yaml
+hook_event:
+  hook: recall|observe|reflect|curate
+  event_id: string
+  host: string
+  cwd: string
+  trigger: string
+  timestamp: string
+  payload: object
+  budgets:
+    latency_ms: 0
+    output_chars: 0
+  permissions:
+    writable_targets: []
+    protected_targets: []
+```
+
+Hook output:
+
+```yaml
+hook_result:
+  hook: recall|observe|reflect|curate
+  event_id: string
+  status: ok|none|proposal|blocked|error
+  prompt_addition: string
+  writes:
+    - target: string
+      action: create|patch|append|report
+      status: applied|proposed|blocked
+  report: string
+  warnings: []
+```
+
+Rules:
+
+- `recall` may return `none`; irrelevant memory is a valid result.
+- `observe` writes evidence, usage signals, or reports; it should not directly rewrite Prompt Memory.
+- `reflect` may patch allowlisted low-risk targets or write proposals.
+- `curate` defaults to dry-run/proposal unless the host explicitly provides safe write enforcement.
+- If the host cannot enforce writable targets, all durable mutations degrade to proposal-only.
+- Every durable mutation writes a report.
+
+## Agent Installation Loop
+
+The host agent installs the harness by following this loop:
+
+```text
+read .mnemon/INSTALL.md
+  -> read .mnemon/harness.yaml
+  -> inventory host surfaces
+  -> choose capability level
+  -> produce install plan
+  -> ask user approval for host-owned edits
+  -> write managed instruction pointer
+  -> expose core skills
+  -> bind semantic hooks when supported
+  -> record .mnemon/bindings/active.json
+  -> run smoke tests
+  -> write reports/install/<timestamp>.md
+```
+
+Inventory should detect only capabilities, not product identity:
+
+| Surface | Questions |
+|---|---|
+| Instruction surface | Where can the host read persistent project instructions? |
+| Skill surface | Can the host discover `SKILL.md` directories or equivalent commands? |
+| Hook surface | Can the host call something on session, model, tool, or stop events? |
+| Scheduler surface | Can the host run idle/scheduled maintenance? |
+| Permission surface | Can the host restrict write targets? |
+| Report surface | Where can the host write human-readable reports? |
+
+Host identity is useful for scripts, but the architecture should not require hardcoded host maps.
+
+## Capability Levels
+
+| Level | Required host capability | Installed behavior |
+|---|---|---|
+| L0 Manual | can read Markdown | user/agent manually reads `GUIDELINE.md` and core skills |
+| L1 Instruction | persistent instruction surface | managed pointer tells the host where `.mnemon` lives |
+| L2 Hooks | lifecycle or tool hooks | `recall`, `observe`, and `reflect` run from host events |
+| L3 Maintenance | idle/scheduled hook or external scheduler | `curate` and dreaming jobs run outside foreground work |
+| L4 Eval | CI or repeatable test surface | higher-risk proposals run checks before merge |
+
+The installer chooses the highest safe level. It must never emulate missing host capabilities by becoming an agent runtime.
 
 ## `harness.yaml`
 
-`harness.yaml` 是机器可读 manifest。建议最小结构：
+`harness.yaml` is a manifest for agents and future scripts:
 
 ```yaml
 harness:
   name: self-evolution-harness
   version: 0.1.0
   schema_version: 1
-  description: Agent-agnostic self-evolution harness installed through skills and hooks.
-
-capabilities:
-  required:
-    - read_markdown
-    - write_reports
-  optional:
-    - native_skills
-    - lifecycle_hooks
-    - scheduled_tasks
-    - maintenance_runner
-    - eval_ci
+  description: Agent-agnostic self-evolution harness installed through semantic hooks.
 
 paths:
-  root: .mnemon/
-  guideline: GUIDELINE.md
+  root: .mnemon
   install: INSTALL.md
+  guideline: GUIDELINE.md
   fs: fs.yaml
-  skills: skills/
-  hooks: hooks/
-  prompts: prompts/
-  schemas: schemas/
-  memory: memory/
-  state: state/
-  reports: reports/
-  runner: runner/
-  bindings: bindings/
-  projections: bindings/projections/
+  skills: skills/core
+  hooks: hooks
+  memory: memory
+  state: state
+  reports: reports
+  bindings: bindings
 
-writable_targets:
-  - memory/**
-  - skills/**
-  - state/**
-  - reports/**
+semantic_hooks:
+  recall:
+    skill: skills/core/recall/SKILL.md
+    template: hooks/recall.md
+    preferred_triggers: [session_start, user_prompt, pre_model_call]
+    fallback: manual_skill
+  observe:
+    skill: skills/core/observe/SKILL.md
+    template: hooks/observe.md
+    preferred_triggers: [pre_tool_call, post_tool_call, approval_result]
+    fallback: session_summary
+  reflect:
+    skill: skills/core/reflect/SKILL.md
+    template: hooks/reflect.md
+    preferred_triggers: [turn_delivered, stop, session_end]
+    fallback: manual_skill
+  curate:
+    skill: skills/core/curate/SKILL.md
+    template: hooks/curate.md
+    preferred_triggers: [idle_tick, scheduled_tick, manual_review]
+    fallback: manual_skill
 
-protected_targets:
-  - INSTALL.md
-  - GUIDELINE.md
-  - harness.yaml
-
-risk_policy:
+write_policy:
   default_mode: proposal
   auto_apply_allowed:
     - reports/**
     - state/usage.json
-  human_approval_required:
-    - GUIDELINE.md
+  protected_targets:
     - INSTALL.md
+    - GUIDELINE.md
+    - harness.yaml
     - hooks/**
     - eval/**
 
@@ -90,257 +208,148 @@ upgrade:
     - state/usage.json
     - reports/**
     - archive/**
-  migration_report: reports/install/
+  report_dir: reports/install
 ```
 
 ## `INSTALL.md`
 
-`INSTALL.md` 是给 host agent 读的说明。它应包含：
+`INSTALL.md` should tell any agent how to install the harness without knowing the host in advance:
 
 ```text
 # INSTALL.md
 
-## Goal
-Install this harness without taking over the host agent runtime.
+Goal:
+Install Mnemon as a harness, not as a replacement agent runtime.
 
-## Host detection
-How to detect supported hosts and capability level.
+Read:
+- .mnemon/harness.yaml
+- .mnemon/GUIDELINE.md
+- .mnemon/fs.yaml
+- .mnemon/skills/core/*/SKILL.md
 
-## Install plan
-What files are copied/linked/merged.
+Find host surfaces:
+- persistent instruction file or system prompt extension
+- native skill directory or command registry
+- lifecycle/tool hooks
+- scheduler/cron/idle jobs
+- write permission and approval boundaries
 
-## Hook mapping
-How recall/observe/reflect/curate map to host lifecycle events.
+Bind semantic hooks:
+- recall -> before context is assembled or as manual skill
+- observe -> around tool calls or as session summary
+- reflect -> after answer delivery or session end
+- curate -> idle/scheduled/manual maintenance
 
-## Permissions
-Writable targets, protected targets, approval rules.
+Write policy:
+- ask before editing host-owned config
+- write only managed markers or generated binding files
+- keep durable memory/state/reports in .mnemon
+- downgrade to proposal-only when write limits cannot be enforced
 
-## Fallbacks
-Skill-only, manual review, proposal-only modes.
-Optional maintenance runner when host lacks scheduler but user opts in.
-
-Runner install rules:
-
-- disabled by default;
-- installed only after L2/L3 artifacts are present;
-- can be configured as host scheduler, external cron, CLI tick, or resident wrapper;
-- resident wrapper must be semantically equivalent to `runner tick`;
-- uninstalling runner keeps memory, reports, and state;
-- LLM jobs require an approved host command and otherwise downgrade to manual/proposal-only.
-
-## Verify
-Dry-run, smoke test, report location.
-
-## Upgrade
-Idempotency, schema migration, preservation rules.
-
-## Uninstall
-Remove harness bindings without deleting user memory/archive/reports.
+Verify:
+- host can find .mnemon/GUIDELINE.md
+- host can invoke recall and receive bounded context or NONE
+- observe can write a report or evidence record
+- reflect can write a proposal report
+- curate can run dry-run
+- reinstall is idempotent
 ```
 
-## Per-Host Install Maps
+## Managed Instruction Pointer
 
-Host maps live under `install/hosts/*.yaml`.
+Any instruction surface should receive only a compact pointer:
 
-Host maps should express projection, not just file copying:
+```markdown
+<!-- mnemon:start -->
+Mnemon self-evolution harness is installed for this workspace.
 
-```yaml
-projection:
-  canonical_root: .mnemon
-  instruction_mode: managed_block
-  skill_mode: symlink_or_copy
-  hook_mode: managed_config_patch
-  drift_policy: report_before_overwrite
+Read `.mnemon/GUIDELINE.md` for behavior rules.
+Use `.mnemon/skills/core/recall/SKILL.md` before context injection when relevant.
+Use `.mnemon/skills/core/observe/SKILL.md` around tool/evidence events when available.
+Use `.mnemon/skills/core/reflect/SKILL.md` after completed work.
+Use `.mnemon/skills/core/curate/SKILL.md` for maintenance.
+
+Do not copy long memory into this file. `.mnemon` is canonical.
+<!-- mnemon:end -->
 ```
 
-Installer must preserve host-owned content outside managed markers. Existing native skills or instructions can be imported only as protected `user + native_import` artifacts unless the user approves a different policy.
+The host owns everything outside the marker.
 
-### Claude Code
+## Binding Record
 
-```yaml
-host: claude-code
-detect:
-  commands: ["claude"]
-  files_any: ["CLAUDE.md", ".claude/"]
-capability:
-  max_level: L3
-instructions:
-  targets:
-    - CLAUDE.md
-    - .claude/CLAUDE.md
-  mode: managed_block
-skills:
-  targets:
-    - .claude/skills/
-  mode: symlink_or_copy
-hooks:
-  recall:
-    - SessionStart
-    - UserPromptSubmit
-  observe:
-    - PreToolUse
-    - PostToolUse
-  reflect:
-    - Stop
-    - SessionEnd
-  curate:
-    - scheduled
-fallbacks:
-  no_hooks: L1
-projection:
-  canonical_root: .mnemon
-  instruction_mode: pointer_block
-  skill_mode: symlink_or_copy
-  drift_policy: report_before_overwrite
-```
-
-### Codex
+After installation, the agent writes the actual binding it chose:
 
 ```yaml
-host: codex
-detect:
-  files_any: ["AGENTS.md", ".codex/"]
-capability:
-  max_level: L1
-instructions:
-  targets:
-    - AGENTS.md
-  mode: managed_block
-skills:
-  targets:
-    - docs/agent-skills/
-    - skills/
-  mode: pointer_or_copy
-hooks:
-  recall: ["manual"]
-  observe: ["manual"]
-  reflect: ["manual"]
-  curate: ["manual"]
-fallbacks:
-  default: L1
-projection:
-  canonical_root: .mnemon
-  instruction_mode: pointer_block
-  skill_mode: pointer
-  drift_policy: report_before_overwrite
-```
-
-### Hermes
-
-```yaml
-host: hermes
-detect:
-  commands: ["hermes"]
-  dirs_any: ["~/.hermes/skills"]
-capability:
-  max_level: L4
-instructions:
-  targets:
-    - "~/.hermes/context/"
-  mode: pointer_or_import
-skills:
-  targets:
-    - "~/.hermes/skills/"
-  mode: native_import_or_symlink
-hooks:
-  recall:
-    - on_session_start
-    - pre_llm_call
-  observe:
-    - pre_tool_call
-    - post_tool_call
-  reflect:
-    - post_llm_call
-    - on_session_end
-  curate:
-    - curator
-    - cron
-projection:
-  canonical_root: .mnemon
-  instruction_mode: pointer
-  skill_mode: native_import_or_symlink
-  drift_policy: report_before_overwrite
-```
-
-### Cursor / Continue / Generic
-
-Cursor and Continue are mainly rule/context surfaces. They can install L0/L1 by default and L2 only when project scripts or external automation are available.
-
-```yaml
-host: generic
-detect:
-  default: true
-capability:
-  max_level: L0
-instructions:
-  targets:
-    - AGENTS.md
-    - README.md
-    - .agent-instructions.md
-skills:
-  targets:
-    - skills/
-hooks:
-  recall: ["manual"]
-  observe: ["manual"]
-  reflect: ["manual"]
-  curate: ["manual"]
-```
-
-## Idempotency
-
-Installation must write markers:
-
-```yaml
-install:
-  harness_version: 0.1.0
-  installed_at: "2026-05-08T00:00:00Z"
-  host: claude-code
+binding:
+  schema_version: 1
+  host_label: detected-by-agent
   capability_level: L2
   canonical_root: .mnemon
-  installed_files: []
-  merged_instruction_blocks:
-    - target: CLAUDE.md
-      marker: "<!-- self-evolution-harness:start -->"
-  hook_bindings: []
-  projections: []
+  instruction_surface:
+    path: AGENTS.md
+    mode: managed_pointer
+    marker: mnemon
+  skill_surface:
+    mode: native|pointer|manual
+    targets: []
+  hooks:
+    recall:
+      trigger: user_prompt
+      mode: host_hook
+      target: .mnemon/hooks/recall.md
+    observe:
+      trigger: post_tool_call
+      mode: host_hook
+      target: .mnemon/hooks/observe.md
+    reflect:
+      trigger: session_end
+      mode: host_hook
+      target: .mnemon/hooks/reflect.md
+    curate:
+      trigger: manual
+      mode: manual_skill
+      target: .mnemon/skills/core/curate/SKILL.md
+  write_policy:
+    enforced_by_host: true
+    default_mode: proposal
+  installed_at: "2026-05-09T00:00:00Z"
 ```
 
-Rules:
+This record is descriptive. The source of authority remains `.mnemon` plus the host's own hook configuration.
 
-- If marker exists, update in place.
-- If user changed generated block, preserve and write conflict report.
-- Projection writes are recorded in `bindings/active.json`.
-- Drift in projected files writes `reports/projection/` before overwrite.
-- Never delete `memory/`, `reports/`, `archive/`, or `state/usage.json`.
-- Upgrade may migrate schemas, but must write `reports/install/<timestamp>.md`.
-- Uninstall removes host bindings and generated skill/hook copies only; user data stays.
+## Verification
 
-## Install Skill Contract
+Smoke tests:
 
-`skills/install/SKILL.md` should instruct the host agent to:
+1. The host instruction surface points to `.mnemon/GUIDELINE.md`.
+2. `recall` returns bounded context or `none`.
+3. `observe` can write a report under `.mnemon/reports/`.
+4. `reflect` can classify a completed turn into memory, skill, evidence, or report-only.
+5. `curate` can run dry-run without mutating protected targets.
+6. Reinstall updates the managed marker in place.
+7. Removing host bindings does not delete memory, reports, or state.
 
-1. Read `harness.yaml`.
-2. Detect host.
-3. Produce an install plan.
-4. Ask approval before modifying host config.
-5. Apply only marked blocks and generated files.
-6. Run verification.
-7. Write install report.
+## Scripted Installer Later
 
-Output schema:
+A future script may automate detection and file edits, but it must implement the same agent-readable protocol:
 
-```yaml
-type: install_report
-host: claude-code
-capability_level: L2
-actions:
-  - target: CLAUDE.md
-    action: merge_block
-    status: applied
-  - target: .claude/skills/
-    action: copy
-    status: applied
-warnings: []
-next_steps: []
-```
+- read `INSTALL.md` and `harness.yaml`;
+- generate the same install plan;
+- ask for the same approvals;
+- write the same binding record;
+- run the same smoke tests;
+- preserve the same proposal-only fallback.
+
+Scripts are convenience, not a required runtime dependency.
+
+## Acceptance Criteria
+
+Installation design is acceptable when:
+
+1. an arbitrary capable agent can install by reading Markdown;
+2. host-specific knowledge is optional optimization, not architectural dependency;
+3. the four semantic hooks can be mapped to native hooks or manual skills;
+4. `.mnemon` remains canonical;
+5. host-owned content outside markers is never overwritten;
+6. missing hook support degrades to manual/proposal mode;
+7. every installation writes an audit report and binding record.

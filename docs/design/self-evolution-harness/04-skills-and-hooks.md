@@ -21,17 +21,17 @@ Rules:
 - Dreaming may surface repeated workflow signals, but writes still go through the same skill_manage path.
 - Curator should prefer umbrella skills and support files over one-session skills.
 - Every path writes usage/provenance metadata.
-- High-risk skills, policy skills, install maps, and hooks require human approval.
+- High-risk skills, policy skills, hook mounting policy, and installed hooks require human approval.
 
 ## Core Skills
 
 ### `install`
 
-Purpose: install or upgrade harness for current host.
+Purpose: install or upgrade the harness by mapping semantic hooks into the current host.
 
 Responsibilities:
 
-- Detect host.
+- Detect host capabilities and surfaces.
 - Read `harness.yaml`.
 - Build install plan.
 - Apply only approved changes.

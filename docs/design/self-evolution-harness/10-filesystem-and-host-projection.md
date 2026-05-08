@@ -1,4 +1,4 @@
-# 10. Filesystem And Host Projection
+# 10. Filesystem And Hook Mounting
 
 The harness has no mandatory runtime, but it still needs a durable filesystem. Without a canonical filesystem, memory, skills, provenance, reports, projections, and rollback state scatter across host-specific files and become impossible to curate safely.
 
@@ -6,11 +6,11 @@ The recommended design is:
 
 ```text
 .mnemon/ is canonical.
-Host-native files are projections or bindings.
+Host-native files are pointers, projections, or hook bindings.
 Host-owned content remains host-owned.
 ```
 
-This is better than writing directly into every host's native template as the primary state. Native embedding is still required, but it should be a projection layer.
+This is better than writing directly into every host's native template as the primary state. Native embedding is still required, but installation should be a small hook-and-pointer mounting layer.
 
 ## Hermes Lessons
 
@@ -22,22 +22,31 @@ Hermes is worth referencing for filesystem design, not for product shape.
 | `skills/<name>/SKILL.md` with frontmatter | directory-based skill artifacts and schema validation |
 | usage/provenance sidecar | engineering metadata outside model-facing Markdown |
 | curator reports and backups | report-first maintenance and rollback |
-| hooks/cron as lifecycle surface | host bindings and optional runner jobs |
+| hooks/cron as lifecycle surface | semantic hook bindings and optional runner jobs |
 
 The part we should not copy is a single host-specific home directory such as `~/.hermes` as the only install target. Mnemon should be repo/project-local by default, with optional user/global overlays later.
 
-## Two Installation Paths
+## Hook-First Mounting
 
-There are two plausible paths:
+The default path is not a host adapter. The default path is an agent-readable hook contract:
 
-| Path | Description | Problem |
+```text
+INSTALL.md
+  -> host agent identifies instruction / skill / hook / scheduler surfaces
+  -> host agent maps recall / observe / reflect / curate
+  -> host agent records the binding in .mnemon/bindings/active.json
+```
+
+There are two execution styles:
+
+| Style | Description | Boundary |
 |---|---|---|
-| Host-native primary | write directly into `CLAUDE.md`, `AGENTS.md`, `.claude/skills`, `~/.hermes/skills`, etc. | portable state, provenance, curation, backup, and uninstall become host-specific |
-| Canonical `.mnemon` + projection | keep source of truth in `.mnemon`, mount/project into host-native surfaces | requires a projection layer, but keeps the harness coherent |
+| Agent-executed install | the host agent reads `INSTALL.md` and performs the binding with user approval | primary path |
+| Scripted install | a script automates the same plan, approvals, binding record, and smoke tests | later convenience |
 
-The second path is better as the default. It gives the harness its own durable object model without owning runtime execution.
+Both styles produce the same result: `.mnemon` remains canonical, and host-native surfaces only point to it or invoke semantic hooks.
 
-The first path remains useful as an L0/L1 fallback when a host cannot reference files, cannot register skills, or the user explicitly wants a native-only install.
+Native-only installation remains an L0 fallback when the host cannot reference files or register hooks, but it is not the main architecture.
 
 ## Canonical Layout
 
@@ -53,14 +62,8 @@ Recommended repo-local install:
   bindings/
     active.json
     hosts/
-      claude-code.yaml
-      codex.yaml
-      hermes.yaml
-      generic.yaml
     projections/
-      claude-code/
-      codex/
-      hermes/
+      <host-label>/
   skills/
     core/
       recall/SKILL.md
@@ -93,8 +96,10 @@ Recommended repo-local install:
       demotions/
       decisions/
   hooks/
-    templates/
-    installed/
+    recall.md
+    observe.md
+    reflect.md
+    curate.md
   prompts/
   schemas/
   scripts/
@@ -117,58 +122,57 @@ Recommended repo-local install:
     budgets/
 ```
 
-`fs.yaml` defines the filesystem contract. `inventory.json` records what the installer detected in the host project. `bindings/active.json` records which projections are currently installed.
+`fs.yaml` defines the filesystem contract. `inventory.json` records what the installing agent detected in the host project. `bindings/active.json` records which instruction pointers, skill surfaces, and semantic hooks are currently mounted.
 
 ## Filesystem Tiers
 
 | Tier | Authority | Examples |
 |---|---|---|
 | Canonical harness state | `.mnemon` | memory, skills, usage/provenance sidecar, reports, runner jobs |
-| Managed projections | generated from `.mnemon` | marked blocks in `CLAUDE.md`/`AGENTS.md`, copied skill folders, hook config |
+| Managed bindings | generated from `.mnemon` | marked instruction pointers, skill projections, hook config |
 | Host-owned native content | host/user | existing instructions, user rules, native skills outside markers |
 
 Only the first tier is the harness source of truth. The second tier can be regenerated. The third tier must be sensed and respected, not overwritten.
 
-## Host Template Sensing
+## Host Surface Sensing
 
-Because the harness is mounted on a host agent, installation must detect and adapt to existing templates instead of blindly writing a new one.
+Because the harness is mounted on a host agent, installation must detect capabilities rather than assume a product. The installing agent asks: what surfaces can this host expose safely?
 
-Template sensing reads:
+Surface sensing reads:
 
-- instruction files: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `continue` config, Hermes config;
-- native skill directories;
-- hook config files;
-- scheduler/cron config;
-- existing managed markers from previous installs;
-- project conventions such as docs directory, package manager, test commands.
+- persistent instruction surfaces;
+- native skill or command discovery surfaces;
+- lifecycle, model, tool, approval, stop, and session hooks;
+- scheduler, cron, idle task, or CI surfaces;
+- write permission and approval boundaries;
+- existing managed markers from previous installs.
 
-Host map example:
+Binding example:
 
 ```yaml
-host: claude-code
-detect:
-  files_any:
-    - CLAUDE.md
-    - .claude/
-instruction_surfaces:
-  - path: CLAUDE.md
-    mode: managed_block
-    marker: mnemon
-skill_surfaces:
-  - path: .claude/skills
-    mode: symlink_or_copy
-hook_surfaces:
-  - path: .claude/settings.json
-    mode: managed_json_patch
-projection:
-  default_mode: pointer
-  refresh_after:
-    - install
-    - curate_apply
-    - skill_promote
+host_label: detected-by-agent
+capability_level: L2
+instruction_surface:
+  path: AGENTS.md
+  mode: managed_pointer
+skill_surface:
+  mode: native|pointer|manual
+semantic_hooks:
+  recall:
+    trigger: user_prompt
+    target: .mnemon/hooks/recall.md
+  observe:
+    trigger: post_tool_call
+    target: .mnemon/hooks/observe.md
+  reflect:
+    trigger: session_end
+    target: .mnemon/hooks/reflect.md
+  curate:
+    trigger: manual
+    target: .mnemon/skills/core/curate/SKILL.md
 ```
 
-The installer should produce an install plan before modifying anything.
+The installer, whether agent-executed or scripted, should produce an install plan before modifying anything.
 
 ## Projection Modes
 
@@ -176,6 +180,7 @@ The installer should produce an install plan before modifying anything.
 |---|---|---|
 | `pointer` | host can read referenced files | native file points to `.mnemon/GUIDELINE.md`, Prompt Memory, skill index |
 | `managed_block` | instruction file supports plain Markdown | insert a small marked block, keep user content untouched |
+| `hook_binding` | host supports lifecycle or tool hooks | bind a host event to `.mnemon/hooks/<name>.md` or a core skill |
 | `symlink` | host skill loader follows symlinks | symlink active `.mnemon` skill dirs into native skill dir |
 | `copy` | host requires physical files | copy generated projections with checksum and source pointer |
 | `json_patch` | host has structured config | apply reversible managed patch |
@@ -192,7 +197,8 @@ Instruction files should receive a short managed block:
 Mnemon self-evolution harness is installed for this project.
 
 Read `.mnemon/GUIDELINE.md` before applying durable memory or skill changes.
-Use `.mnemon/skills/core/recall/SKILL.md` for recall, `.mnemon/skills/core/reflect/SKILL.md` after completed work, and `.mnemon/skills/core/curate/SKILL.md` for maintenance.
+Map host lifecycle events to `.mnemon/hooks/recall.md`, `.mnemon/hooks/observe.md`, `.mnemon/hooks/reflect.md`, and `.mnemon/hooks/curate.md` when hooks are available.
+Use `.mnemon/skills/core/*/SKILL.md` as the manual fallback.
 Prompt Memory lives under `.mnemon/memory/prompt/`; reports live under `.mnemon/reports/`.
 Do not edit generated projections directly; update `.mnemon` canonical files.
 <!-- mnemon:end -->
@@ -264,19 +270,19 @@ The harness should never silently choose host-native state over canonical state.
 
 ```text
 install:
-  detect host templates
-  inventory native surfaces
+  read INSTALL.md
+  inventory instruction / skill / hook / scheduler surfaces
   create/update .mnemon canonical files
-  create projection plan
+  create hook mounting plan
   ask approval
-  write managed blocks / symlinks / copies / hook bindings
+  write managed pointers / skill projections / hook bindings
   record bindings/active.json
   write install report
 
 runtime:
   host reads native instruction block
   host follows pointers into .mnemon
-  hooks call .mnemon skills/prompts/scripts
+  host events invoke recall / observe / reflect / curate
   reports and sidecars are written in .mnemon
 
 maintenance:
@@ -316,6 +322,7 @@ canonical:
 projection:
   managed_marker: mnemon
   default_mode: pointer
+  hook_binding_mode: host_native_or_manual
   refresh_events:
     - install
     - upgrade
@@ -331,13 +338,13 @@ drift:
 Canonical `.mnemon` is better because it gives the harness:
 
 1. one place for usage/provenance state;
-2. host-independent backup, rollback, and reports;
+2. host-independent hook binding records, backup, rollback, and reports;
 3. stable Prompt/Long-Term Memory layout and explicit consolidation artifacts;
 4. safe curator/dreaming over self-authored assets;
 5. clean uninstall and upgrade;
-6. multi-host portability.
+6. multi-host portability without a host-specific adapter.
 
-Pure host-native embedding is attractive for first-use ergonomics, but it makes long-term self-evolution fragmented. The right compromise is canonical filesystem plus host-native projection.
+Pure host-native embedding is attractive for first-use ergonomics, but it makes long-term self-evolution fragmented. The right compromise is canonical filesystem plus agent-readable hook mounting.
 
 ## Acceptance Criteria
 
@@ -347,6 +354,7 @@ Filesystem design is acceptable when:
 2. uninstall removes host bindings without losing `.mnemon`;
 3. host files outside managed markers are untouched;
 4. projection drift is reported before overwrite;
-5. native-only install remains possible as L0 fallback;
-6. curator operates on canonical files, not random host templates;
-7. every projected artifact points back to its canonical source.
+5. recall/observe/reflect/curate can be mounted as hooks or manual skills;
+6. native-only install remains possible as L0 fallback;
+7. curator operates on canonical files, not random host templates;
+8. every projected artifact points back to its canonical source.

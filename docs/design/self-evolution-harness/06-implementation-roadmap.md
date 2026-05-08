@@ -25,17 +25,15 @@ Acceptance:
 
 ## Phase 1: L1 Installable Harness
 
-Goal: install into instruction/skill surfaces.
+Goal: let a host agent install by reading `INSTALL.md`, then bind instruction, skill, and semantic hook surfaces.
 
 Deliverables:
 
-- `install/hosts/generic.yaml`
-- `install/hosts/codex.yaml`
-- `install/hosts/claude-code.yaml`
 - install skill that generates install plan
 - idempotent instruction block markers
-- host template sensing
-- managed block / pointer projection
+- host surface sensing
+- managed pointer block
+- semantic hook binding record
 - `bindings/active.json`
 - `inventory.json`
 - `state/install.json`
@@ -160,7 +158,7 @@ Acceptance:
 
 - Skill prompt changes run schema + sample eval.
 - Hook prompt changes run regression cases.
-- Guideline/install map changes require human approval.
+- Guideline/hook mounting policy changes require human approval.
 - Eval output is proposal/PR, not prompt mutation.
 
 ## Initial File Tree
@@ -202,14 +200,14 @@ Do not start by writing a daemon, server, SDK, database adapter, or universal ag
 
 | Decision | Options | Recommendation |
 |---|---|---|
-| Package root | host-native primary vs repo-local `.mnemon/` | use `.mnemon/` as canonical root, project into host-native files |
+| Package root | host-native primary vs repo-local `.mnemon/` | use `.mnemon/` as canonical root, mount through host-native surfaces |
 | Schema format | JSON Schema vs YAML docs | JSON Schema for machine contracts, Markdown for explanation |
 | Direct apply | never vs low-risk allowlisted | allow low-risk only when host enforces write target |
-| Host maps | built-in vs community contributed | built-in core maps, allow community maps |
+| Host knowledge | generic hook contract vs host maps | generic hook contract first; scripts may add host maps later |
 | Long-term index | none vs SQLite/FTS/vector | protocol first, implementation later |
 | Runner packaging | no runner vs CLI tick vs resident process | CLI tick first; resident process only as equivalent wrapper |
 | LLM maintenance | embedded SDK vs host command | host command only; missing command means proposal/manual |
-| Projection mode | pointer vs symlink vs copy | pointer first, symlink/copy only for native skill loaders |
+| Mount mode | pointer vs hook binding vs symlink/copy | pointer + semantic hook binding first; symlink/copy only for native skill loaders |
 
 ## Risks
 

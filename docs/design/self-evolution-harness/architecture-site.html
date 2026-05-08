@@ -1450,7 +1450,7 @@
         <div class="eyebrow" data-i18n="hero.eyebrow">Agent-agnostic self-evolution harness</div>
         <h1 data-i18n="hero.title">一个没有自有 agent runtime 的自进化外骨骼</h1>
         <p class="lead" data-i18n-html="hero.lead">
-          Mnemon 把 canonical state 放在 <strong>.mnemon</strong>，通过 host projection 挂载到 Claude Code、Codex、Hermes 或 generic agent。Host 仍拥有 LLM loop、工具、权限和 UI；harness 只提供技能、记忆、hook、报告、治理和可选 maintenance runner。
+          Mnemon 把 canonical state 放在 <strong>.mnemon</strong>，让 host agent 读取 INSTALL.md 后把 recall、observe、reflect、curate 四类 semantic hooks 挂载到自己的生命周期。Host 仍拥有 LLM loop、工具、权限和 UI；harness 只提供技能、记忆、hook、报告、治理和可选 maintenance runner。
         </p>
         <div class="hero-actions">
           <a class="action primary" href="#map" data-i18n="hero.actions.map">查看交互架构</a>
@@ -1461,7 +1461,7 @@
       <aside class="hero-visual" aria-label="Architecture summary" data-i18n-aria="hero.visualAria">
         <div class="mini-title">
           <strong data-i18n="hero.visualTitle">核心形态</strong>
-          <span data-i18n="hero.visualSubtitle">canonical filesystem + host projection</span>
+          <span data-i18n="hero.visualSubtitle">canonical filesystem + hook mounting</span>
         </div>
         <div class="mini-stack">
           <div class="mini-cell" style="border-left: 5px solid var(--cyan)">
@@ -1476,7 +1476,7 @@
           </div>
           <div class="mini-cell" style="border-left: 5px solid var(--gold)">
             <div>
-              <h3 data-i18n="hero.cells.projection.title">Host Projection</h3>
+              <h3 data-i18n="hero.cells.projection.title">Hook Mounting</h3>
               <p data-i18n="hero.cells.projection.body">managed block、pointer、symlink/copy、native import。</p>
             </div>
             <div class="mini-tags">
@@ -1547,7 +1547,7 @@
 
             <button class="node" data-node="native" style="--accent: var(--gold); left: 28%; top: 25%; --w: 190px;">
               <span class="kicker">Host Native</span>
-              <strong>CLAUDE.md / AGENTS.md / native skills</strong>
+              <strong>instruction / skills / hooks</strong>
               <span>通过 managed block 或 projection 挂载。</span>
             </button>
 
@@ -1732,19 +1732,19 @@
     <section id="projection" class="panel">
       <div class="section-head">
         <div>
-          <h2 data-i18n="sections.projection.title">Host Projection Explorer</h2>
-          <p data-i18n="sections.projection.body">.mnemon 是 canonical；host 原生文件是投影。选择 host 查看安装面、挂载方式和 fallback。</p>
+          <h2 data-i18n="sections.projection.title">Hook Mount Explorer</h2>
+          <p data-i18n="sections.projection.body">.mnemon 是 canonical；host agent 通过 instruction、skill、hook、scheduler 四类表面挂载 semantic hooks。</p>
         </div>
       </div>
       <div class="projection-layout">
         <div class="host-list" role="tablist" aria-label="Host projection selector" data-i18n-aria="sections.projection.selectorAria">
-          <button class="host-button active" type="button" data-host="claude"><strong>Claude Code</strong><span>CLAUDE.md + skills + hooks</span></button>
-          <button class="host-button" type="button" data-host="codex"><strong>Codex</strong><span>AGENTS.md + manual skills</span></button>
-          <button class="host-button" type="button" data-host="hermes"><strong>Hermes</strong><span>native skills + hooks + cron</span></button>
-          <button class="host-button" type="button" data-host="generic"><strong>Generic</strong><span>Markdown-only fallback</span></button>
+          <button class="host-button active" type="button" data-host="claude"><strong>L0 Manual</strong><span>Markdown + skills</span></button>
+          <button class="host-button" type="button" data-host="codex"><strong>L1 Instruction</strong><span>managed pointer</span></button>
+          <button class="host-button" type="button" data-host="hermes"><strong>L2 Hooks</strong><span>recall / observe / reflect</span></button>
+          <button class="host-button" type="button" data-host="generic"><strong>L3 Maintenance</strong><span>curate / dreaming</span></button>
         </div>
         <div class="projection-detail">
-          <h3 id="host-title">Claude Code</h3>
+          <h3 id="host-title">L0 Manual</h3>
           <p id="host-summary"></p>
           <div class="projection-columns" id="host-columns"></div>
         </div>
@@ -1778,10 +1778,10 @@
       },
       native: {
         title: "Host Native Surfaces",
-        body: "CLAUDE.md, AGENTS.md, native skill folders, hook configs and scheduler definitions are projection targets, not canonical state.",
-        owns: ["host instruction files", "native skill loader", "hook config"],
-        reads: [".mnemon pointers", "managed block", "generated skill projection"],
-        writes: ["only inside managed markers or projection targets"],
+        body: "Instruction files, skill registries, hook configs and scheduler definitions are mounting surfaces, not canonical state.",
+        owns: ["instruction surface", "skill surface", "hook surface", "scheduler surface"],
+        reads: [".mnemon pointers", "managed block", "semantic hook binding"],
+        writes: ["only inside managed markers or binding targets"],
         risk: "Host-owned content outside markers is read-only by default."
       },
       mnemon: {
@@ -1865,16 +1865,16 @@
         risk: "Eval constraints are protected and cannot be self-weakened."
       },
       projection: {
-        title: "Projection Metadata",
-        body: "Records how .mnemon is mounted into host-native surfaces. Tracks checksum, mode, target and drift.",
+        title: "Hook Binding Metadata",
+        body: "Records how recall, observe, reflect and curate are mounted into host-native surfaces. Tracks mode, target, trigger and drift.",
         owns: ["bindings/active.json", "inventory.json", "projection reports"],
-        reads: ["host-native templates", "canonical source checksums"],
-        writes: ["managed blocks", "symlinks/copies", "drift reports"],
-        risk: "Projected copies are not canonical and should not be edited directly."
+        reads: ["host surfaces", "semantic hook contract"],
+        writes: ["managed pointers", "hook binding records", "drift reports"],
+        risk: "Bindings are descriptive; .mnemon remains canonical."
       },
       human: {
         title: "Human Approval",
-        body: "Human review gates high-risk changes: guideline, install maps, hooks, safety policy, user-created content and eval constraints.",
+        body: "Human review gates high-risk changes: guideline, hook mounting policy, hooks, safety policy, user-created content and eval constraints.",
         owns: ["approval decisions", "merge decisions"],
         reads: ["reports", "diffs", "eval output"],
         writes: ["approved apply", "rejection", "manual override"],
@@ -1885,15 +1885,15 @@
     const flows = {
       install: {
         title: "Install & Mount",
-        body: "Detect host, sense existing templates, create .mnemon, then project into host-native surfaces.",
+        body: "The host agent reads INSTALL.md, inventories its own surfaces, then mounts semantic hooks into the host.",
         nodes: ["host", "native", "mnemon", "projection", "human"],
         lines: ["line-host-native", "line-native-mnemon", "line-mnemon-projection", "line-projection-native", "line-human-host"],
         steps: [
-          ["Detect host", "Find CLAUDE.md, AGENTS.md, native skill dirs or Hermes config."],
+          ["Read contract", "Use INSTALL.md and harness.yaml as the install source."],
+          ["Inventory surfaces", "Find instruction, skill, hook, scheduler and permission surfaces."],
           ["Create .mnemon", "Initialize canonical memory, skills, schemas, state and reports."],
-          ["Plan projection", "Choose managed block, pointer, symlink/copy or native import."],
-          ["Ask approval", "Write only marked blocks and generated projections."],
-          ["Record binding", "Store active projection and drift metadata."]
+          ["Bind hooks", "Map recall, observe, reflect and curate to native hooks or manual skills."],
+          ["Record binding", "Store active hook mapping, write policy and drift metadata."]
         ]
       },
       task: {
@@ -1969,54 +1969,54 @@
         ]
       },
       projection: {
-        title: "Projection Refresh",
-        body: "Canonical changes refresh host projections. Drift is reported before overwrite.",
+        title: "Binding Refresh",
+        body: "Canonical hook or skill changes refresh host bindings. Drift is reported before overwrite.",
         nodes: ["mnemon", "projection", "native", "host", "reports"],
         lines: ["line-mnemon-projection", "line-projection-native", "line-host-native", "line-runner-reports"],
         steps: [
-          ["Canonical changed", "Curator, install or skill promotion updates .mnemon."],
-          ["Compute projection", "Use active binding mode and checksum."],
+          ["Canonical changed", "Install, hook policy, curator or skill promotion updates .mnemon."],
+          ["Compute binding", "Use active hook mapping, pointer mode and checksum."],
           ["Detect drift", "Manual edits in projected files become reports."],
-          ["Refresh", "Regenerate managed blocks or projected skill copies."]
+          ["Refresh", "Regenerate managed pointer, hook binding or projected skill copy."]
         ]
       }
     };
 
     const hosts = {
       claude: {
-        title: "Claude Code",
-        summary: "最佳 L2/L3 host：CLAUDE.md 承载短 managed block，.claude/skills 可 symlink/copy .mnemon skills，Stop/SessionEnd hooks 可运行 reflection。",
+        title: "L0 Manual",
+        summary: "Only Markdown is required. The agent reads GUIDELINE.md and core SKILL.md files manually; all durable changes are reports or proposals.",
         columns: [
-          ["Instruction", ["CLAUDE.md managed block", ".claude/CLAUDE.md pointer", "Do not copy long memory into instructions"]],
-          ["Skills", [".claude/skills symlink_or_copy", "core skills from .mnemon/skills/core", "generated skills only after promotion"]],
-          ["Hooks", ["SessionStart/UserPromptSubmit -> recall", "PreToolUse/PostToolUse -> observe", "Stop/SessionEnd -> reflect"]]
+          ["Instruction", ["read .mnemon/GUIDELINE.md", "follow INSTALL.md checklist", "no host config edits required"]],
+          ["Skills", ["manual recall", "manual reflect", "manual curate"]],
+          ["Fallback", ["proposal-only", "reports under .mnemon/reports", "no automatic mutation"]]
         ]
       },
       codex: {
-        title: "Codex",
-        summary: "偏 L1 host：AGENTS.md 适合 repo instruction 和 pointer block。若无稳定 hooks，则 reflect/curate 走手动 skill 或 queued job。",
+        title: "L1 Instruction",
+        summary: "The host has a persistent instruction surface. Install a short managed pointer to .mnemon; skills may still be manual.",
         columns: [
-          ["Instruction", ["AGENTS.md pointer block", "Keep project rules host-owned", "Managed marker records .mnemon location"]],
-          ["Skills", ["docs/agent-skills pointer", "manual skill discovery", "proposal-first updates"]],
-          ["Fallback", ["manual recall", "manual reflect", "external cron or no runner by default"]]
+          ["Instruction", ["managed pointer block", "do not copy long memory", "host-owned content outside marker is read-only"]],
+          ["Skills", ["native skill pointer if available", "manual core skills otherwise"]],
+          ["Verification", ["host can find .mnemon", "reinstall updates marker in place"]]
         ]
       },
       hermes: {
-        title: "Hermes",
-        summary: "能力最完整的参考 host：native skills、hooks、curator 和 cron 都可承载 Mnemon projection，但 .mnemon 仍是 canonical root。",
+        title: "L2 Hooks",
+        summary: "The host can call lifecycle or tool hooks. Bind recall, observe and reflect to native events while preserving proposal-first writes.",
         columns: [
-          ["Instruction", ["Hermes context pointer", "bounded MEMORY/USER pattern informs Prompt Memory", "native import is protected"]],
-          ["Skills", ["~/.hermes/skills native_import_or_symlink", "SKILL.md frontmatter validation", "usage sidecar stays in .mnemon"]],
-          ["Maintenance", ["post-turn review maps to reflect", "curator maps to L3 maintenance", "cron maps to runner tick semantics"]]
+          ["Recall", ["session_start", "user_prompt", "pre_model_call"]],
+          ["Observe", ["pre_tool_call", "post_tool_call", "approval_result"]],
+          ["Reflect", ["turn_delivered", "stop", "session_end"]]
         ]
       },
       generic: {
-        title: "Generic Agent",
-        summary: "最低可用路径：只要能读 Markdown，就能通过 INSTALL.md 和 GUIDELINE.md 手动安装 L0/L1。",
+        title: "L3 Maintenance",
+        summary: "The host has idle/scheduled execution or an external scheduler. Curate and dreaming run outside foreground work.",
         columns: [
-          ["Instruction", [".agent-instructions.md or README pointer", "No automatic mutation", "Manual review required"]],
-          ["Skills", ["read .mnemon/skills/core manually", "reports/proposals only", "no native skill assumption"]],
-          ["Fallback", ["manual recall", "manual reflect", "manual curate", "native-only install allowed but not preferred"]]
+          ["Curate", ["manual_review", "idle_tick", "scheduled_tick"]],
+          ["Dreaming", ["compact", "extract", "promote/demote proposals"]],
+          ["Safety", ["lease + budget", "dry-run default", "reports before apply"]]
         ]
       }
     };
@@ -2032,13 +2032,13 @@
             pipelines: "管道",
             memory: "记忆循环",
             skills: "技能演化",
-            projection: "Host 挂载",
+            projection: "Hook 挂载",
             levels: "能力等级"
           },
           hero: {
             eyebrow: "Agent 无关的自进化 harness",
             title: "一个没有自有 agent runtime 的自进化外骨骼",
-            lead: "Mnemon 把 canonical state 放在 <strong>.mnemon</strong>，通过 host projection 挂载到 Claude Code、Codex、Hermes 或 generic agent。Host 仍拥有 LLM loop、工具、权限和 UI；harness 只提供技能、记忆、hook、报告、治理和可选 maintenance runner。",
+            lead: "Mnemon 把 canonical state 放在 <strong>.mnemon</strong>，让 host agent 读取 INSTALL.md 后把 recall、observe、reflect、curate 四类 semantic hooks 挂载到自己的生命周期。Host 仍拥有 LLM loop、工具、权限和 UI；harness 只提供技能、记忆、hook、报告、治理和可选 maintenance runner。",
             actions: {
               map: "查看交互架构",
               projection: "查看挂载策略",
@@ -2046,15 +2046,15 @@
             },
             visualAria: "架构摘要",
             visualTitle: "核心形态",
-            visualSubtitle: "canonical filesystem + host projection",
+            visualSubtitle: "canonical filesystem + hook mounting",
             cells: {
               mnemon: {
                 title: ".mnemon",
                 body: "memory、skills、state、reports、runner jobs 的 source of truth。"
               },
               projection: {
-                title: "Host Projection",
-                body: "managed block、pointer、symlink/copy、native import。"
+                title: "Hook Mounting",
+                body: "instruction pointer、skill surface、hook binding、scheduler。"
               },
               loop: {
                 title: "Self-Evolution Loop",
@@ -2086,8 +2086,8 @@
               flowAria: "Skill flow selector"
             },
             projection: {
-              title: "Host Projection Explorer",
-              body: ".mnemon 是 canonical；host 原生文件是投影。选择 host 查看安装面、挂载方式和 fallback。",
+              title: "Hook Mount Explorer",
+              body: ".mnemon 是 canonical；host agent 通过 instruction、skill、hook、scheduler 四类表面挂载 semantic hooks。",
               selectorAria: "Host projection 选择器"
             },
             levels: {
@@ -2121,13 +2121,13 @@
           },
           native: {
             kicker: "Host Native",
-            mapTitle: "CLAUDE.md / AGENTS.md / native skills",
-            summary: "通过 managed block 或 projection 挂载。",
+            mapTitle: "instruction / skills / hooks",
+            summary: "通过 pointer 和 semantic hook binding 挂载。",
             title: "Host 原生表面",
-            body: "CLAUDE.md、AGENTS.md、native skill folders、hook configs 和 scheduler definitions 是 projection targets，不是 canonical state。",
-            owns: ["host instruction files", "native skill loader", "hook config"],
-            reads: [".mnemon pointers", "managed block", "generated skill projection"],
-            writes: ["只写 managed markers 或 projection targets"],
+            body: "Instruction files、skill registries、hook configs 和 scheduler definitions 是挂载表面，不是 canonical state。",
+            owns: ["instruction surface", "skill surface", "hook surface", "scheduler surface"],
+            reads: [".mnemon pointers", "managed block", "semantic hook binding"],
+            writes: ["只写 managed markers 或 binding targets"],
             risk: "Markers 外的 host-owned 内容默认只读。"
           },
           mnemon: {
@@ -2244,19 +2244,19 @@
             kicker: "Projection State",
             mapTitle: "bindings / inventory / drift",
             summary: "记录挂载、校验和冲突报告。",
-            title: "Projection Metadata",
-            body: "记录 .mnemon 如何挂载到 host-native surfaces：checksum、mode、target 和 drift。",
+            title: "Hook Binding Metadata",
+            body: "记录 recall、observe、reflect、curate 如何挂载到 host-native surfaces：mode、target、trigger 和 drift。",
             owns: ["bindings/active.json", "inventory.json", "projection reports"],
-            reads: ["host-native templates", "canonical source checksums"],
-            writes: ["managed blocks", "symlinks/copies", "drift reports"],
-            risk: "Projected copies 不是 canonical，不应直接编辑。"
+            reads: ["host surfaces", "semantic hook contract"],
+            writes: ["managed pointers", "hook binding records", "drift reports"],
+            risk: "Binding 是描述性状态；.mnemon 仍是 canonical。"
           },
           human: {
             kicker: "Human Gate",
             mapTitle: "approval / review / merge",
             summary: "高风险变化必须人工确认。",
             title: "Human Approval",
-            body: "人工审核 gate 负责 guideline、install maps、hooks、safety policy、user-created content 和 eval constraints 等高风险变化。",
+            body: "人工审核 gate 负责 guideline、hook mounting policy、hooks、safety policy、user-created content 和 eval constraints 等高风险变化。",
             owns: ["approval decisions", "merge decisions"],
             reads: ["reports", "diffs", "eval output"],
             writes: ["approved apply", "rejection", "manual override"],
@@ -2267,15 +2267,15 @@
           install: {
             chip: "安装",
             title: "安装与挂载",
-            body: "探测 host、感知已有模板、创建 .mnemon，然后投影到 host-native surfaces。",
+            body: "Host agent 读取 INSTALL.md，盘点自己的 instruction、skill、hook、scheduler 表面，然后挂载 semantic hooks。",
             nodes: ["host", "native", "mnemon", "projection", "human"],
             lines: ["line-host-native", "line-native-mnemon", "line-mnemon-projection", "line-projection-native", "line-human-host"],
             steps: [
-              ["探测 host", "查找 CLAUDE.md、AGENTS.md、native skill dirs 或 Hermes config。"],
+              ["读取契约", "以 INSTALL.md 和 harness.yaml 为安装源。"],
+              ["盘点表面", "找出 instruction、skill、hook、scheduler 和 permission surface。"],
               ["创建 .mnemon", "初始化 canonical memory、skills、schemas、state 和 reports。"],
-              ["规划 projection", "选择 managed block、pointer、symlink/copy 或 native import。"],
-              ["请求批准", "只写 marked blocks 和 generated projections。"],
-              ["记录 binding", "保存 active projection 和 drift metadata。"]
+              ["绑定 hooks", "将 recall、observe、reflect、curate 映射到 native hooks 或 manual skills。"],
+              ["记录 binding", "保存 active hook mapping、write policy 和 drift metadata。"]
             ]
           },
           task: {
@@ -2359,60 +2359,61 @@
           projection: {
             chip: "投影",
             title: "Projection Refresh",
-            body: "Canonical changes 会刷新 host projections。覆盖前必须报告 drift。",
+            title: "Binding Refresh",
+            body: "Canonical hook 或 skill 变化会刷新 host bindings。覆盖前必须报告 drift。",
             nodes: ["mnemon", "projection", "native", "host", "reports"],
             lines: ["line-mnemon-projection", "line-projection-native", "line-host-native", "line-runner-reports"],
             steps: [
-              ["Canonical changed", "Curator、install 或 skill promotion 更新 .mnemon。"],
-              ["计算 projection", "使用 active binding mode 和 checksum。"],
+              ["Canonical changed", "Install、hook policy、curator 或 skill promotion 更新 .mnemon。"],
+              ["计算 binding", "使用 active hook mapping、pointer mode 和 checksum。"],
               ["检测 drift", "Projected files 中的手动编辑会进入 reports。"],
-              ["刷新", "重新生成 managed blocks 或 projected skill copies。"]
+              ["刷新", "重新生成 managed pointer、hook binding 或 projected skill copy。"]
             ]
           }
         },
         hosts: {
           claude: {
-            buttonTitle: "Claude Code",
-            buttonSubtitle: "CLAUDE.md + skills + hooks",
-            title: "Claude Code",
-            summary: "最佳 L2/L3 host：CLAUDE.md 承载短 managed block，.claude/skills 可 symlink/copy .mnemon skills，Stop/SessionEnd hooks 可运行 reflection。",
+            buttonTitle: "L0 Manual",
+            buttonSubtitle: "Markdown + skills",
+            title: "L0 Manual",
+            summary: "只需要能读 Markdown。Agent 手动读取 GUIDELINE.md 与 core SKILL.md；所有 durable changes 都是 report/proposal。",
             columns: [
-              ["Instruction", ["CLAUDE.md managed block", ".claude/CLAUDE.md pointer", "不要把长 memory 复制进 instruction"]],
-              ["Skills", [".claude/skills symlink_or_copy", "core skills from .mnemon/skills/core", "generated skills 只有 promotion 后才激活"]],
-              ["Hooks", ["SessionStart/UserPromptSubmit -> recall", "PreToolUse/PostToolUse -> observe", "Stop/SessionEnd -> reflect"]]
+              ["Instruction", ["读取 .mnemon/GUIDELINE.md", "遵循 INSTALL.md checklist", "不需要修改 host config"]],
+              ["Skills", ["manual recall", "manual reflect", "manual curate"]],
+              ["Fallback", ["proposal-only", "reports 写在 .mnemon/reports", "无自动 mutation"]]
             ]
           },
           codex: {
-            buttonTitle: "Codex",
-            buttonSubtitle: "AGENTS.md + manual skills",
-            title: "Codex",
-            summary: "偏 L1 host：AGENTS.md 适合 repo instruction 和 pointer block。若无稳定 hooks，则 reflect/curate 走手动 skill 或 queued job。",
+            buttonTitle: "L1 Instruction",
+            buttonSubtitle: "managed pointer",
+            title: "L1 Instruction",
+            summary: "Host 有持久 instruction surface。安装一个短 managed pointer 指向 .mnemon；skills 仍可手动。",
             columns: [
-              ["Instruction", ["AGENTS.md pointer block", "保留 project rules 的 host-owned 属性", "Managed marker 记录 .mnemon 位置"]],
-              ["Skills", ["docs/agent-skills pointer", "manual skill discovery", "proposal-first updates"]],
-              ["Fallback", ["manual recall", "manual reflect", "默认 external cron 或 no runner"]]
+              ["Instruction", ["managed pointer block", "不要复制长 memory", "marker 外的 host-owned 内容只读"]],
+              ["Skills", ["可用时注册 native skill pointer", "否则手动读取 core skills"]],
+              ["Verify", ["host 能找到 .mnemon", "reinstall 原地更新 marker"]]
             ]
           },
           hermes: {
-            buttonTitle: "Hermes",
-            buttonSubtitle: "native skills + hooks + cron",
-            title: "Hermes",
-            summary: "能力最完整的参考 host：native skills、hooks、curator 和 cron 都可承载 Mnemon projection，但 .mnemon 仍是 canonical root。",
+            buttonTitle: "L2 Hooks",
+            buttonSubtitle: "recall / observe / reflect",
+            title: "L2 Hooks",
+            summary: "Host 可以调用 lifecycle 或 tool hooks。将 recall、observe、reflect 绑定到原生事件，同时保留 proposal-first 写入策略。",
             columns: [
-              ["Instruction", ["Hermes context pointer", "bounded MEMORY/USER pattern informs Prompt Memory", "native import 默认 protected"]],
-              ["Skills", ["~/.hermes/skills native_import_or_symlink", "SKILL.md frontmatter validation", "usage sidecar stays in .mnemon"]],
-              ["Maintenance", ["post-turn review maps to reflect", "curator maps to L3 maintenance", "cron maps to runner tick semantics"]]
+              ["Recall", ["session_start", "user_prompt", "pre_model_call"]],
+              ["Observe", ["pre_tool_call", "post_tool_call", "approval_result"]],
+              ["Reflect", ["turn_delivered", "stop", "session_end"]]
             ]
           },
           generic: {
-            buttonTitle: "Generic",
-            buttonSubtitle: "Markdown-only fallback",
-            title: "Generic Agent",
-            summary: "最低可用路径：只要能读 Markdown，就能通过 INSTALL.md 和 GUIDELINE.md 手动安装 L0/L1。",
+            buttonTitle: "L3 Maintenance",
+            buttonSubtitle: "curate / dreaming",
+            title: "L3 Maintenance",
+            summary: "Host 有 idle/scheduled execution 或外部 scheduler。Curate 和 dreaming 在前台工作之外运行。",
             columns: [
-              ["Instruction", [".agent-instructions.md or README pointer", "无自动 mutation", "需要 manual review"]],
-              ["Skills", ["手动读取 .mnemon/skills/core", "reports/proposals only", "不假设 native skill system"]],
-              ["Fallback", ["manual recall", "manual reflect", "manual curate", "native-only install 可以作为 L0 fallback"]]
+              ["Curate", ["manual_review", "idle_tick", "scheduled_tick"]],
+              ["Dreaming", ["compact", "extract", "promote/demote proposals"]],
+              ["Safety", ["lease + budget", "默认 dry-run", "apply 前先 report"]]
             ]
           }
         },
@@ -2700,7 +2701,7 @@
         },
         levels: [
           { number: "L0", title: "Skill-only", body: "只读 Markdown 和手动调用。可以安装 guideline 与 manual reflect/curate。", accent: "var(--cyan)" },
-          { number: "L1", title: "Instruction + Skill", body: "通过 CLAUDE.md、AGENTS.md 或 native skill index 发现 .mnemon。", accent: "var(--blue)" },
+          { number: "L1", title: "Instruction + Skill", body: "通过 host instruction surface 或 native skill index 发现 .mnemon。", accent: "var(--blue)" },
           { number: "L2", title: "Lifecycle Hooks", body: "自动 recall、observe、reflect。写入能力受 allowlist 和 host permission 限制。", accent: "var(--green)" },
           { number: "L3", title: "Scheduled / Idle", body: "curator、dreaming、index jobs 可由 host scheduler、cron 或 runner tick 执行。", accent: "var(--orange)" },
           { number: "L4", title: "Eval / CI", body: "高风险修改走 constraints、dataset、PR proposal 和 human approval。", accent: "var(--red)" }
@@ -2716,13 +2717,13 @@
             pipelines: "Pipelines",
             memory: "Memory Loop",
             skills: "Skill Evolution",
-            projection: "Host Mounts",
+            projection: "Hook Mounts",
             levels: "Capability Levels"
           },
           hero: {
             eyebrow: "Agent-agnostic self-evolution harness",
             title: "A self-evolution exoskeleton without its own agent runtime",
-            lead: "Mnemon keeps canonical state in <strong>.mnemon</strong> and mounts it into Claude Code, Codex, Hermes, or generic agents through host projections. The host still owns the LLM loop, tools, permissions, and UI; the harness provides skills, memory, hooks, reports, governance, and an optional maintenance runner.",
+            lead: "Mnemon keeps canonical state in <strong>.mnemon</strong>. The host agent reads INSTALL.md, then mounts recall, observe, reflect, and curate into its own lifecycle. The host still owns the LLM loop, tools, permissions, and UI; the harness provides skills, memory, hooks, reports, governance, and an optional maintenance runner.",
             actions: {
               map: "Open Architecture Map",
               projection: "Inspect Mount Strategy",
@@ -2730,15 +2731,15 @@
             },
             visualAria: "Architecture summary",
             visualTitle: "Core Shape",
-            visualSubtitle: "canonical filesystem + host projection",
+            visualSubtitle: "canonical filesystem + hook mounting",
             cells: {
               mnemon: {
                 title: ".mnemon",
                 body: "The source of truth for memory, skills, state, reports, and runner jobs."
               },
               projection: {
-                title: "Host Projection",
-                body: "Managed blocks, pointers, symlinks/copies, and native imports."
+                title: "Hook Mounting",
+                body: "Instruction pointers, skill surfaces, hook bindings, and schedulers."
               },
               loop: {
                 title: "Self-Evolution Loop",
@@ -2770,8 +2771,8 @@
               flowAria: "Skill flow selector"
             },
             projection: {
-              title: "Host Projection Explorer",
-              body: ".mnemon is canonical; host-native files are projections. Choose a host to inspect install surfaces, mount modes, and fallbacks.",
+              title: "Hook Mount Explorer",
+              body: ".mnemon is canonical; the host agent mounts semantic hooks through instruction, skill, hook, and scheduler surfaces.",
               selectorAria: "Host projection selector"
             },
             levels: {
@@ -2805,13 +2806,13 @@
           },
           native: {
             kicker: "Host Native",
-            mapTitle: "CLAUDE.md / AGENTS.md / native skills",
-            summary: "Mounted through managed blocks or projections.",
+            mapTitle: "instruction / skills / hooks",
+            summary: "Mounted through pointers and semantic hook bindings.",
             title: "Host-Native Surfaces",
-            body: "CLAUDE.md, AGENTS.md, native skill folders, hook configs, and scheduler definitions are projection targets, not canonical state.",
-            owns: ["host instruction files", "native skill loader", "hook config"],
-            reads: [".mnemon pointers", "managed block", "generated skill projection"],
-            writes: ["only inside managed markers or projection targets"],
+            body: "Instruction files, skill registries, hook configs, and scheduler definitions are mounting surfaces, not canonical state.",
+            owns: ["instruction surface", "skill surface", "hook surface", "scheduler surface"],
+            reads: [".mnemon pointers", "managed block", "semantic hook binding"],
+            writes: ["only inside managed markers or binding targets"],
             risk: "Host-owned content outside markers is read-only by default."
           },
           mnemon: {
@@ -2928,19 +2929,19 @@
             kicker: "Projection State",
             mapTitle: "bindings / inventory / drift",
             summary: "Tracks mounts, checksums, and conflict reports.",
-            title: "Projection Metadata",
-            body: "Records how .mnemon is mounted into host-native surfaces. Tracks checksum, mode, target, and drift.",
+            title: "Hook Binding Metadata",
+            body: "Records how recall, observe, reflect, and curate are mounted into host-native surfaces. Tracks mode, target, trigger, and drift.",
             owns: ["bindings/active.json", "inventory.json", "projection reports"],
-            reads: ["host-native templates", "canonical source checksums"],
-            writes: ["managed blocks", "symlinks/copies", "drift reports"],
-            risk: "Projected copies are not canonical and should not be edited directly."
+            reads: ["host surfaces", "semantic hook contract"],
+            writes: ["managed pointers", "hook binding records", "drift reports"],
+            risk: "Bindings are descriptive; .mnemon remains canonical."
           },
           human: {
             kicker: "Human Gate",
             mapTitle: "approval / review / merge",
             summary: "High-risk changes require explicit human approval.",
             title: "Human Approval",
-            body: "Human review gates high-risk changes: guidelines, install maps, hooks, safety policy, user-created content, and eval constraints.",
+            body: "Human review gates high-risk changes: guidelines, hook mounting policy, hooks, safety policy, user-created content, and eval constraints.",
             owns: ["approval decisions", "merge decisions"],
             reads: ["reports", "diffs", "eval output"],
             writes: ["approved apply", "rejection", "manual override"],
@@ -2951,15 +2952,15 @@
           install: {
             chip: "Install",
             title: "Install & Mount",
-            body: "Detect the host, sense existing templates, create .mnemon, then project into host-native surfaces.",
+            body: "The host agent reads INSTALL.md, inventories its own instruction, skill, hook, and scheduler surfaces, then mounts semantic hooks.",
             nodes: ["host", "native", "mnemon", "projection", "human"],
             lines: ["line-host-native", "line-native-mnemon", "line-mnemon-projection", "line-projection-native", "line-human-host"],
             steps: [
-              ["Detect host", "Find CLAUDE.md, AGENTS.md, native skill directories, or Hermes config."],
+              ["Read contract", "Use INSTALL.md and harness.yaml as the install source."],
+              ["Inventory surfaces", "Find instruction, skill, hook, scheduler, and permission surfaces."],
               ["Create .mnemon", "Initialize canonical memory, skills, schemas, state, and reports."],
-              ["Plan projection", "Choose managed block, pointer, symlink/copy, or native import."],
-              ["Ask approval", "Write only marked blocks and generated projections."],
-              ["Record binding", "Store active projection and drift metadata."]
+              ["Bind hooks", "Map recall, observe, reflect, and curate to native hooks or manual skills."],
+              ["Record binding", "Store active hook mapping, write policy, and drift metadata."]
             ]
           },
           task: {
@@ -3042,61 +3043,61 @@
           },
           projection: {
             chip: "Projection",
-            title: "Projection Refresh",
-            body: "Canonical changes refresh host projections. Drift is reported before overwrite.",
+            title: "Binding Refresh",
+            body: "Canonical hook or skill changes refresh host bindings. Drift is reported before overwrite.",
             nodes: ["mnemon", "projection", "native", "host", "reports"],
             lines: ["line-mnemon-projection", "line-projection-native", "line-host-native", "line-runner-reports"],
             steps: [
-              ["Canonical changed", "Curator, install, or skill promotion updates .mnemon."],
-              ["Compute projection", "Use the active binding mode and checksum."],
+              ["Canonical changed", "Install, hook policy, curator, or skill promotion updates .mnemon."],
+              ["Compute binding", "Use the active hook mapping, pointer mode, and checksum."],
               ["Detect drift", "Manual edits in projected files become reports."],
-              ["Refresh", "Regenerate managed blocks or projected skill copies."]
+              ["Refresh", "Regenerate managed pointer, hook binding, or projected skill copy."]
             ]
           }
         },
         hosts: {
           claude: {
-            buttonTitle: "Claude Code",
-            buttonSubtitle: "CLAUDE.md + skills + hooks",
-            title: "Claude Code",
-            summary: "The strongest L2/L3 host: CLAUDE.md carries a short managed block, .claude/skills can symlink or copy .mnemon skills, and Stop/SessionEnd hooks can run reflection.",
+            buttonTitle: "L0 Manual",
+            buttonSubtitle: "Markdown + skills",
+            title: "L0 Manual",
+            summary: "Only Markdown is required. The agent reads GUIDELINE.md and core SKILL.md files manually; all durable changes are reports or proposals.",
             columns: [
-              ["Instruction", ["CLAUDE.md managed block", ".claude/CLAUDE.md pointer", "Do not copy long memory into instructions"]],
-              ["Skills", [".claude/skills symlink_or_copy", "core skills from .mnemon/skills/core", "generated skills activate only after promotion"]],
-              ["Hooks", ["SessionStart/UserPromptSubmit -> recall", "PreToolUse/PostToolUse -> observe", "Stop/SessionEnd -> reflect"]]
+              ["Instruction", ["read .mnemon/GUIDELINE.md", "follow INSTALL.md checklist", "no host config edits required"]],
+              ["Skills", ["manual recall", "manual reflect", "manual curate"]],
+              ["Fallback", ["proposal-only", "reports under .mnemon/reports", "no automatic mutation"]]
             ]
           },
           codex: {
-            buttonTitle: "Codex",
-            buttonSubtitle: "AGENTS.md + manual skills",
-            title: "Codex",
-            summary: "Primarily an L1 host: AGENTS.md is a good repository instruction and pointer surface. Without stable hooks, reflect and curate run through manual skills or queued jobs.",
+            buttonTitle: "L1 Instruction",
+            buttonSubtitle: "managed pointer",
+            title: "L1 Instruction",
+            summary: "The host has a persistent instruction surface. Install a short managed pointer to .mnemon; skills may still be manual.",
             columns: [
-              ["Instruction", ["AGENTS.md pointer block", "Keep project rules host-owned", "Managed marker records the .mnemon location"]],
-              ["Skills", ["docs/agent-skills pointer", "manual skill discovery", "proposal-first updates"]],
-              ["Fallback", ["manual recall", "manual reflect", "external cron or no runner by default"]]
+              ["Instruction", ["managed pointer block", "do not copy long memory", "host-owned content outside marker is read-only"]],
+              ["Skills", ["native skill pointer when available", "manual core skills otherwise"]],
+              ["Verify", ["host can find .mnemon", "reinstall updates marker in place"]]
             ]
           },
           hermes: {
-            buttonTitle: "Hermes",
-            buttonSubtitle: "native skills + hooks + cron",
-            title: "Hermes",
-            summary: "The fullest reference host: native skills, hooks, curator, and cron can all carry Mnemon projections, while .mnemon remains the canonical root.",
+            buttonTitle: "L2 Hooks",
+            buttonSubtitle: "recall / observe / reflect",
+            title: "L2 Hooks",
+            summary: "The host can call lifecycle or tool hooks. Bind recall, observe, and reflect to native events while preserving proposal-first writes.",
             columns: [
-              ["Instruction", ["Hermes context pointer", "bounded MEMORY/USER pattern informs Prompt Memory", "native import is protected by default"]],
-              ["Skills", ["~/.hermes/skills native_import_or_symlink", "SKILL.md frontmatter validation", "usage sidecar stays in .mnemon"]],
-              ["Maintenance", ["post-turn review maps to reflect", "curator maps to L3 maintenance", "cron maps to runner tick semantics"]]
+              ["Recall", ["session_start", "user_prompt", "pre_model_call"]],
+              ["Observe", ["pre_tool_call", "post_tool_call", "approval_result"]],
+              ["Reflect", ["turn_delivered", "stop", "session_end"]]
             ]
           },
           generic: {
-            buttonTitle: "Generic",
-            buttonSubtitle: "Markdown-only fallback",
-            title: "Generic Agent",
-            summary: "The lowest viable path: any agent that can read Markdown can manually install L0/L1 through INSTALL.md and GUIDELINE.md.",
+            buttonTitle: "L3 Maintenance",
+            buttonSubtitle: "curate / dreaming",
+            title: "L3 Maintenance",
+            summary: "The host has idle/scheduled execution or an external scheduler. Curate and dreaming run outside foreground work.",
             columns: [
-              ["Instruction", [".agent-instructions.md or README pointer", "No automatic mutation", "Manual review required"]],
-              ["Skills", ["read .mnemon/skills/core manually", "reports/proposals only", "no native skill assumption"]],
-              ["Fallback", ["manual recall", "manual reflect", "manual curate", "native-only install is allowed as an L0 fallback"]]
+              ["Curate", ["manual_review", "idle_tick", "scheduled_tick"]],
+              ["Dreaming", ["compact", "extract", "promote/demote proposals"]],
+              ["Safety", ["lease + budget", "dry-run default", "reports before apply"]]
             ]
           }
         },
@@ -3384,7 +3385,7 @@
         },
         levels: [
           { number: "L0", title: "Skill-only", body: "Read-only Markdown and manual invocation. Installs guidelines plus manual reflect/curate.", accent: "var(--cyan)" },
-          { number: "L1", title: "Instruction + Skill", body: "Discover .mnemon through CLAUDE.md, AGENTS.md, or a native skill index.", accent: "var(--blue)" },
+          { number: "L1", title: "Instruction + Skill", body: "Discover .mnemon through a host instruction surface or native skill index.", accent: "var(--blue)" },
           { number: "L2", title: "Lifecycle Hooks", body: "Automatic recall, observe, and reflect. Writes are limited by allowlists and host permissions.", accent: "var(--green)" },
           { number: "L3", title: "Scheduled / Idle", body: "Curator, dreaming, and index jobs run through host scheduler, cron, or runner tick.", accent: "var(--orange)" },
           { number: "L4", title: "Eval / CI", body: "High-risk changes go through constraints, datasets, PR proposals, and human approval.", accent: "var(--red)" }
