@@ -26,6 +26,7 @@ turn_delivered
 5. **Provenance 是安全边界。** 自动治理只能处理明确 self-authored / agent-created 的资产。
 6. **Curator 必须 dry-run/report/backup/archive-first。** 高风险演化必须走 eval 和 PR gate。
 7. **这是 harness framework，不是 agent framework。** 安装目标是 Claude Code、Codex、Cursor、Continue、Hermes、OpenClaw 或任意 generic agent；harness 不拥有 agent loop，只绑定 host lifecycle。
+8. **Harness 需要自己的 canonical filesystem。** 默认放在 repo-local `.mnemon/`；host 原生文件应是 projection/binding，而不是唯一 source of truth。
 
 ## 0. Harness Framework, Not Agent Framework
 
@@ -43,9 +44,11 @@ turn_delivered
 Harness 的交付物应是：
 
 ```text
-self-evolution-harness/
+.mnemon/
   INSTALL.md          # host agent 如何安装本 harness
   GUIDELINE.md        # 安装后的记忆与自进化行为准则
+  fs.yaml             # canonical filesystem 与 projection policy
+  bindings/           # active host bindings 与 projection metadata
   skills/             # recall / observe / reflect / curate / research
   hooks/              # 四阶段语义 hook 的脚本或 prompt 模板
   memory/             # hot / warm / cold 的文件布局
@@ -74,15 +77,17 @@ self-evolution-harness/
 
 因此，harness 的核心不是“写一个万能 adapter”，而是定义一份 host agent 能读懂的安装契约和一套可降级的语义能力。
 
-No-runtime guarantee：
+No mandatory agent runtime guarantee：
 
 ```text
-Harness 不运行常驻进程。
+Harness core 不要求常驻进程。
 Harness 不持有 agent state。
 Harness 不拦截 LLM 调用。
 Harness 不实现 hook bus、prompt assembler、scheduler、tool router、reflection executor。
-Harness 只贡献文件布局、Markdown 资产、JSON schema、prompt 模板和可由 host 调用的脚本。
+Harness 只贡献 `.mnemon` 文件布局、Markdown 资产、JSON schema、prompt 模板和可由 host 调用的脚本。
 所有执行都发生在 host agent 或 host 平台中。
+Harness 可以提供可选 maintenance runner，但它只能执行 curator/dreaming/index/eval/post-turn review 等维护 job，不能接管 host agent loop。
+Host 原生模板通过 managed block、pointer、symlink/copy projection 或 import report 挂载 `.mnemon`。
 ```
 
 ## 调研范围
@@ -120,7 +125,7 @@ evolution/core/constraints.py
 
 社区/生态参考包括 Hermes 官方文档、Claude Code memory/skills/hooks、OpenAI Codex AGENTS.md、Cursor rules、Continue rules、OpenClaw skills/dreaming、MemGPT/Letta 记忆分层。公开文档与源码有少量漂移；涉及 Hermes 行为时，本文以本地源码为准。
 
-Claude Code 也参与了多轮只读审阅。它的主要建议已合入本文：把 Hermes 的 after-turn reflection 主链路前置；把方案从 runtime object 改成 artifacts、schemas、prompt templates、hook scripts 和 install maps；把 INSTALL/GUIDELINE、hot/warm/cold、dry-run 权限、no-runtime guarantee 和源码数字锚点补齐。
+Claude Code 也参与了多轮只读审阅。它的主要建议已合入本文：把 Hermes 的 after-turn reflection 主链路前置；把方案从 runtime object 改成 artifacts、schemas、prompt templates、hook scripts 和 install maps；把 INSTALL/GUIDELINE、hot/warm/cold、dry-run 权限、no mandatory agent runtime 边界和源码数字锚点补齐。
 
 ## 1. 自进化是系统工程
 
