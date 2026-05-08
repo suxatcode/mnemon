@@ -1,0 +1,1497 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mnemon Self-Evolution Harness Architecture</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --ink: #16181d;
+      --muted: #5e6573;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --panel-2: #f0f4f8;
+      --cyan: #0e9f9b;
+      --blue: #3468c0;
+      --green: #3a8f53;
+      --orange: #d26a2c;
+      --red: #c84f55;
+      --violet: #7357c7;
+      --gold: #a98218;
+      --shadow: 0 18px 45px rgba(29, 38, 54, 0.12);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(247, 248, 251, 0.88);
+      border-bottom: 1px solid rgba(217, 222, 232, 0.9);
+    }
+
+    .topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 64px;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 220px;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border: 2px solid var(--ink);
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: var(--panel);
+    }
+
+    .brand-mark svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .nav a {
+      text-decoration: none;
+      color: var(--muted);
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .nav a:hover {
+      color: var(--ink);
+      background: var(--panel-2);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+      gap: 28px;
+      align-items: stretch;
+      padding: 34px 0 24px;
+    }
+
+    .hero-copy {
+      padding: 22px 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--cyan);
+      font-size: 13px;
+      font-weight: 740;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 14px;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: var(--cyan);
+      border-radius: 50%;
+    }
+
+    h1 {
+      font-size: clamp(34px, 5vw, 76px);
+      line-height: 0.98;
+      letter-spacing: 0;
+      margin: 0 0 18px;
+      max-width: 920px;
+    }
+
+    .lead {
+      color: var(--muted);
+      font-size: clamp(16px, 1.6vw, 20px);
+      max-width: 760px;
+      margin: 0 0 22px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .action {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 9px 13px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      text-decoration: none;
+      background: var(--panel);
+      color: var(--ink);
+      font-weight: 670;
+      box-shadow: 0 8px 20px rgba(29, 38, 54, 0.06);
+    }
+
+    .action.primary {
+      background: var(--ink);
+      color: white;
+      border-color: var(--ink);
+    }
+
+    .hero-visual {
+      min-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+    }
+
+    .mini-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .mini-title strong {
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .mini-stack {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .mini-cell {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 12px;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: #fbfcfe;
+    }
+
+    .mini-cell.wide {
+      grid-column: span 2;
+      min-height: 120px;
+    }
+
+    .mini-cell h3 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .mini-cell p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mini-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: white;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 620;
+    }
+
+    .tag.cyan { color: var(--cyan); border-color: rgba(14, 159, 155, 0.35); }
+    .tag.blue { color: var(--blue); border-color: rgba(52, 104, 192, 0.34); }
+    .tag.green { color: var(--green); border-color: rgba(58, 143, 83, 0.34); }
+    .tag.orange { color: var(--orange); border-color: rgba(210, 106, 44, 0.34); }
+    .tag.violet { color: var(--violet); border-color: rgba(115, 87, 199, 0.34); }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 30px rgba(29, 38, 54, 0.06);
+      margin: 18px 0;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(22px, 2.4vw, 34px);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .section-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .chip {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 7px;
+      padding: 7px 10px;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 690;
+      font-size: 13px;
+    }
+
+    .chip:hover,
+    .chip.active {
+      color: var(--ink);
+      border-color: var(--ink);
+      background: #f8fbff;
+    }
+
+    .map-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 0;
+    }
+
+    .map-wrap {
+      padding: 18px;
+      border-right: 1px solid var(--line);
+      min-width: 0;
+    }
+
+    .map-canvas {
+      position: relative;
+      min-height: 680px;
+      border-radius: 7px;
+      background:
+        linear-gradient(rgba(22, 24, 29, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(22, 24, 29, 0.04) 1px, transparent 1px),
+        #fbfcfe;
+      background-size: 28px 28px;
+      overflow: hidden;
+      border: 1px solid #e6ebf2;
+    }
+
+    .flow-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .flow-line {
+      fill: none;
+      stroke: #b7c1d1;
+      stroke-width: 4;
+      stroke-linecap: round;
+      opacity: 0.28;
+      transition: opacity 180ms ease, stroke 180ms ease, stroke-width 180ms ease;
+    }
+
+    .flow-line.active {
+      opacity: 0.95;
+      stroke-width: 6;
+    }
+
+    .flow-line.install { stroke: var(--cyan); }
+    .flow-line.task { stroke: var(--blue); }
+    .flow-line.observe { stroke: var(--green); }
+    .flow-line.reflect { stroke: var(--orange); }
+    .flow-line.maintenance { stroke: var(--violet); }
+    .flow-line.eval { stroke: var(--red); }
+    .flow-line.projection { stroke: var(--gold); }
+
+    .node {
+      position: absolute;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+      width: var(--w, 170px);
+      min-height: var(--h, 92px);
+      border: 1px solid #d6dce7;
+      border-left: 5px solid var(--accent, var(--blue));
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 8px;
+      padding: 11px 12px;
+      text-align: left;
+      color: var(--ink);
+      cursor: pointer;
+      box-shadow: 0 12px 24px rgba(29, 38, 54, 0.08);
+      transition: transform 170ms ease, box-shadow 170ms ease, border-color 170ms ease, opacity 170ms ease;
+    }
+
+    .node:hover,
+    .node.selected {
+      transform: translateY(-2px);
+      border-color: var(--ink);
+      box-shadow: 0 18px 35px rgba(29, 38, 54, 0.16);
+    }
+
+    .node.dim {
+      opacity: 0.42;
+    }
+
+    .node.active {
+      opacity: 1;
+      outline: 3px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+
+    .node .kicker {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 780;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .node strong {
+      font-size: 15px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .node span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .detail {
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .detail h3 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .detail p {
+      color: var(--muted);
+      margin: 9px 0 14px;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .detail-item {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+      background: #fbfcfe;
+    }
+
+    .detail-item b {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 5px;
+    }
+
+    .detail-item div,
+    .detail-item ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 14px;
+    }
+
+    .detail-item li + li {
+      margin-top: 4px;
+    }
+
+    .flow-summary {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .flow-summary h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .steps {
+      display: grid;
+      gap: 8px;
+      counter-reset: step;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 8px;
+      align-items: start;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: white;
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--ink);
+      color: white;
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .step strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .step span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfe;
+      padding: 15px;
+      min-width: 0;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .meter {
+      margin-top: 12px;
+      height: 10px;
+      background: #e6ebf2;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .meter span {
+      display: block;
+      height: 100%;
+      width: var(--value, 50%);
+      background: var(--accent, var(--blue));
+      border-radius: inherit;
+    }
+
+    .pipeline {
+      display: grid;
+      gap: 10px;
+      padding: 18px;
+    }
+
+    .pipeline-row {
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr) 180px;
+      gap: 12px;
+      align-items: stretch;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfe;
+      padding: 12px;
+    }
+
+    .pipeline-row h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .pipeline-track {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .pill {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      background: white;
+      border-radius: 999px;
+      padding: 6px 9px;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      font-weight: 640;
+    }
+
+    .arrow {
+      color: #9aa5b6;
+      flex: 0 0 auto;
+    }
+
+    .pipeline-row button {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: white;
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .levels {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+      padding: 18px;
+      overflow-x: auto;
+    }
+
+    .level {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: white;
+      padding: 14px;
+      min-height: 178px;
+    }
+
+    .level .number {
+      display: inline-grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 7px;
+      background: var(--accent, var(--blue));
+      color: white;
+      font-weight: 780;
+      margin-bottom: 12px;
+    }
+
+    .level h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+
+    .level p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .projection-layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .host-list {
+      border-right: 1px solid var(--line);
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .host-button {
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+      border-radius: 7px;
+      padding: 10px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .host-button.active,
+    .host-button:hover {
+      border-color: var(--ink);
+      background: white;
+    }
+
+    .host-button strong {
+      display: block;
+    }
+
+    .host-button span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .projection-detail {
+      padding: 18px;
+    }
+
+    .projection-columns {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .mini-list {
+      margin: 10px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 7px;
+    }
+
+    .mini-list li {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px;
+      background: white;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .footer {
+      padding: 28px 0 42px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1120px) {
+      .hero,
+      .map-layout,
+      .projection-layout,
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .map-wrap,
+      .host-list {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .map-canvas {
+        min-height: 820px;
+      }
+
+      .node {
+        width: min(var(--w, 170px), 42vw);
+      }
+
+      .projection-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: min(100vw - 20px, 1440px);
+      }
+
+      .topbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 10px 0;
+      }
+
+      .hero {
+        padding-top: 18px;
+      }
+
+      .section-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .pipeline-row {
+        grid-template-columns: 1fr;
+      }
+
+      .mini-stack {
+        grid-template-columns: 1fr;
+      }
+
+      .mini-cell.wide {
+        grid-column: auto;
+      }
+
+      .map-canvas {
+        min-height: 980px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M5 12h14M12 5v14M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span>Mnemon Harness Map</span>
+      </div>
+      <nav class="nav" aria-label="Page sections">
+        <a href="#map">架构地图</a>
+        <a href="#pipelines">管道</a>
+        <a href="#memory">记忆流</a>
+        <a href="#projection">Host 挂载</a>
+        <a href="#levels">能力等级</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">Agent-agnostic self-evolution harness</div>
+        <h1>一个没有自有 agent runtime 的自进化外骨骼</h1>
+        <p class="lead">
+          Mnemon 把 canonical state 放在 <strong>.mnemon</strong>，通过 host projection 挂载到 Claude Code、Codex、Hermes 或 generic agent。Host 仍拥有 LLM loop、工具、权限和 UI；harness 只提供技能、记忆、hook、报告、治理和可选 maintenance runner。
+        </p>
+        <div class="hero-actions">
+          <a class="action primary" href="#map">查看交互架构</a>
+          <a class="action" href="#projection">查看挂载策略</a>
+          <a class="action" href="#pipelines">查看自进化路径</a>
+        </div>
+      </div>
+      <aside class="hero-visual" aria-label="Architecture summary">
+        <div class="mini-title">
+          <strong>核心形态</strong>
+          <span>canonical filesystem + host projection</span>
+        </div>
+        <div class="mini-stack">
+          <div class="mini-cell" style="border-left: 5px solid var(--cyan)">
+            <div>
+              <h3>.mnemon</h3>
+              <p>memory、skills、state、reports、runner jobs 的 source of truth。</p>
+            </div>
+            <div class="mini-tags">
+              <span class="tag cyan">canonical</span>
+              <span class="tag blue">diffable</span>
+            </div>
+          </div>
+          <div class="mini-cell" style="border-left: 5px solid var(--gold)">
+            <div>
+              <h3>Host Projection</h3>
+              <p>managed block、pointer、symlink/copy、native import。</p>
+            </div>
+            <div class="mini-tags">
+              <span class="tag orange">mount</span>
+              <span class="tag green">safe drift</span>
+            </div>
+          </div>
+          <div class="mini-cell wide" style="border-left: 5px solid var(--violet)">
+            <div>
+              <h3>Self-Evolution Loop</h3>
+              <p>任务完成后反思，沉淀 skill/memory proposal；curator 和 dreaming 在维护路径上治理增长；eval gate 处理高风险修改。</p>
+            </div>
+            <div class="mini-tags">
+              <span class="tag violet">reflect</span>
+              <span class="tag green">curate</span>
+              <span class="tag orange">dream</span>
+              <span class="tag blue">eval</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section id="map" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>交互架构地图</h2>
+          <p>点击管道高亮能力流；点击节点查看职责、读写边界和风险控制。</p>
+        </div>
+        <div class="toolbar" role="tablist" aria-label="Flow selector">
+          <button class="chip active" data-flow="install" type="button">Install</button>
+          <button class="chip" data-flow="task" type="button">Recall</button>
+          <button class="chip" data-flow="observe" type="button">Observe</button>
+          <button class="chip" data-flow="reflect" type="button">Reflect</button>
+          <button class="chip" data-flow="maintenance" type="button">Curate/Dream</button>
+          <button class="chip" data-flow="eval" type="button">Eval</button>
+          <button class="chip" data-flow="projection" type="button">Projection</button>
+        </div>
+      </div>
+      <div class="map-layout">
+        <div class="map-wrap">
+          <div class="map-canvas" aria-label="Mnemon architecture nodes">
+            <svg class="flow-svg" viewBox="0 0 1200 680" preserveAspectRatio="none" aria-hidden="true">
+              <path id="line-host-native" class="flow-line install projection" d="M155 118 C245 118 252 212 345 212" />
+              <path id="line-native-mnemon" class="flow-line install projection" d="M505 212 C610 212 630 320 745 320" />
+              <path id="line-mnemon-projection" class="flow-line install projection" d="M745 370 C650 450 455 450 355 410" />
+              <path id="line-projection-native" class="flow-line install projection" d="M345 395 C260 350 240 240 345 224" />
+              <path id="line-host-hooks" class="flow-line task observe reflect maintenance" d="M155 146 C220 210 230 300 330 300" />
+              <path id="line-hooks-skills" class="flow-line task observe reflect maintenance" d="M492 300 C555 295 575 205 642 205" />
+              <path id="line-skills-hot" class="flow-line task reflect" d="M800 205 C886 200 920 145 1010 145" />
+              <path id="line-skills-sidecar" class="flow-line observe reflect maintenance" d="M805 228 C900 270 918 330 1012 346" />
+              <path id="line-hot-warm" class="flow-line reflect maintenance" d="M1040 190 C1040 250 1040 275 1040 315" />
+              <path id="line-warm-cold" class="flow-line observe maintenance" d="M1040 410 C1040 456 1040 488 1040 535" />
+              <path id="line-sidecar-runner" class="flow-line maintenance" d="M1012 362 C910 370 888 510 762 510" />
+              <path id="line-runner-reports" class="flow-line maintenance eval" d="M646 535 C556 610 470 610 365 555" />
+              <path id="line-runner-skills" class="flow-line maintenance" d="M652 505 C610 400 650 310 705 252" />
+              <path id="line-eval-reports" class="flow-line eval" d="M205 552 C250 600 305 600 365 555" />
+              <path id="line-reports-human" class="flow-line reflect maintenance eval" d="M365 535 C315 465 220 455 158 410" />
+              <path id="line-human-host" class="flow-line install eval" d="M155 375 C115 300 105 220 125 160" />
+            </svg>
+
+            <button class="node" data-node="host" style="--accent: var(--blue); left: 3%; top: 8%; --w: 180px;">
+              <span class="kicker">Host Agent</span>
+              <strong>LLM loop / tools / UI</strong>
+              <span>拥有 runtime、权限和用户会话。</span>
+            </button>
+
+            <button class="node" data-node="native" style="--accent: var(--gold); left: 28%; top: 25%; --w: 190px;">
+              <span class="kicker">Host Native</span>
+              <strong>CLAUDE.md / AGENTS.md / native skills</strong>
+              <span>通过 managed block 或 projection 挂载。</span>
+            </button>
+
+            <button class="node" data-node="hooks" style="--accent: var(--green); left: 27%; top: 41%; --w: 185px;">
+              <span class="kicker">Semantic Hooks</span>
+              <strong>recall / observe / reflect / curate</strong>
+              <span>由 host lifecycle 触发，失败可降级。</span>
+            </button>
+
+            <button class="node" data-node="skills" style="--accent: var(--orange); left: 55%; top: 22%; --w: 185px;">
+              <span class="kicker">Skill Pack</span>
+              <strong>install / recall / reflect / curate</strong>
+              <span>行为资产和自进化操作面。</span>
+            </button>
+
+            <button class="node" data-node="mnemon" style="--accent: var(--cyan); left: 61%; top: 42%; --w: 205px;">
+              <span class="kicker">Canonical FS</span>
+              <strong>.mnemon</strong>
+              <span>memory、skills、state、reports 的 source of truth。</span>
+            </button>
+
+            <button class="node" data-node="projection" style="--accent: var(--gold); left: 24%; top: 57%; --w: 190px;">
+              <span class="kicker">Projection State</span>
+              <strong>bindings / inventory / drift</strong>
+              <span>记录挂载、校验和冲突报告。</span>
+            </button>
+
+            <button class="node" data-node="human" style="--accent: var(--red); left: 3%; top: 52%; --w: 180px;">
+              <span class="kicker">Human Gate</span>
+              <strong>approval / review / merge</strong>
+              <span>高风险变化必须人工确认。</span>
+            </button>
+
+            <button class="node" data-node="eval" style="--accent: var(--red); left: 4%; top: 76%; --w: 185px;">
+              <span class="kicker">Eval Gate</span>
+              <strong>constraints / tests / PR</strong>
+              <span>prompt、hook、guideline 进入 PR 式评估。</span>
+            </button>
+
+            <button class="node" data-node="reports" style="--accent: var(--violet); left: 29%; top: 76%; --w: 190px;">
+              <span class="kicker">Reports</span>
+              <strong>install / reflection / curator / dreaming</strong>
+              <span>所有 durable change 的审计面。</span>
+            </button>
+
+            <button class="node" data-node="runner" style="--accent: var(--violet); left: 55%; top: 72%; --w: 190px;">
+              <span class="kicker">Optional Runner</span>
+              <strong>cron + lease + ledger</strong>
+              <span>只跑维护 jobs，不接管 agent loop。</span>
+            </button>
+
+            <button class="node" data-node="hot" style="--accent: var(--blue); left: 84%; top: 12%; --w: 170px;">
+              <span class="kicker">Hot Memory</span>
+              <strong>MEMORY / USER / project</strong>
+              <span>短、稳定、直接进模型。</span>
+            </button>
+
+            <button class="node" data-node="sidecar" style="--accent: var(--green); left: 84%; top: 41%; --w: 170px;">
+              <span class="kicker">Sidecar</span>
+              <strong>usage / pins / lineage</strong>
+              <span>治理元数据，不污染 Markdown。</span>
+            </button>
+
+            <button class="node" data-node="warm" style="--accent: var(--orange); left: 84%; top: 56%; --w: 170px;">
+              <span class="kicker">Warm Memory</span>
+              <strong>topics / sessions / candidates</strong>
+              <span>整理后的中间层。</span>
+            </button>
+
+            <button class="node" data-node="cold" style="--accent: var(--cyan); left: 84%; top: 76%; --w: 170px;">
+              <span class="kicker">Cold Memory</span>
+              <strong>evidence / transcripts / index</strong>
+              <span>高容量证据层，不直接注入。</span>
+            </button>
+          </div>
+        </div>
+        <aside class="detail" aria-live="polite">
+          <h3 id="detail-title">Install & Mount</h3>
+          <p id="detail-body">安装阶段探测 host 模板，创建 .mnemon canonical filesystem，再用 managed block、pointer、symlink/copy 或 hook config 挂载到 host。</p>
+          <div class="detail-grid" id="detail-grid"></div>
+          <div class="flow-summary">
+            <h4 id="flow-title">当前管道</h4>
+            <div class="steps" id="flow-steps"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="pipelines" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>能力管道与自进化路径</h2>
+          <p>每条管道都可以被 host hook、manual skill、external cron 或 optional runner 触发；能力强弱取决于 host 可安装等级。</p>
+        </div>
+      </div>
+      <div class="pipeline" id="pipeline-list"></div>
+    </section>
+
+    <section id="memory" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>Memory / Skill 分层</h2>
+          <p>模型直接消费 hot；工程层治理 warm/cold；流程性知识沉淀成 skill，而不是塞进 memory。</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        <article class="card" style="--accent: var(--blue)">
+          <h3>Hot</h3>
+          <p>短预算、稳定事实和偏好。Recall 命中也必须过相关性阈值，否则返回 NONE。</p>
+          <div class="meter" aria-label="Hot budget"><span style="--value: 28%; --accent: var(--blue)"></span></div>
+        </article>
+        <article class="card" style="--accent: var(--orange)">
+          <h3>Warm</h3>
+          <p>topic/session/candidate capsule。支持 promotion/demotion，不直接整段注入 prompt。</p>
+          <div class="meter" aria-label="Warm budget"><span style="--value: 58%; --accent: var(--orange)"></span></div>
+        </article>
+        <article class="card" style="--accent: var(--cyan)">
+          <h3>Cold</h3>
+          <p>证据、transcripts、imports、archive、index。可以用 filesystem、FTS、vector index 实现。</p>
+          <div class="meter" aria-label="Cold budget"><span style="--value: 92%; --accent: var(--cyan)"></span></div>
+        </article>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <h3>Promotion</h3>
+          <p>重复修正、稳定事实、反复成功流程、curator/dreaming 证据充分时，生成 promotion proposal。事实进 hot memory；流程进 skill。</p>
+          <ul class="mini-list">
+            <li>cold evidence -> warm candidate</li>
+            <li>warm candidate -> hot fact proposal</li>
+            <li>workflow pattern -> skill patch/create proposal</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Demotion</h3>
+          <p>Hot 超预算、内容过细、过时或程序性太强时，生成 demotion proposal。默认 archive over delete。</p>
+          <ul class="mini-list">
+            <li>hot detail -> warm topic capsule</li>
+            <li>stale generated skill -> archive report</li>
+            <li>conflict -> human review / eval gate</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="projection" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>Host Projection Explorer</h2>
+          <p>.mnemon 是 canonical；host 原生文件是投影。选择 host 查看安装面、挂载方式和 fallback。</p>
+        </div>
+      </div>
+      <div class="projection-layout">
+        <div class="host-list" role="tablist" aria-label="Host projection selector">
+          <button class="host-button active" type="button" data-host="claude"><strong>Claude Code</strong><span>CLAUDE.md + skills + hooks</span></button>
+          <button class="host-button" type="button" data-host="codex"><strong>Codex</strong><span>AGENTS.md + manual skills</span></button>
+          <button class="host-button" type="button" data-host="hermes"><strong>Hermes</strong><span>native skills + hooks + cron</span></button>
+          <button class="host-button" type="button" data-host="generic"><strong>Generic</strong><span>Markdown-only fallback</span></button>
+        </div>
+        <div class="projection-detail">
+          <h3 id="host-title">Claude Code</h3>
+          <p id="host-summary"></p>
+          <div class="projection-columns" id="host-columns"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="levels" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>能力等级</h2>
+          <p>Harness 不能假设 host 能力。安装器应探测 host 后选择最高可安全安装等级。</p>
+        </div>
+      </div>
+      <div class="levels">
+        <article class="level" style="--accent: var(--cyan)">
+          <span class="number">L0</span>
+          <h3>Skill-only</h3>
+          <p>只读 Markdown 和手动调用。可以安装 guideline 与 manual reflect/curate。</p>
+        </article>
+        <article class="level" style="--accent: var(--blue)">
+          <span class="number">L1</span>
+          <h3>Instruction + Skill</h3>
+          <p>通过 CLAUDE.md、AGENTS.md 或 native skill index 发现 .mnemon。</p>
+        </article>
+        <article class="level" style="--accent: var(--green)">
+          <span class="number">L2</span>
+          <h3>Lifecycle Hooks</h3>
+          <p>自动 recall、observe、reflect。写入能力受 allowlist 和 host permission 限制。</p>
+        </article>
+        <article class="level" style="--accent: var(--orange)">
+          <span class="number">L3</span>
+          <h3>Scheduled / Idle</h3>
+          <p>curator、dreaming、index jobs 可由 host scheduler、cron 或 runner tick 执行。</p>
+        </article>
+        <article class="level" style="--accent: var(--red)">
+          <span class="number">L4</span>
+          <h3>Eval / CI</h3>
+          <p>高风险修改走 constraints、dataset、PR proposal 和 human approval。</p>
+        </article>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Source docs: docs/design/self-evolution-harness. This page is a standalone visualization of the current design.</p>
+    </footer>
+  </main>
+
+  <script>
+    const nodes = {
+      host: {
+        title: "Host Agent",
+        body: "Host owns LLM loop, prompt assembly, tools, permissions, UI and live conversation state. Harness never intercepts those surfaces.",
+        owns: ["LLM call", "tool routing", "permission model", "session lifecycle"],
+        reads: ["managed block", ".mnemon guideline", "recall output"],
+        writes: ["host-native config only after approval"],
+        risk: "Harness must not become a prompt assembler or tool router."
+      },
+      native: {
+        title: "Host Native Surfaces",
+        body: "CLAUDE.md, AGENTS.md, native skill folders, hook configs and scheduler definitions are projection targets, not canonical state.",
+        owns: ["host instruction files", "native skill loader", "hook config"],
+        reads: [".mnemon pointers", "managed block", "generated skill projection"],
+        writes: ["only inside managed markers or projection targets"],
+        risk: "Host-owned content outside markers is read-only by default."
+      },
+      mnemon: {
+        title: ".mnemon Canonical Filesystem",
+        body: "Canonical source of truth for memory, skills, schemas, reports, state, projection metadata and optional runner jobs.",
+        owns: ["memory", "skills", "state", "reports", "bindings", "runner jobs"],
+        reads: ["host inventory", "evidence", "usage sidecar"],
+        writes: ["canonical files with reports and provenance"],
+        risk: "Canonical files are durable; projected copies are regenerable."
+      },
+      hooks: {
+        title: "Semantic Hooks",
+        body: "Host lifecycle events map to recall, observe, reflect and curate. Hooks have idempotency keys, latency budgets and proposal-only fallback.",
+        owns: ["hook templates", "hook IO schema", "fallback rules"],
+        reads: ["event payload", "current cwd", "budgets"],
+        writes: ["bounded outputs", "reports", "cold evidence if allowed"],
+        risk: "If host cannot enforce write target allowlists, hook mutations become proposal-only."
+      },
+      skills: {
+        title: "Skill Pack",
+        body: "Skills are behavior assets. They encode reusable procedures and operational knowledge; facts and preferences stay in memory.",
+        owns: ["install", "recall", "observe", "reflect", "curate", "research"],
+        reads: ["guideline", "memory", "reports", "usage sidecar"],
+        writes: ["skill proposals", "skill patches", "reports"],
+        risk: "Patch existing class-level skills before creating new ones."
+      },
+      hot: {
+        title: "Hot Memory",
+        body: "Small model-facing memory: MEMORY.md, USER.md and project.md. Current user request always wins over memory.",
+        owns: ["stable facts", "preferences", "short project context"],
+        reads: ["promotion proposals", "user confirmations"],
+        writes: ["budgeted hot entries"],
+        risk: "Hot memory is not a transcript cache; overflow creates demotion proposals."
+      },
+      warm: {
+        title: "Warm Memory",
+        body: "Curated middle layer: topics, session capsules and candidates. Recalled only through summary.",
+        owns: ["topic capsules", "session summaries", "promotion candidates"],
+        reads: ["cold evidence", "reflection reports"],
+        writes: ["summaries", "candidates", "demotion targets"],
+        risk: "Warm content can be large, but must be summarized before injection."
+      },
+      cold: {
+        title: "Cold Memory",
+        body: "High-capacity evidence layer: transcripts, imports, archive and index. It is searchable but not directly injected.",
+        owns: ["raw evidence", "transcripts", "archive", "indexes"],
+        reads: ["observe hook", "imports", "tool results"],
+        writes: ["evidence files", "index metadata"],
+        risk: "Raw transcripts never become prompt context without summarization and relevance gate."
+      },
+      sidecar: {
+        title: "Usage / Provenance Sidecar",
+        body: "Engineering metadata for governance: created_by, provenance, pinned, state, lineage, use counts and patch counts.",
+        owns: ["usage.json", "pins.json", "lineage.json"],
+        reads: ["skill usage", "projection state", "curator reports"],
+        writes: ["state transitions", "quarantine/active/archive states"],
+        risk: "Model-facing Markdown should not be polluted with governance metadata."
+      },
+      runner: {
+        title: "Optional Maintenance Runner",
+        body: "A bounded maintenance executor. It is cron + lease + ledger, not an agent loop.",
+        owns: ["runner jobs", "leases", "budgets", "ledger"],
+        reads: ["state", "reports", "warm/cold memory", "usage sidecar"],
+        writes: ["reports", "proposals", "allowlisted low-risk patches"],
+        risk: "One job step maps to one scoped LLM call and one schema-validated response."
+      },
+      reports: {
+        title: "Reports",
+        body: "Human-readable audit surface for install, reflection, curator, dreaming, projection drift and eval proposals.",
+        owns: ["install reports", "reflection reports", "curator reports", "dreaming reports", "projection reports"],
+        reads: ["all proposed or applied durable changes"],
+        writes: ["Markdown reports", "machine-readable metadata"],
+        risk: "Durable changes without reports are architecture violations."
+      },
+      eval: {
+        title: "Eval Gate",
+        body: "Higher-risk changes are evaluated through constraints, held-out tasks, regression checks and PR-style proposals.",
+        owns: ["constraints", "datasets", "PR templates"],
+        reads: ["candidate changes", "reports", "schemas"],
+        writes: ["eval reports", "PR proposals"],
+        risk: "Eval constraints are protected and cannot be self-weakened."
+      },
+      projection: {
+        title: "Projection Metadata",
+        body: "Records how .mnemon is mounted into host-native surfaces. Tracks checksum, mode, target and drift.",
+        owns: ["bindings/active.json", "inventory.json", "projection reports"],
+        reads: ["host-native templates", "canonical source checksums"],
+        writes: ["managed blocks", "symlinks/copies", "drift reports"],
+        risk: "Projected copies are not canonical and should not be edited directly."
+      },
+      human: {
+        title: "Human Approval",
+        body: "Human review gates high-risk changes: guideline, install maps, hooks, safety policy, user-created content and eval constraints.",
+        owns: ["approval decisions", "merge decisions"],
+        reads: ["reports", "diffs", "eval output"],
+        writes: ["approved apply", "rejection", "manual override"],
+        risk: "Self-evolution must never rewrite its own safety boundary silently."
+      }
+    };
+
+    const flows = {
+      install: {
+        title: "Install & Mount",
+        body: "Detect host, sense existing templates, create .mnemon, then project into host-native surfaces.",
+        nodes: ["host", "native", "mnemon", "projection", "human"],
+        lines: ["line-host-native", "line-native-mnemon", "line-mnemon-projection", "line-projection-native", "line-human-host"],
+        steps: [
+          ["Detect host", "Find CLAUDE.md, AGENTS.md, native skill dirs or Hermes config."],
+          ["Create .mnemon", "Initialize canonical memory, skills, schemas, state and reports."],
+          ["Plan projection", "Choose managed block, pointer, symlink/copy or native import."],
+          ["Ask approval", "Write only marked blocks and generated projections."],
+          ["Record binding", "Store active projection and drift metadata."]
+        ]
+      },
+      task: {
+        title: "Task-Time Recall",
+        body: "Before or during a model turn, host calls recall. Recall can return NONE when memory is irrelevant.",
+        nodes: ["host", "hooks", "skills", "hot", "warm", "cold"],
+        lines: ["line-host-hooks", "line-hooks-skills", "line-skills-hot", "line-hot-warm", "line-warm-cold"],
+        steps: [
+          ["Event", "session_start, pre_llm_call or manual recall."],
+          ["Rank candidates", "Use relevance, recency, frequency, confidence, scope and risk."],
+          ["Summarize", "Warm/cold hits are summarized with evidence links."],
+          ["Inject or NONE", "Host receives bounded context or a successful empty result."]
+        ]
+      },
+      observe: {
+        title: "Observe Evidence",
+        body: "Tool outputs, user corrections and errors become cold evidence and usage signals, not immediate hot memory.",
+        nodes: ["host", "hooks", "skills", "cold", "warm", "sidecar"],
+        lines: ["line-host-hooks", "line-hooks-skills", "line-skills-sidecar", "line-warm-cold"],
+        steps: [
+          ["Capture", "pre_tool_call, post_tool_call or approval response."],
+          ["Redact", "Discard or redact secrets before persistence."],
+          ["Store evidence", "Write cold evidence and optional warm session capsule."],
+          ["Update sidecar", "Record usage and provenance signals if allowed."]
+        ]
+      },
+      reflect: {
+        title: "Post-Turn Reflection",
+        body: "After the answer is delivered, reflection classifies insights into memory, skill, session summary or report-only proposal.",
+        nodes: ["host", "hooks", "skills", "hot", "warm", "sidecar", "reports", "human"],
+        lines: ["line-host-hooks", "line-hooks-skills", "line-skills-hot", "line-skills-sidecar", "line-hot-warm", "line-reports-human"],
+        steps: [
+          ["Summarize turn", "Use bounded transcript or session summary."],
+          ["Classify", "facts/preferences -> memory; workflows -> skill; raw logs -> cold evidence."],
+          ["Patch before create", "Prefer existing class-level skill patches."],
+          ["Apply or propose", "Low-risk allowlisted writes only; otherwise report."]
+        ]
+      },
+      maintenance: {
+        title: "Curator / Dreaming",
+        body: "Periodic maintenance consolidates self-authored assets, manages memory overflow and proposes promotion/demotion.",
+        nodes: ["runner", "sidecar", "warm", "cold", "skills", "reports", "human", "mnemon"],
+        lines: ["line-sidecar-runner", "line-runner-reports", "line-runner-skills", "line-skills-sidecar", "line-warm-cold", "line-reports-human"],
+        steps: [
+          ["Acquire lease", "Runner or host scheduler checks budgets and kill switches."],
+          ["Dream", "Light/REM/Deep stages extract candidates and themes."],
+          ["Curate", "Skip pinned/user/package/imported; consolidate self-authored assets."],
+          ["Report first", "Default dry-run/proposal; apply only after backup and validation."]
+        ]
+      },
+      eval: {
+        title: "Eval-Gated Evolution",
+        body: "High-risk changes go through constraints, tests and PR-style reports instead of silent mutation.",
+        nodes: ["eval", "reports", "human", "runner", "mnemon"],
+        lines: ["line-eval-reports", "line-runner-reports", "line-reports-human", "line-human-host"],
+        steps: [
+          ["Candidate", "Skill prompt, hook prompt, guideline or install-map proposal."],
+          ["Validate", "Run schema checks, regression cases and held-out tasks."],
+          ["Report", "Write eval result and PR template."],
+          ["Human merge", "Protected targets require approval."]
+        ]
+      },
+      projection: {
+        title: "Projection Refresh",
+        body: "Canonical changes refresh host projections. Drift is reported before overwrite.",
+        nodes: ["mnemon", "projection", "native", "host", "reports"],
+        lines: ["line-mnemon-projection", "line-projection-native", "line-host-native", "line-runner-reports"],
+        steps: [
+          ["Canonical changed", "Curator, install or skill promotion updates .mnemon."],
+          ["Compute projection", "Use active binding mode and checksum."],
+          ["Detect drift", "Manual edits in projected files become reports."],
+          ["Refresh", "Regenerate managed blocks or projected skill copies."]
+        ]
+      }
+    };
+
+    const hosts = {
+      claude: {
+        title: "Claude Code",
+        summary: "最佳 L2/L3 host：CLAUDE.md 承载短 managed block，.claude/skills 可 symlink/copy .mnemon skills，Stop/SessionEnd hooks 可运行 reflection。",
+        columns: [
+          ["Instruction", ["CLAUDE.md managed block", ".claude/CLAUDE.md pointer", "Do not copy long memory into instructions"]],
+          ["Skills", [".claude/skills symlink_or_copy", "core skills from .mnemon/skills/core", "generated skills only after promotion"]],
+          ["Hooks", ["SessionStart/UserPromptSubmit -> recall", "PreToolUse/PostToolUse -> observe", "Stop/SessionEnd -> reflect"]]
+        ]
+      },
+      codex: {
+        title: "Codex",
+        summary: "偏 L1 host：AGENTS.md 适合 repo instruction 和 pointer block。若无稳定 hooks，则 reflect/curate 走手动 skill 或 queued job。",
+        columns: [
+          ["Instruction", ["AGENTS.md pointer block", "Keep project rules host-owned", "Managed marker records .mnemon location"]],
+          ["Skills", ["docs/agent-skills pointer", "manual skill discovery", "proposal-first updates"]],
+          ["Fallback", ["manual recall", "manual reflect", "external cron or no runner by default"]]
+        ]
+      },
+      hermes: {
+        title: "Hermes",
+        summary: "能力最完整的参考 host：native skills、hooks、curator 和 cron 都可承载 Mnemon projection，但 .mnemon 仍是 canonical root。",
+        columns: [
+          ["Instruction", ["Hermes context pointer", "bounded MEMORY/USER pattern informs hot memory", "native import is protected"]],
+          ["Skills", ["~/.hermes/skills native_import_or_symlink", "SKILL.md frontmatter validation", "usage sidecar stays in .mnemon"]],
+          ["Maintenance", ["post-turn review maps to reflect", "curator maps to L3 maintenance", "cron maps to runner tick semantics"]]
+        ]
+      },
+      generic: {
+        title: "Generic Agent",
+        summary: "最低可用路径：只要能读 Markdown，就能通过 INSTALL.md 和 GUIDELINE.md 手动安装 L0/L1。",
+        columns: [
+          ["Instruction", [".agent-instructions.md or README pointer", "No automatic mutation", "Manual review required"]],
+          ["Skills", ["read .mnemon/skills/core manually", "reports/proposals only", "no native skill assumption"]],
+          ["Fallback", ["manual recall", "manual reflect", "manual curate", "native-only install allowed but not preferred"]]
+        ]
+      }
+    };
+
+    function renderDetail(nodeKey) {
+      const node = nodes[nodeKey];
+      if (!node) return;
+      document.querySelectorAll(".node").forEach((el) => el.classList.toggle("selected", el.dataset.node === nodeKey));
+      document.getElementById("detail-title").textContent = node.title;
+      document.getElementById("detail-body").textContent = node.body;
+      const grid = document.getElementById("detail-grid");
+      grid.innerHTML = ["owns", "reads", "writes"].map((key) => {
+        const label = key === "owns" ? "Owns" : key === "reads" ? "Reads" : "Writes";
+        return `<div class="detail-item"><b>${label}</b><ul>${node[key].map((item) => `<li>${item}</li>`).join("")}</ul></div>`;
+      }).join("") + `<div class="detail-item"><b>Risk Boundary</b><div>${node.risk}</div></div>`;
+    }
+
+    function renderFlow(flowKey) {
+      const flow = flows[flowKey];
+      if (!flow) return;
+      document.querySelectorAll(".chip").forEach((el) => el.classList.toggle("active", el.dataset.flow === flowKey));
+      document.querySelectorAll(".flow-line").forEach((el) => el.classList.toggle("active", flow.lines.includes(el.id)));
+      document.querySelectorAll(".node").forEach((el) => {
+        const active = flow.nodes.includes(el.dataset.node);
+        el.classList.toggle("active", active);
+        el.classList.toggle("dim", !active);
+      });
+      document.getElementById("detail-title").textContent = flow.title;
+      document.getElementById("detail-body").textContent = flow.body;
+      document.getElementById("flow-title").textContent = flow.title;
+      document.getElementById("flow-steps").innerHTML = flow.steps.map(([title, body]) => (
+        `<div class="step"><div><strong>${title}</strong><span>${body}</span></div></div>`
+      )).join("");
+      document.getElementById("detail-grid").innerHTML = `
+        <div class="detail-item"><b>Active Nodes</b><div>${flow.nodes.map((key) => nodes[key].title).join(" -> ")}</div></div>
+        <div class="detail-item"><b>Default Safety</b><div>proposal-first, allowlist apply only, report every durable mutation</div></div>
+      `;
+    }
+
+    function renderPipelines() {
+      const container = document.getElementById("pipeline-list");
+      container.innerHTML = Object.entries(flows).map(([key, flow]) => {
+        const pills = flow.steps.map(([title], index) => (
+          `${index > 0 ? '<span class="arrow">-></span>' : ''}<span class="pill">${title}</span>`
+        )).join("");
+        return `
+          <div class="pipeline-row">
+            <div><h3>${flow.title}</h3><p>${flow.body}</p></div>
+            <div class="pipeline-track">${pills}</div>
+            <button type="button" data-jump-flow="${key}">Highlight</button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderHost(hostKey) {
+      const host = hosts[hostKey];
+      if (!host) return;
+      document.querySelectorAll(".host-button").forEach((el) => el.classList.toggle("active", el.dataset.host === hostKey));
+      document.getElementById("host-title").textContent = host.title;
+      document.getElementById("host-summary").textContent = host.summary;
+      document.getElementById("host-columns").innerHTML = host.columns.map(([title, items]) => `
+        <article class="card">
+          <h3>${title}</h3>
+          <ul class="mini-list">${items.map((item) => `<li>${item}</li>`).join("")}</ul>
+        </article>
+      `).join("");
+    }
+
+    document.querySelectorAll("[data-flow]").forEach((button) => {
+      button.addEventListener("click", () => renderFlow(button.dataset.flow));
+    });
+
+    document.querySelectorAll("[data-node]").forEach((button) => {
+      button.addEventListener("click", () => renderDetail(button.dataset.node));
+    });
+
+    document.addEventListener("click", (event) => {
+      const jump = event.target.closest("[data-jump-flow]");
+      if (jump) {
+        renderFlow(jump.dataset.jumpFlow);
+        document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+
+    document.querySelectorAll("[data-host]").forEach((button) => {
+      button.addEventListener("click", () => renderHost(button.dataset.host));
+    });
+
+    renderPipelines();
+    renderHost("claude");
+    renderFlow("install");
+  </script>
+</body>
+</html>

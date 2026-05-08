@@ -114,6 +114,7 @@ Self-Evolution Harness 应满足：
 | [08-skill-production-paths.md](08-skill-production-paths.md) | foreground、post-turn review、maintenance synthesis 三条 skill 生产路径 |
 | [09-anti-patterns.md](09-anti-patterns.md) | 防止 harness 滑成 agent framework 的反模式清单 |
 | [10-filesystem-and-host-projection.md](10-filesystem-and-host-projection.md) | `.mnemon` canonical filesystem、host template sensing、projection/mount 策略 |
+| [architecture-site.html](architecture-site.html) | 交互式 HTML 架构地图、管道流、host projection explorer |
 
 ## 架构一句话
 
