@@ -88,7 +88,7 @@ The same harness maps differently across runtimes:
 | Codex | `AGENTS.md`, skills, local instructions, and hooks when enabled |
 | Claude Code | `CLAUDE.md`, skills, slash commands, settings hooks, and project/user memory files |
 | OpenClaw | Plugin hooks and skills, without requiring a Mnemon-specific memory engine |
-| Hermes-style agents | Skills, memory guidance, and lightweight reminders |
+| Skill-first agents | Skills, memory guidance, and lightweight reminders |
 | Minimal CLIs | A rules file or system instruction that references `SKILL.md` and `GUIDELINE.md` |
 
 Mnemon should document these mappings as examples in `INSTALL.md`. They are not

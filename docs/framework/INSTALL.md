@@ -73,7 +73,7 @@ Use the closest native equivalent:
 | Codex | `AGENTS.md`, skills, local instructions, and hooks when enabled |
 | Claude Code | `CLAUDE.md`, skills, slash commands, settings hooks, project/user memory |
 | OpenClaw | Plugin hooks and skills |
-| Hermes-style agents | Skills, memory guidance, and lightweight reminders |
+| Skill-first agents | Skills, memory guidance, and lightweight reminders |
 | Minimal CLI | A rule file or system instruction that references the skill and guideline |
 
 These mappings are examples. Preserve the behavior contract even if paths or

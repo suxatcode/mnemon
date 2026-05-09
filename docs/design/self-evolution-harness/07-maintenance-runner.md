@@ -50,7 +50,7 @@ Some self-evolution tasks are bad foreground work:
 | Risk/eval batch | needs static scans, target checks, or optional regression cases | write risk report / proposal |
 | Backup rotation | unrelated to active task | bounded housekeeping |
 
-The runner is not required for Hermes-style post-turn review when the host already supports a background review agent. In that case the harness only provides the reflection prompt, provenance schema, and write policy.
+The runner is not required for post-turn review when the host already supports a background review agent. In that case the harness only provides the reflection prompt, provenance schema, and write policy.
 
 ## Non-Goals
 
@@ -171,7 +171,7 @@ Rules:
 - failed schema validation writes a report and stops;
 - missing host command downgrades the job to report-only/manual.
 
-This keeps the runner from becoming a second agent while still allowing Hermes-style review or OpenClaw-style dreaming where the host supports it.
+This keeps the runner from becoming a second agent while still allowing review or dreaming jobs where the host supports them.
 
 Stronger rule:
 
@@ -381,7 +381,7 @@ Dreaming promotion rules:
 
 ## Review-Agent Skill Creation Through Runner
 
-Hermes uses background review to create or patch skills after a turn. In the harness architecture, that behavior is represented as a `reflect.deferred` job or host-native post-turn hook:
+The harness represents background skill review as a `reflect.deferred` job or host-native post-turn hook:
 
 ```text
 completed turn summary

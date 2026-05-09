@@ -26,14 +26,14 @@ This keeps the mental model clear without forcing brain-science terms into every
 
 ## Working Memory / Prompt Memory
 
-Working Memory is the bounded Markdown memory directly loaded into the host agent's prompt. It follows the practical pattern used by Claude-style agents and Hermes: a small set of durable facts and preferences, not a database.
+Working Memory is the bounded Markdown memory directly loaded into the host agent's prompt. It follows the practical pattern used by Markdown-first agents: a small set of durable facts and preferences, not a database.
 
-Hermes baseline:
+Reference baseline:
 
-| Mechanism | Hermes behavior |
+| Mechanism | Reference behavior |
 |---|---|
 | Files | `MEMORY.md`, `USER.md` |
-| Location | `~/.hermes/memories/` |
+| Location | agent-owned memory directory |
 | Budget | about 2,200 chars for `MEMORY.md`, 1,375 chars for `USER.md` |
 | Loading | frozen snapshot injected into system prompt at session start |
 | Updates | `add`, `replace`, `remove` through a memory tool |
@@ -180,7 +180,7 @@ Dreaming job types:
 | `archive` | prompt entries, evidence events | `memory/longterm/archive/prompt/**` | preserve demoted prompt memory |
 | `extract` | evidence, transcripts, summaries | semantic memory proposal | turn evidence into facts/preferences/summaries |
 | `promote` | semantic memory, recall hits, user confirmations | prompt patch proposal | reactivate durable facts into Working Memory |
-| `skill-review-signal` | repeated workflows, failures, tool traces | reflection/curator report or `skills/generated/**` via skill_manage | feed procedures into the Hermes-style skill path |
+| `skill-review-signal` | repeated workflows, failures, tool traces | reflection/curator report or `skills/generated/**` via skill_manage | feed procedures into the skill path |
 
 Triggers:
 
@@ -413,11 +413,11 @@ Curator rules:
 - skip pinned/user/imported unless approved;
 - high-risk guideline/hook/install changes are proposal-only.
 
-## Hermes-Derived Eval And Risk Control
+## Eval And Risk Control
 
-Hermes does not rely on a heavy evaluation framework for day-to-day self-evolution. Its effective pattern is layered risk control:
+Day-to-day self-evolution should not depend on a heavy evaluation framework. The effective pattern is layered risk control:
 
-| Hermes mechanism | Harness abstraction |
+| Mechanism | Harness abstraction |
 |---|---|
 | dangerous command hardline block | unbypassable protected-target gate |
 | dangerous command approval | human approval gate for risky apply |
@@ -429,7 +429,7 @@ Hermes does not rely on a heavy evaluation framework for day-to-day self-evoluti
 | checkpoint/rollback | snapshot before durable apply when host supports it |
 | tool-loop guardrails | stop repeated failed/no-progress maintenance loops |
 
-The harness should copy this shape directly. "Eval" means a small gate pipeline, not an always-on benchmark system.
+The harness should adopt this shape directly. "Eval" means a small gate pipeline, not an always-on benchmark system.
 
 ```text
 candidate change
@@ -456,7 +456,7 @@ R4 is not "needs approval"; it is blocked from self-evolution. A human may still
 
 ### Trust Policy
 
-Use Hermes' trust-aware shape:
+Use a trust-aware shape:
 
 | Source | Safe | Caution | Dangerous |
 |---|---|---|---|
@@ -499,7 +499,7 @@ Background:
 - R2/R3 become proposals;
 - R4 blocks.
 
-This mirrors Hermes' cron approval model: unattended jobs should deny or defer risky actions rather than invent approval.
+Unattended jobs should deny or defer risky actions rather than invent approval.
 
 ### Checkpoint And Rollback
 
@@ -546,7 +546,7 @@ required_gates:
   - report-written
 ```
 
-Regression cases are optional and target-specific. They are useful for hook prompts, recall ranking, and package upgrades, but they should not block the simple Hermes-style daily loop.
+Regression cases are optional and target-specific. They are useful for hook prompts, recall ranking, and package upgrades, but they should not block the simple daily loop.
 
 ## Reports
 

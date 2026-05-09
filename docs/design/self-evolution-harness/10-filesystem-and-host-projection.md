@@ -12,11 +12,11 @@ Host-owned content remains host-owned.
 
 This is better than writing directly into every host's native template as the primary state. Native embedding is still required, but installation should be a small hook-and-pointer mounting layer.
 
-## Hermes Lessons
+## Filesystem References
 
-Hermes is worth referencing for filesystem design, not for product shape.
+Existing agent systems are useful references for filesystem design, not for product shape.
 
-| Hermes pattern | Harness abstraction |
+| Reference pattern | Harness abstraction |
 |---|---|
 | Small bounded `MEMORY.md` / `USER.md` | canonical Prompt Memory files with strict budgets |
 | `skills/<name>/SKILL.md` with frontmatter | directory-based skill artifacts and schema validation |
@@ -24,7 +24,7 @@ Hermes is worth referencing for filesystem design, not for product shape.
 | curator reports and backups | report-first maintenance and rollback |
 | hooks/cron as lifecycle surface | semantic hook bindings and optional runner jobs |
 
-The part we should not copy is a single host-specific home directory such as `~/.hermes` as the only install target. Mnemon should be repo/project-local by default, with optional user/global overlays later.
+The part we should not copy is a single host-specific home directory as the only install target. Mnemon should be repo/project-local by default, with optional user/global overlays later.
 
 ## Hook-First Mounting
 

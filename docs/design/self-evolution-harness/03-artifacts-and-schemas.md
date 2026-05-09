@@ -98,7 +98,7 @@ description: Review completed work and propose durable memory or skill updates.
 | `description` | yes | discovery text |
 | `version` | no | package version |
 
-Governance fields such as `created_by`, `provenance`, `state`, and `pinned` belong in `state/usage.json`, following the Hermes sidecar pattern.
+Governance fields such as `created_by`, `provenance`, `state`, and `pinned` belong in `state/usage.json`, following the sidecar pattern.
 
 Rules:
 
@@ -379,7 +379,7 @@ archives:
 }
 ```
 
-If host cannot enforce this allowlist, reflection and curator must run proposal-only. Risk classification follows the Hermes-derived R0-R4 model in `05-memory-curation-eval.md`.
+If host cannot enforce this allowlist, reflection and curator must run proposal-only. Risk classification follows the R0-R4 model in `05-memory-curation-eval.md`.
 
 Minimal risk result:
 

@@ -99,7 +99,7 @@ Mnemon executes deterministic memory commands.
 The agent decides when memory is useful.
 ```
 
-This keeps the system portable. Codex, Claude Code, OpenClaw, Hermes, and future
+This keeps the system portable. Codex, Claude Code, OpenClaw, and future
 agent runtimes can install the same conceptual harness through their own native
 instruction mechanisms.
 
@@ -417,7 +417,7 @@ contract is the phase behavior, not the script body. For example:
   project/user memory files.
 - OpenClaw can use plugin hooks and skills, but Mnemon should not require an
   OpenClaw-specific memory engine.
-- Hermes-style runtimes can express most behavior directly as skills, memory
+- Skill-first runtimes can express most behavior directly as skills, memory
   guidance, and lightweight reminders.
 
 If a runtime lacks hooks, use rules or persistent instructions that simulate the

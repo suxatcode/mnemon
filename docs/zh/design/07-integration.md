@@ -74,7 +74,7 @@ Hook 契约是行为契约。脚本正文是 runtime-specific implementation det
 | Codex | `AGENTS.md`、skill、本地指令，以及启用后的 hooks |
 | Claude Code | `CLAUDE.md`、skill、slash command、settings hooks、project/user memory 文件 |
 | OpenClaw | Plugin hooks 和 skill，但不要求 Mnemon-specific memory engine |
-| Hermes-style agents | Skill、memory guidance 和轻量提醒 |
+| Skill-first agents | Skill、memory guidance 和轻量提醒 |
 | Minimal CLIs | 引用 `SKILL.md` 和 `GUIDELINE.md` 的 rules 文件或 system instruction |
 
 Mnemon 应在 `INSTALL.md` 中把这些映射写成例子。它们不是独立的产品架构。

@@ -1,6 +1,6 @@
-# 08. Hermes-Derived Skill Index And Manage
+# 08. Skill Index And Manage
 
-Mnemon should not invent a more complex skill system than Hermes. The harness should extract the Hermes skill loop into an agent-agnostic contract:
+Mnemon should keep the skill system deliberately small. The harness skill loop is an agent-agnostic contract:
 
 ```text
 skills_list / skill_view
@@ -12,11 +12,11 @@ skills_list / skill_view
 
 The host agent still owns the runtime, model loop, tools, UI, and permissions. Mnemon owns the canonical filesystem, schemas, reports, and projection contract.
 
-## What We Copy From Hermes
+## Skill Loop Shape
 
-Hermes already has the useful shape:
+The useful shape is:
 
-| Hermes mechanism | Harness abstraction |
+| Mechanism | Harness abstraction |
 |---|---|
 | `skills_list` | metadata-only skill index |
 | `skill_view(name[, file_path])` | progressive disclosure for `SKILL.md` and support files |
@@ -28,7 +28,7 @@ Hermes already has the useful shape:
 | curator | scheduled/idle/manual `curate` hook/job |
 | class-level skill policy | patch umbrella skills before creating narrow skills |
 
-The only translation is runtime binding. Hermes calls Python tools inside its own `AIAgent`; Mnemon exposes the same semantics through host skills, hooks, CLI commands, or queued jobs.
+The only translation is runtime binding. Mnemon exposes the same semantics through host skills, hooks, CLI commands, or queued jobs.
 
 ## Skill Artifact
 
@@ -65,7 +65,7 @@ Recommended harness layout:
     curator/
 ```
 
-This follows Hermes more closely than a multi-stage generated skill tree. Agent-created skills live under `skills/generated/`; their state is in `state/usage.json`. Archived skills move to `skills/archive/`.
+This intentionally stays closer to a small managed skill library than a multi-stage generated skill tree. Agent-created skills live under `skills/generated/`; their state is in `state/usage.json`. Archived skills move to `skills/archive/`.
 
 `SKILL.md` frontmatter should stay small:
 
@@ -132,7 +132,7 @@ output:
 
 ## Skill Manage
 
-The write surface should match Hermes semantics:
+The write surface should stay compact:
 
 | Action | Meaning | Default policy |
 |---|---|---|
@@ -143,7 +143,7 @@ The write surface should match Hermes semantics:
 | `remove_file` | remove support file | report required |
 | `delete` | remove from active library | harness maps this to archive for recoverability |
 
-Hermes exposes `delete`; the harness should implement it as a recoverable archive operation when the target is self-authored. The tool name can still be `delete` for compatibility, but the storage effect should be:
+The harness should implement deletion as a recoverable archive operation when the target is self-authored. The tool name can still be `delete` for compatibility, but the storage effect should be:
 
 ```text
 skills/generated/<name> -> skills/archive/<name>
@@ -166,7 +166,7 @@ Write rules:
 
 ## Usage Sidecar
 
-Hermes keeps governance state outside `SKILL.md`; Mnemon should do the same.
+Governance state stays outside `SKILL.md`.
 
 ```json
 {
@@ -191,7 +191,7 @@ Hermes keeps governance state outside `SKILL.md`; Mnemon should do the same.
 }
 ```
 
-Lifecycle states follow Hermes:
+Lifecycle states stay minimal:
 
 ```text
 active -> stale -> archived
@@ -219,7 +219,7 @@ User, project, core, imported, and pinned skills are not auto-curated.
 
 ## Three Production Entrances
 
-Hermes has three practical production entrances.
+The harness has three practical production entrances.
 
 ### 1. User-Declared
 
@@ -243,7 +243,7 @@ Policy:
 
 During foreground work, the agent notices a reusable procedure and asks the user whether to save it.
 
-Hermes trigger examples:
+Trigger examples:
 
 - complex task succeeded after several tool calls;
 - errors were overcome;
@@ -259,7 +259,7 @@ Policy:
 
 ### 3. Background Review
 
-After the answer is delivered, Hermes forks a restricted review agent. Mnemon expresses the same thing as a host-native post-turn hook or queued `reflect` job.
+After the answer is delivered, Mnemon represents background review as a host-native post-turn hook or queued `reflect` job.
 
 ```text
 completed turn
@@ -314,7 +314,7 @@ Curator rules:
 
 ## Memory Interaction
 
-Hermes uses a simple boundary:
+The memory/skill boundary is simple:
 
 ```text
 memory = who the user is / durable preferences / current operating context
@@ -334,7 +334,7 @@ Background review may run as a combined memory+skill review, but the classificat
 
 ## Dreaming Interaction
 
-Dreaming should not become a second skill framework. Its role is to surface evidence to the same Hermes-derived skill path.
+Dreaming should not become a second skill framework. Its role is to surface evidence to the same skill path.
 
 ```text
 episodic evidence + reports
@@ -378,8 +378,8 @@ The harness-specific responsibility is not to make a new agent. It is to keep:
 
 The skill system is acceptable when:
 
-1. skill artifacts match the Hermes shape;
-2. index/manage semantics match Hermes;
+1. skill artifacts match the harness shape;
+2. index/manage semantics stay compact and host-agnostic;
 3. lifecycle is only `active/stale/archived` plus `pinned`;
 4. background review-created skills are curator-eligible;
 5. foreground user/user-confirmed skills are protected;

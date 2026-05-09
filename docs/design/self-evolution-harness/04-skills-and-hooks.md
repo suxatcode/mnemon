@@ -240,7 +240,7 @@ When host cannot run post-turn hooks, it may write a bounded session summary to 
 state/jobs/queue/reflect/<session-id>.json
 ```
 
-The queued job is processed by manual `reflect`, host scheduler, external cron, or optional runner. This is weaker than immediate Hermes-style background review, but preserves the same contract:
+The queued job is processed by manual `reflect`, host scheduler, external cron, or optional runner. This is weaker than immediate background review, but preserves the same contract:
 
 - summary/evidence in;
 - memory-or-skill classification;

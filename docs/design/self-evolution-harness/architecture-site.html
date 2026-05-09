@@ -1584,7 +1584,7 @@
             <button class="node" data-node="eval" style="--accent: var(--red); left: 4%; top: 76%; --w: 185px;">
               <span class="kicker">Risk Gate</span>
               <strong>R0-R4 / scanner / approval</strong>
-              <span>Hermes 风格的轻量 gate，而不是重型 benchmark。</span>
+              <span>轻量 risk ladder，而不是重型 benchmark。</span>
             </button>
 
             <button class="node" data-node="reports" style="--accent: var(--violet); left: 29%; top: 76%; --w: 190px;">
@@ -1740,7 +1740,7 @@
         <div class="host-list" role="tablist" aria-label="Host projection selector" data-i18n-aria="sections.projection.selectorAria">
           <button class="host-button active" type="button" data-host="claude"><strong>L0 Manual</strong><span>Markdown + skills</span></button>
           <button class="host-button" type="button" data-host="codex"><strong>L1 Instruction</strong><span>managed pointer</span></button>
-          <button class="host-button" type="button" data-host="hermes"><strong>L2 Hooks</strong><span>recall / observe / reflect</span></button>
+          <button class="host-button" type="button" data-host="hooked"><strong>L2 Hooks</strong><span>recall / observe / reflect</span></button>
           <button class="host-button" type="button" data-host="generic"><strong>L3 Maintenance</strong><span>curate / dreaming</span></button>
         </div>
         <div class="projection-detail">
@@ -1818,7 +1818,7 @@
       },
       consolidation: {
         title: "Memory Consolidation",
-        body: "Dreaming Jobs compact Prompt Memory, archive evidence, extract semantic memory, and surface repeated workflow signals to the Hermes-style skill path.",
+        body: "Dreaming Jobs compact Prompt Memory, archive evidence, extract semantic memory, and surface repeated workflow signals to the skill path.",
         owns: ["candidates", "summaries", "promotion proposals", "demotion proposals"],
         reads: ["episodic evidence", "prompt budget", "reflection reports"],
         writes: ["consolidation decisions", "promotion candidates", "demotion plans"],
@@ -1858,7 +1858,7 @@
       },
       eval: {
         title: "Risk Gate",
-        body: "Hermes-style risk control: classify R0-R4, validate schema/path/size, scan for dangerous content, then allow, propose, ask, or block.",
+        body: "Risk ladder control: classify R0-R4, validate schema/path/size, scan for dangerous content, then allow, propose, ask, or block.",
         owns: ["risk classifier", "static scanner", "approval policy", "rollback contract"],
         reads: ["candidate changes", "reports", "schemas", "write policy"],
         writes: ["risk reports", "approval proposals", "rollback pointers"],
@@ -1957,8 +1957,8 @@
         ]
       },
       eval: {
-        title: "Hermes Risk Gate",
-        body: "Self-evolution changes pass a lightweight Hermes-style gate before any durable write.",
+        title: "Risk Ladder Gate",
+        body: "Self-evolution changes pass a lightweight risk ladder before any durable write.",
         nodes: ["eval", "reports", "human", "runner", "mnemon"],
         lines: ["line-eval-reports", "line-runner-reports", "line-reports-human", "line-human-host"],
         steps: [
@@ -2001,7 +2001,7 @@
           ["Verification", ["host can find .mnemon", "reinstall updates marker in place"]]
         ]
       },
-      hermes: {
+      hooked: {
         title: "L2 Hooks",
         summary: "The host can call lifecycle or tool hooks. Bind recall, observe and reflect to native events while preserving proposal-first writes.",
         columns: [
@@ -2179,7 +2179,7 @@
             mapTitle: "dreaming jobs / decisions",
             summary: "巩固、降级、晋升与技能候选。",
             title: "Memory Consolidation",
-              body: "由 Dreaming Jobs 实现：compact、archive、extract、promote，并把重复 workflow 信号送入 Hermes 风格的 skill 路径。",
+              body: "由 Dreaming Jobs 实现：compact、archive、extract、promote，并把重复 workflow 信号送入同一条 skill 路径。",
             owns: ["candidates", "summaries", "promotion proposals", "demotion proposals"],
             reads: ["episodic evidence", "prompt budget", "reflection reports"],
             writes: ["consolidation decisions", "promotion candidates", "demotion plans"],
@@ -2232,9 +2232,9 @@
           eval: {
             kicker: "Risk Gate",
             mapTitle: "R0-R4 / scanner / approval",
-            summary: "Hermes 风格的轻量 gate，而不是重型 benchmark。",
+            summary: "轻量 risk ladder，而不是重型 benchmark。",
             title: "Risk Gate",
-            body: "Hermes 风格风控：先分 R0-R4，再做 schema/path/size 校验、静态扫描，最后决定 allow、proposal、ask 或 block。",
+            body: "Risk ladder 风控：先分 R0-R4，再做 schema/path/size 校验、静态扫描，最后决定 allow、proposal、ask 或 block。",
             owns: ["risk classifier", "static scanner", "approval policy", "rollback contract"],
             reads: ["candidate changes", "reports", "schemas", "write policy"],
             writes: ["risk reports", "approval proposals", "rollback pointers"],
@@ -2345,8 +2345,8 @@
           },
           eval: {
             chip: "风控",
-            title: "Hermes Risk Gate",
-            body: "所有自进化写入先经过 Hermes 风格的轻量 gate，再决定是否持久化。",
+            title: "Risk Ladder Gate",
+            body: "所有自进化写入先经过轻量 risk ladder，再决定是否持久化。",
             nodes: ["eval", "reports", "human", "runner", "mnemon"],
             lines: ["line-eval-reports", "line-runner-reports", "line-reports-human", "line-human-host"],
             steps: [
@@ -2394,7 +2394,7 @@
               ["Verify", ["host 能找到 .mnemon", "reinstall 原地更新 marker"]]
             ]
           },
-          hermes: {
+          hooked: {
             buttonTitle: "L2 Hooks",
             buttonSubtitle: "recall / observe / reflect",
             title: "L2 Hooks",
@@ -2438,7 +2438,7 @@
             kicker: "Working Memory",
             title: "Prompt Memory",
             summary: "bounded Markdown，直接进入 prompt。",
-            body: "类似 Hermes / Claude Code 的 Markdown memory：MEMORY.md、USER.md、project.md。它小、稳定、高置信，并在 prompt snapshot 中全量加载。",
+            body: "Markdown working memory：MEMORY.md、USER.md、project.md。它小、稳定、高置信，并在 prompt snapshot 中全量加载。",
             contains: ["stable preference", "project fact", "compact constraint"],
             reads: ["user confirmation", "promotion proposal"],
             writes: ["budgeted Markdown entry", "compact patch"],
@@ -2478,7 +2478,7 @@
             kicker: "Procedural",
             title: "Skills",
             summary: "程序性记忆，不塞进 Markdown。",
-            body: "重复流程、工具策略和操作习惯属于 procedural memory，由 Hermes 风格的 skill review 和 curator 承载。",
+            body: "重复流程、工具策略和操作习惯属于 procedural memory，由 skill review 和 curator 承载。",
             contains: ["workflow", "tool tactic", "failure recovery", "habit"],
             reads: ["repeated evidence", "usage sidecar", "human review"],
             writes: ["skills/generated/**", "state/usage.json"],
@@ -2588,7 +2588,7 @@
             kicker: "写入面",
             title: "Skill Index / Manage",
             summary: "list/view/patch/create/write_file/archive。",
-            body: "逻辑 API 采用 Hermes 风格：先 list metadata，再 view SKILL.md 或 support files，写入时优先 patch，必要时 write_file 或 create。",
+            body: "逻辑 API 保持渐进披露：先 list metadata，再 view SKILL.md 或 support files，写入时优先 patch，必要时 write_file 或 create。",
             contains: ["skills_list", "skill_view", "skill_manage contract"],
             reads: ["SKILL.md frontmatter", "support files", "protected targets"],
             writes: ["patch", "create", "write_file", "archive proposal"],
@@ -2631,7 +2631,7 @@
             body: "Canonical skill 留在 .mnemon；host 侧通过 symlink/copy/pointer 注册。projection drift 先报告，不静默覆盖。",
             contains: ["symlink_or_copy", "managed pointer", "native import"],
             reads: [".mnemon skills", "binding metadata"],
-            writes: [".claude/skills", "~/.hermes/skills", "host pointers"],
+            writes: ["native skill dirs", "managed pointers", "host pointers"],
             safety: "projected copy 不是 source of truth。"
           },
           reports: {
@@ -2702,7 +2702,7 @@
         levels: [
           { number: "01", title: "安装挂载", body: "Agent 读取 INSTALL.md，把 semantic hooks 挂到 host lifecycle。", accent: "var(--cyan)" },
           { number: "02", title: "记忆循环", body: "Working Memory + Long-Term Memory + dreaming consolidation。", accent: "var(--blue)" },
-          { number: "03", title: "技能演进", body: "Hermes 风格 skills_list / skill_view / skill_manage + curator。", accent: "var(--green)" },
+          { number: "03", title: "技能演进", body: "skills_list / skill_view / skill_manage + curator。", accent: "var(--green)" },
           { number: "04", title: "评测风控", body: "R0-R4 gate、static scan、approval、checkpoint/report。", accent: "var(--red)" }
         ]
       },
@@ -2916,9 +2916,9 @@
           eval: {
             kicker: "Risk Gate",
             mapTitle: "R0-R4 / scanner / approval",
-            summary: "Hermes-style lightweight gates, not heavy benchmarks.",
+            summary: "Lightweight risk ladder, not heavy benchmarks.",
             title: "Risk Gate",
-            body: "Hermes-style risk control: classify R0-R4, validate schema/path/size, scan for dangerous content, then allow, propose, ask, or block.",
+            body: "Risk ladder control: classify R0-R4, validate schema/path/size, scan for dangerous content, then allow, propose, ask, or block.",
             owns: ["risk classifier", "static scanner", "approval policy", "rollback contract"],
             reads: ["candidate changes", "reports", "schemas", "write policy"],
             writes: ["risk reports", "approval proposals", "rollback pointers"],
@@ -3029,8 +3029,8 @@
           },
           eval: {
             chip: "Risk",
-            title: "Hermes Risk Gate",
-            body: "Self-evolution changes pass a lightweight Hermes-style gate before any durable write.",
+            title: "Risk Ladder Gate",
+            body: "Self-evolution changes pass a lightweight risk ladder before any durable write.",
             nodes: ["eval", "reports", "human", "runner", "mnemon"],
             lines: ["line-eval-reports", "line-runner-reports", "line-reports-human", "line-human-host"],
             steps: [
@@ -3077,7 +3077,7 @@
               ["Verify", ["host can find .mnemon", "reinstall updates marker in place"]]
             ]
           },
-          hermes: {
+          hooked: {
             buttonTitle: "L2 Hooks",
             buttonSubtitle: "recall / observe / reflect",
             title: "L2 Hooks",
@@ -3121,7 +3121,7 @@
             kicker: "Working Memory",
             title: "Prompt Memory",
             summary: "Bounded Markdown loaded directly into the prompt.",
-            body: "Hermes / Claude Code-style Markdown memory: MEMORY.md, USER.md, and project.md. It is small, stable, high-confidence, and fully loaded in the prompt snapshot.",
+            body: "Markdown working memory: MEMORY.md, USER.md, and project.md. It is small, stable, high-confidence, and fully loaded in the prompt snapshot.",
             contains: ["stable preference", "project fact", "compact constraint"],
             reads: ["user confirmation", "promotion proposal"],
             writes: ["budgeted Markdown entry", "compact patch"],
@@ -3161,7 +3161,7 @@
             kicker: "Procedural",
             title: "Skills",
             summary: "Procedural memory outside Markdown memory.",
-            body: "Repeated workflows, tool tactics, and operational habits are procedural memory carried by Hermes-style skill review and curator governance.",
+            body: "Repeated workflows, tool tactics, and operational habits are procedural memory carried by skill review and curator governance.",
             contains: ["workflow", "tool tactic", "failure recovery", "habit"],
             reads: ["repeated evidence", "usage sidecar", "human review"],
             writes: ["skills/generated/**", "state/usage.json"],
@@ -3271,7 +3271,7 @@
             kicker: "Write Surface",
             title: "Skill Index / Manage",
             summary: "list/view/patch/create/write_file/archive.",
-            body: "The logical API follows the Hermes shape: list metadata first, then view SKILL.md or support files, and prefer patch/write_file before creating.",
+            body: "The logical API uses progressive disclosure: list metadata first, then view SKILL.md or support files, and prefer patch/write_file before creating.",
             contains: ["skills_list", "skill_view", "skill_manage contract"],
             reads: ["SKILL.md frontmatter", "support files", "protected targets"],
             writes: ["patch", "create", "write_file", "archive proposal"],
@@ -3314,7 +3314,7 @@
             body: "Canonical skills stay in .mnemon; host-native registration uses symlink, copy, or pointer. Projection drift is reported before overwrite.",
             contains: ["symlink_or_copy", "managed pointer", "native import"],
             reads: [".mnemon skills", "binding metadata"],
-            writes: [".claude/skills", "~/.hermes/skills", "host pointers"],
+            writes: ["native skill dirs", "managed pointers", "host pointers"],
             safety: "Projected copies are not the source of truth."
           },
           reports: {
@@ -3385,7 +3385,7 @@
         levels: [
           { number: "01", title: "Install & Mount", body: "The agent reads INSTALL.md and mounts semantic hooks into the host lifecycle.", accent: "var(--cyan)" },
           { number: "02", title: "Memory Loop", body: "Working Memory plus Long-Term Memory plus dreaming consolidation.", accent: "var(--blue)" },
-          { number: "03", title: "Skill Evolution", body: "Hermes-style skills_list / skill_view / skill_manage plus curator.", accent: "var(--green)" },
+          { number: "03", title: "Skill Evolution", body: "skills_list / skill_view / skill_manage plus curator.", accent: "var(--green)" },
           { number: "04", title: "Risk Control", body: "R0-R4 gates, static scan, approval, checkpoint and report.", accent: "var(--red)" }
         ]
       }

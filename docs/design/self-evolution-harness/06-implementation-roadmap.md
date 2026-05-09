@@ -82,7 +82,7 @@ Deliverables:
 - `scripts/rollback`
 - `state/curator_state.json`
 - `reports/templates/curator.md`
-- Hermes-style lifecycle fields in `state/usage.json`
+- lifecycle fields in `state/usage.json`
 
 Acceptance:
 
@@ -145,7 +145,7 @@ Acceptance:
 
 ## Phase 5: Eval-Driven Evolution
 
-Goal: add Hermes-style risk gates before durable self-evolution writes.
+Goal: add lightweight risk gates before durable self-evolution writes.
 
 Deliverables:
 
@@ -224,7 +224,7 @@ Do not start by writing a daemon, server, SDK, database adapter, or universal ag
 | User-created artifacts mutated | provenance and created_by gates |
 | Install corrupts host config | dry-run, markers, backup, uninstall |
 | Host-native files drift from `.mnemon` | projection checksums, drift reports, explicit import |
-| Evaluation becomes theater | Hermes-style gates first; target-specific regression only when useful |
+| Evaluation becomes theater | lightweight gates first; target-specific regression only when useful |
 | Runner competes with foreground task | foreground activity signal, leases, budget, deferral |
 
 ## Success Criteria

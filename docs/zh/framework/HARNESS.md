@@ -76,7 +76,7 @@ Mnemon 执行确定性的记忆命令。
 Agent 判断什么时候记忆有用。
 ```
 
-这让系统保持可移植。Codex、Claude Code、OpenClaw、Hermes 以及未来 runtime，都可以通过自己的原生指令机制安装同一个概念 harness。
+这让系统保持可移植。Codex、Claude Code、OpenClaw 以及未来 runtime，都可以通过自己的原生指令机制安装同一个概念 harness。
 
 ### `SKILL.md`
 
@@ -358,7 +358,7 @@ Hook 脚本可以只打印自然语言提醒。它们不需要自己执行重型
 - Codex 可以使用 hooks 加 `AGENTS.md`、skill 或本地指令。
 - Claude Code 可以使用 `CLAUDE.md`、skill、slash command、settings hooks 或 project/user memory 文件。
 - OpenClaw 可以使用 plugin hooks 和 skill，但 Mnemon 不应要求一个 OpenClaw-specific memory engine。
-- Hermes 风格的 runtime 可以把绝大多数行为直接表达为 skill、memory guidance 和轻量提醒。
+- Skill-first runtime 可以把绝大多数行为直接表达为 skill、memory guidance 和轻量提醒。
 
 如果 runtime 没有 hook，用 rules 或持久指令模拟同样检查：
 

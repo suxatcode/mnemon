@@ -66,7 +66,7 @@ go install github.com/mnemon-dev/mnemon@latest
 | Codex | `AGENTS.md`、skill、本地指令，以及启用后的 hooks |
 | Claude Code | `CLAUDE.md`、skill、slash command、settings hooks、project/user memory |
 | OpenClaw | Plugin hooks 和 skill |
-| Hermes-style agents | Skill、memory guidance 和轻量提醒 |
+| Skill-first agents | Skill、memory guidance 和轻量提醒 |
 | Minimal CLI | 引用 skill 和 guideline 的 rule 文件或 system instruction |
 
 这些映射只是例子。即使路径或文件名不同，也要保留行为契约。
