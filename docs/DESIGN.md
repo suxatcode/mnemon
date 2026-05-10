@@ -6,7 +6,7 @@
 
 Mnemon is a persistent memory system designed for LLM agents. It adopts the **LLM-Supervised** pattern: the host LLM acts as external orchestrator of a standalone memory binary through symbolic CLI interfaces, while the binary handles deterministic storage, graph indexing, and lifecycle management. Memory is organized as a four-graph knowledge structure with temporal, entity, causal, and semantic edges. Implemented as a single Go binary + SQLite, with no external API dependencies.
 
-This document describes the current Mnemon binary and engine architecture. The broader memory harness doctrine lives in [Mnemon Memory Harness](framework/HARNESS.md), with installable runtime artifacts in [INSTALL.md](framework/INSTALL.md) and [GUIDELINE.md](framework/GUIDELINE.md). It is discussed separately from the current implementation.
+This document describes the current Mnemon binary and engine architecture. The broader memory harness doctrine lives in [Mnemon Memory Harness](framework/HARNESS.md), with installable runtime artifacts in [INSTALL.md](framework/INSTALL.md) and [GUIDELINE.md](framework/GUIDELINE.md). The v0.2 self-evolution architecture is consolidated in [Self-Evolution Harness Design](design/SELF_EVOLUTION_HARNESS.md).
 
 ---
 
@@ -39,6 +39,10 @@ Effective Importance (EI) decay formula, immunity rules, auto-pruning, GC comman
 ### [7. LLM CLI Integration](design/07-integration.md)
 
 Markdown-installable runtime integration: `SKILL.md`, `INSTALL.md`, `GUIDELINE.md`, the four hook phases (Prime, Remind, Nudge, Compact), agent-led memory decisions, optional setup automation, and lightweight markdown self-evolution.
+
+### [Self-Evolution Harness](design/SELF_EVOLUTION_HARNESS.md)
+
+The v0.2 architecture for agent-agnostic installation, canonical `.mnemon` filesystem, memory consolidation loop, skill evolution, optional maintenance runner, and proposal-first risk control.
 
 ### [8. Design Decisions & Future Direction](design/08-decisions.md)
 
