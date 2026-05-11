@@ -2,7 +2,7 @@
 
 本文档是 Mnemon self-evolution harness 的唯一核心设计入口。它替代此前分散在 `docs/design/self-evolution-harness/` 下的多份分篇设计，并把研究材料浓缩为架构决策所需的摘要。
 
-交互式架构展示保留在 [architecture-site.html](self-evolution-harness/architecture-site.html)。Issue 入口见 [#10](https://github.com/mnemon-dev/mnemon/issues/10)，初始设计 PR 见 [#9](https://github.com/mnemon-dev/mnemon/pull/9)。
+交互式架构展示保留在 [architecture-site.html](architecture-site.html)。Memory loop MVP 的设计文档见 [memory-loop/README.zh.md](memory-loop/README.zh.md)，双语可视化页面见 [memory-loop/site/index.html](memory-loop/site/index.html)。Issue 入口见 [#10](https://github.com/mnemon-dev/mnemon/issues/10)，初始设计 PR 见 [#9](https://github.com/mnemon-dev/mnemon/pull/9)。
 
 ## 1. 背景与决策
 
@@ -1196,7 +1196,7 @@ Cross-system conclusions:
 5. Background maintenance needs provenance, reports, backups, and hard write boundaries.
 6. Host-specific adapters should be convenience scripts, not the core architecture.
 
-Source provenance is kept in [Agent Systems Research](../research/agent-systems/README.md). Detailed per-system notes were intentionally folded into this synthesis to keep the architecture maintainable.
+Source provenance is kept in [Agent Systems Research](research/agent-systems/README.md). Detailed per-system notes were intentionally folded into this synthesis to keep the architecture maintainable.
 
 ## 18. 成功标准 Success Criteria
 

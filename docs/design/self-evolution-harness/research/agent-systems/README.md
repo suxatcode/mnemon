@@ -1,6 +1,6 @@
 # Agent Systems Research
 
-本目录保留 Mnemon self-evolution harness 设计的来源索引与研究摘要。详细分项目调研已经浓缩进 [Self-Evolution Harness 设计](../../design/SELF_EVOLUTION_HARNESS.md)，不再维护多份长研究笔记。
+本目录保留 Mnemon self-evolution harness 设计的来源索引与研究摘要。详细分项目调研已经浓缩进 [Self-Evolution Harness 设计](../../SELF_EVOLUTION_HARNESS.md)，不再维护多份长研究笔记。
 
 ## Scope
 
