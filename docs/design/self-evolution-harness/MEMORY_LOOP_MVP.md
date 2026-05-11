@@ -4,6 +4,8 @@ This document describes the first implementation slice of the memory loop. The g
 
 Related visualization: [memory-loop-mvp.html](./memory-loop-mvp.html)
 
+Reference implementation: [harness/memory-loop](../../../harness/memory-loop)
+
 ## Core Model
 
 The MVP has three core parts:
@@ -23,7 +25,7 @@ The first version should maintain the following assets:
 | Asset | Kind | Purpose |
 | --- | --- | --- |
 | `GUIDE.md` | Manual | Describes when to read memory, when to write memory, and what kind of information is worth keeping. |
-| `INSTALL.md` | Manual | Explains how an agent should install the four hooks into its own host runtime. |
+| Claude Code setup scripts | Setup | First concrete installation path. It installs project/user Claude Code hooks, skills, subagent, and memory files. |
 | Prime hook | Hook | Loads `MEMORY.md` and `GUIDE.md` into the system prompt. |
 | Remind hook | Hook | Reminds the HostAgent to decide whether memory should be read. |
 | Nudge hook | Hook | Reminds the HostAgent to decide whether memory should be accumulated. |
@@ -43,11 +45,11 @@ It should answer questions like:
 - Is this information stable enough to keep?
 - Is this a durable preference, project convention, or reusable fact?
 
-It should not require the HostAgent to decide whether the target is `MEMORY.md` or Mnemon. That decision is pushed into the capability layer:
+It should not require the HostAgent to decide whether the target is `MEMORY.md` or Mnemon. That decision is pushed into the capability layer. Reusable capabilities locate their runtime directory through `MNEMON_MEMORY_LOOP_DIR`.
 
 - `memory_get.md` maps read-memory behavior to Mnemon recall.
-- `memory_set.md` maps write-memory behavior to `MEMORY.md` edits.
-- The dreaming subagent maps consolidation behavior to Mnemon write plus `MEMORY.md` compaction.
+- `memory_set.md` maps write-memory behavior to `$MNEMON_MEMORY_LOOP_DIR/MEMORY.md` edits.
+- The dreaming subagent maps consolidation behavior to Mnemon write plus `$MNEMON_MEMORY_LOOP_DIR/MEMORY.md` compaction.
 
 This split keeps the guide portable across different host agents.
 
@@ -150,7 +152,7 @@ Boundary:
 The MVP should include:
 
 - A minimal `GUIDE.md`.
-- An `INSTALL.md` that tells a host agent how to mount Prime, Remind, Nudge, and Compact.
+- Claude Code setup scripts that mount Prime, Remind, Nudge, and Compact into `.claude/settings.json`.
 - A `MEMORY.md` template.
 - A `memory_get.md` skill for Mnemon recall.
 - A `memory_set.md` skill for `MEMORY.md` edits.
@@ -168,7 +170,7 @@ The MVP should not include:
 
 The harness should remain agent-agnostic. It gives a host agent the materials needed to install memory behavior into itself:
 
-- manuals for rules and installation;
+- manuals for rules and scripts for installation;
 - hooks for timing;
 - skills for online memory operations;
 - a subagent for offline consolidation;
