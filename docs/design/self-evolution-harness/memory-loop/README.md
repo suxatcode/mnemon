@@ -2,9 +2,11 @@
 
 This document describes the first implementation slice of the memory loop. The goal is to keep the harness small: install a few hook prompts and Markdown-based capabilities around an existing host agent, while using Mnemon as the long-term memory backend.
 
-Related visualization: [memory-loop-mvp.html](./memory-loop-mvp.html)
+Related visualization: [site/index.html](./site/index.html)
 
-Reference implementation: [harness/memory-loop](../../../harness/memory-loop)
+Chinese version: [README.zh.md](./README.zh.md)
+
+Reference implementation: [harness/memory-loop](../../../../harness/memory-loop)
 
 ## Core Model
 

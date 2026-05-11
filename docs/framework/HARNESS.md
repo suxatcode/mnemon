@@ -464,7 +464,7 @@ Self-evolution should start as a lightweight markdown loop, not a heavy
 framework.
 
 The full v0.2 architecture is consolidated in
-[Self-Evolution Harness Design](../design/SELF_EVOLUTION_HARNESS.md).
+[Self-Evolution Harness Design](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md).
 
 Mnemon should not automatically rewrite runtime behavior. It should help the
 agent notice repeated experience, preserve evidence, and propose markdown
