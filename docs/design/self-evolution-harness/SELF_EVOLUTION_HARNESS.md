@@ -1,8 +1,8 @@
 # Self-Evolution Harness 设计
 
-本文档是 Mnemon self-evolution harness 的唯一核心设计入口。它替代此前分散在 `docs/design/self-evolution-harness/` 下的多份分篇设计，并把研究材料浓缩为架构决策所需的摘要。
+本文档是 Mnemon self-evolution harness 的上层架构背景。当前 MVP 的具体设计已拆分为 memory loop 与 skill loop 两个更窄的设计入口。
 
-交互式架构展示保留在 [architecture-site.html](architecture-site.html)。Loop MVP 的当前入口见 [README.md](README.md)，其中包含 memory loop 设计（[EN](memory-loop/DESIGN.md) / [中文](memory-loop/DESIGN.zh.md)）与 skill loop 设计（[EN](skill-loop/DESIGN.md) / [中文](skill-loop/DESIGN.zh.md)），对应可视化页面分别是 [memory-loop/site/index.html](memory-loop/site/index.html) 和 [skill-loop/site/index.html](skill-loop/site/index.html)。Issue 入口见 [#10](https://github.com/mnemon-dev/mnemon/issues/10)，初始设计 PR 见 [#9](https://github.com/mnemon-dev/mnemon/pull/9)。
+Loop MVP 的当前入口见 [README.md](README.md)，其中包含 memory loop 设计（[EN](memory-loop/DESIGN.md) / [中文](memory-loop/DESIGN.zh.md)）与 skill loop 设计（[EN](skill-loop/DESIGN.md) / [中文](skill-loop/DESIGN.zh.md)），对应可视化页面分别是 [memory-loop/site/index.html](memory-loop/site/index.html) 和 [skill-loop/site/index.html](skill-loop/site/index.html)。Issue 入口见 [#10](https://github.com/mnemon-dev/mnemon/issues/10)，初始设计 PR 见 [#9](https://github.com/mnemon-dev/mnemon/pull/9)。
 
 ## 1. 背景与决策
 

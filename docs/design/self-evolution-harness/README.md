@@ -22,7 +22,6 @@ The current MVP is split into two loop designs. Both use the same harness vocabu
 ## Architecture Context
 
 - [SELF_EVOLUTION_HARNESS.md](SELF_EVOLUTION_HARNESS.md) is the broader v0.2 harness architecture.
-- [architecture-site.html](architecture-site.html) is the older full-architecture visualization.
 - [research/agent-systems/README.md](research/agent-systems/README.md) records condensed research references.
 
 The loop-specific pages are intentionally narrower. They document the first practical MVP slice rather than the full future architecture.
