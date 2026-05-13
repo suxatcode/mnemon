@@ -196,7 +196,7 @@ MNEMON_STORE=work mnemon recall "query"  # 或按进程使用环境变量
 `mnemon setup` 默认**本地**（项目级 `.claude/`），适合大多数用户。**全局**（`mnemon setup --global`，安装到 `~/.claude/`）在所有项目中激活 mnemon — 如果想让其他框架（如 OpenClaw）通过 Claude Code CLI 共享记忆很方便，但可能增加维护开销。
 
 **如何自定义行为？**
-编辑当前 setup 流程生成的 guideline（`~/.mnemon/prompt/guide.md`），或以可安装的 [GUIDELINE.md](framework/GUIDELINE.md) 作为来源。Skill 文件应专注于命令语法。
+编辑当前 setup 流程生成的 guideline（`~/.mnemon/prompt/guide.md`），或以可安装的 [memory loop GUIDE](../../harness/memory-loop/GUIDE.md) 作为来源。Skill 文件应专注于命令语法。
 
 **什么是 Sub-agent 委派？**
 Sub-agent 委派是可选执行策略。当 runtime 支持时，主 agent 可以决定*记什么*，再让更便宜或隔离的 worker 执行 `mnemon remember`。它有用，但不是 Mnemon 架构必需品。
@@ -229,12 +229,9 @@ make help           # 显示所有目标
 
 ## 文档
 
-- [Mnemon Memory Harness](framework/HARNESS.md) — skill-first memory harness 设计与安装指引
-- [Harness 安装指南](framework/INSTALL.md) — 面向 agent 的安装契约
-- [Memory Guideline](framework/GUIDELINE.md) — recall/writeback 判断策略
 - [Modular Self-Evolution Harness](../harness/README.md) — modular agent、memory loop 与 skill loop 的正式 harness 文档
-- [Self-Evolution Harness Archive](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md) — 历史 v0.2 安装挂载、记忆循环、技能演进与风控架构
-- [Agent Systems Research](../design/self-evolution-harness/research/agent-systems/README.md) — 记忆与自进化调研的浓缩来源索引
+- [Memory Loop Harness](../../harness/memory-loop/README.md) — 可安装 memory loop 资产
+- [Skill Loop Harness](../../harness/skill-loop/README.md) — 可安装 skill loop 资产
 - [设计与架构](DESIGN.md) — 当前 engine architecture、核心概念、算法、集成设计
 - [用法与参考](USAGE.md) — CLI 命令、嵌入向量支持、架构概览
 - [架构图](../diagrams/) — 系统架构、记忆/召回流程、四图模型、生命周期管理

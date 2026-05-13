@@ -30,7 +30,7 @@ Mnemon 采用 **LLM-Supervised** 模式：
 - **更强的判断能力**：Opus 级别的 LLM 评估候选链接，而非 gpt-4o-mini
 - **LLM 可替换**：同一套 Binary + Skill 可在 Claude Code、Cursor、任何 LLM CLI 中使用
 
-当前 engine 遵循更上层的 [Mnemon Memory Harness](../framework/HARNESS.md) 立场：hook-native、LLM-led、protocol-constrained。Harness doctrine 与当前 engine architecture 分开维护，这样可以讨论原则，而不默认今天的 binary 就是最终 runtime 形态。
+当前 engine 遵循更上层的 [Mnemon Harness](../../harness/README.md) 立场：hook-native、LLM-led、protocol-constrained，并围绕宿主 agent 模块化挂载。Harness doctrine 与当前 engine architecture 分开维护，这样可以讨论原则，而不默认今天的 binary 就是最终 runtime 形态。
 
 ## 2.2 Tools are Organs, Skills are Textbooks
 

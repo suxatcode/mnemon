@@ -40,6 +40,3 @@ that make the host agent more durable and self-improving.
 
 Claude Code is the first reference host because it exposes hooks, skills, and
 subagents. The architecture is intentionally broader than Claude Code.
-
-Historical v0.2 architecture context remains in
-[docs/design/self-evolution-harness](../design/self-evolution-harness/README.md).

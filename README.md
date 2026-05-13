@@ -209,8 +209,8 @@ Different agents/processes can use different stores via the `MNEMON_STORE` envir
 
 **How do I customize the behavior?**
 Edit the generated guideline (`~/.mnemon/prompt/guide.md` in current setup
-flows) or use the installable [GUIDELINE.md](docs/framework/GUIDELINE.md) as
-the source. The skill file should stay focused on command syntax.
+flows) or use the installable [memory loop GUIDE](harness/memory-loop/GUIDE.md)
+as the source. The skill file should stay focused on command syntax.
 
 **What is sub-agent delegation?**
 Sub-agent delegation is optional. When a runtime supports it, the main agent can
@@ -249,12 +249,9 @@ See [Development and Deployment](docs/DEPLOYMENT.md) for Docker, Compose, Ollama
 
 ## Documentation
 
-- [Mnemon Memory Harness](docs/framework/HARNESS.md) — skill-first memory harness design and installation guideline
-- [Harness Install Guide](docs/framework/INSTALL.md) — agent-facing installation contract
-- [Memory Guideline](docs/framework/GUIDELINE.md) — recall/writeback judgment policy
 - [Modular Self-Evolution Harness](docs/harness/README.md) — formal harness docs for modular agent, memory loop, and skill loop design
-- [Self-Evolution Harness Archive](docs/design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md) — historical v0.2 architecture for install, memory loop, skill evolution, and risk control
-- [Agent Systems Research](docs/design/self-evolution-harness/research/agent-systems/README.md) — condensed source index for memory and self-evolution research
+- [Memory Loop Harness](harness/memory-loop/README.md) — installable memory loop assets
+- [Skill Loop Harness](harness/skill-loop/README.md) — installable skill loop assets
 - [Design & Architecture](docs/DESIGN.md) — current engine architecture, algorithms, integration design
 - [Usage & Reference](docs/USAGE.md) — CLI commands, embedding support, architecture overview
 - [Architecture Diagrams](docs/diagrams/) — system architecture, pipelines, lifecycle management
