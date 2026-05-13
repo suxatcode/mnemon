@@ -17,6 +17,7 @@ host surface projection，以及可选的 daemon scheduling。
 | 主题 | 设计 |
 | --- | --- |
 | Modular Agent Harness | [中文](modular-agent/DESIGN.md) / [EN](../../harness/modular-agent/DESIGN.md) |
+| Harness Roadmap | [中文](ROADMAP.md) / [EN](../../harness/ROADMAP.md) |
 | Memory Loop | [中文](memory-loop/DESIGN.md) / [EN](../../harness/memory-loop/DESIGN.md) / [site](../../site/memory-loop/site.html) |
 | Skill Loop | [中文](skill-loop/DESIGN.md) / [EN](../../harness/skill-loop/DESIGN.md) / [site](../../site/skill-loop/site.html) |
 
