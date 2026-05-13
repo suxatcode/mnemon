@@ -2,7 +2,7 @@
 
 Related visualization: [site/index.html](site/index.html)
 
-Installable MVP assets: [harness/skill-loop](../../../../harness/skill-loop/README.md)
+Installable MVP assets: [harness/skill-loop](../../../harness/skill-loop/README.md)
 
 The skill loop gives a host agent a self-evolving skill library without replacing the host's native skill runtime. It treats skills as host-native assets, while `.mnemon` owns the canonical lifecycle state and the evidence used to evolve that state.
 

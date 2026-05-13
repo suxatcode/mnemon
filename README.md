@@ -252,7 +252,8 @@ See [Development and Deployment](docs/DEPLOYMENT.md) for Docker, Compose, Ollama
 - [Mnemon Memory Harness](docs/framework/HARNESS.md) — skill-first memory harness design and installation guideline
 - [Harness Install Guide](docs/framework/INSTALL.md) — agent-facing installation contract
 - [Memory Guideline](docs/framework/GUIDELINE.md) — recall/writeback judgment policy
-- [Self-Evolution Harness Design](docs/design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md) — consolidated v0.2 architecture for install, memory loop, skill evolution, and risk control
+- [Modular Self-Evolution Harness](docs/harness/README.md) — formal harness docs for modular agent, memory loop, and skill loop design
+- [Self-Evolution Harness Archive](docs/design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md) — historical v0.2 architecture for install, memory loop, skill evolution, and risk control
 - [Agent Systems Research](docs/design/self-evolution-harness/research/agent-systems/README.md) — condensed source index for memory and self-evolution research
 - [Design & Architecture](docs/DESIGN.md) — current engine architecture, algorithms, integration design
 - [Usage & Reference](docs/USAGE.md) — CLI commands, embedding support, architecture overview

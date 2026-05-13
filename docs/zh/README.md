@@ -232,7 +232,8 @@ make help           # 显示所有目标
 - [Mnemon Memory Harness](framework/HARNESS.md) — skill-first memory harness 设计与安装指引
 - [Harness 安装指南](framework/INSTALL.md) — 面向 agent 的安装契约
 - [Memory Guideline](framework/GUIDELINE.md) — recall/writeback 判断策略
-- [Self-Evolution Harness 设计](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md) — v0.2 安装挂载、记忆循环、技能演进与风控架构
+- [Modular Self-Evolution Harness](../harness/README.md) — modular agent、memory loop 与 skill loop 的正式 harness 文档
+- [Self-Evolution Harness Archive](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md) — 历史 v0.2 安装挂载、记忆循环、技能演进与风控架构
 - [Agent Systems Research](../design/self-evolution-harness/research/agent-systems/README.md) — 记忆与自进化调研的浓缩来源索引
 - [设计与架构](DESIGN.md) — 当前 engine architecture、核心概念、算法、集成设计
 - [用法与参考](USAGE.md) — CLI 命令、嵌入向量支持、架构概览

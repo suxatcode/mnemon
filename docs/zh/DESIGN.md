@@ -6,7 +6,7 @@
 
 Mnemon 是一个为 LLM agent 设计的持久化记忆系统。它采用 **LLM-Supervised** 模式：宿主 LLM 作为独立记忆 Binary 的外部编排者，通过符号化 CLI 接口交互，而 Binary 负责确定性的存储、图索引和生命周期管理。记忆以四图知识结构组织 — temporal、entity、causal、semantic 四种 edge。以单一 Go binary + SQLite 的形式实现，不依赖任何外部 API。
 
-本文档描述当前 Mnemon binary 与 engine architecture。更上层的 memory harness doctrine 见 [Mnemon Memory Harness](framework/HARNESS.md)，可安装 runtime 资产见 [INSTALL.md](framework/INSTALL.md) 和 [GUIDELINE.md](framework/GUIDELINE.md)。v0.2 自进化架构已收敛到 [Self-Evolution Harness 设计](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md)。
+本文档描述当前 Mnemon binary 与 engine architecture。更上层的 memory harness doctrine 见 [Mnemon Memory Harness](framework/HARNESS.md)，可安装 runtime 资产见 [INSTALL.md](framework/INSTALL.md) 和 [GUIDELINE.md](framework/GUIDELINE.md)。正式 modular self-evolution harness 文档见 [Mnemon Harness](../harness/README.md)，历史 v0.2 架构保留在 [Self-Evolution Harness Archive](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md)。
 
 ---
 
@@ -40,9 +40,9 @@ MAGMA 四图模型（temporal、entity、causal、semantic），LLM 注意力与
 
 Markdown 可安装的 runtime 集成：`SKILL.md`、`INSTALL.md`、`GUIDELINE.md`、四个 hook phase（Prime、Remind、Nudge、Compact）、agent 主导的记忆判断、可选 setup 自动化，以及轻量 Markdown 自进化。
 
-### [Self-Evolution Harness](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md)
+### [Self-Evolution Harness](../harness/README.md)
 
-v0.2 的 agent-agnostic 安装挂载、`.mnemon` canonical filesystem、记忆巩固循环、技能演进、可选维护 runner 与 proposal-first 风控架构。
+正式 modular harness 文档，覆盖 agent-agnostic 安装挂载、memory loop、skill loop 与未来可外挂 evolution modules。历史 v0.2 背景保留在 [Self-Evolution Harness Archive](../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md)。
 
 ### [8. 设计决策与未来方向](design/08-decisions.md)
 

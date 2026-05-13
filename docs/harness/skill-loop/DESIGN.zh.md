@@ -2,7 +2,7 @@
 
 相关可视化页面：[site/index.html](site/index.html)
 
-可安装 MVP 资产：[harness/skill-loop](../../../../harness/skill-loop/README.md)
+可安装 MVP 资产：[harness/skill-loop](../../../harness/skill-loop/README.md)
 
 Skill loop 的目标是让宿主 Agent 拥有一套可自我演进的 skill library，同时不替换宿主原生的 skill runtime。Skill 仍然是宿主可发现、可调用的原生资产；Mnemon 负责保存 canonical lifecycle state，以及支撑演进判断的 evidence。
 

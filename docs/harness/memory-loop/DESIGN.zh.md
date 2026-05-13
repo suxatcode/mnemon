@@ -4,6 +4,8 @@
 
 英文版本：[DESIGN.md](DESIGN.md)
 
+可安装 MVP 资产：[harness/memory-loop](../../../harness/memory-loop/README.md)
+
 Memory loop 是 self-evolution harness 的第一个可落地切片。它给 HostAgent 提供一份面向 prompt 的工作记忆，同时使用 Mnemon 作为持久长期记忆。Harness 本身保持很小：围绕已有 HostAgent 安装 Markdown policy、hook prompt、protocol skills 和一个维护型 subagent。
 
 ## 设计目标

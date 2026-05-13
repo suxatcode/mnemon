@@ -6,7 +6,7 @@
 
 Mnemon is a persistent memory system designed for LLM agents. It adopts the **LLM-Supervised** pattern: the host LLM acts as external orchestrator of a standalone memory binary through symbolic CLI interfaces, while the binary handles deterministic storage, graph indexing, and lifecycle management. Memory is organized as a four-graph knowledge structure with temporal, entity, causal, and semantic edges. Implemented as a single Go binary + SQLite, with no external API dependencies.
 
-This document describes the current Mnemon binary and engine architecture. The broader memory harness doctrine lives in [Mnemon Memory Harness](framework/HARNESS.md), with installable runtime artifacts in [INSTALL.md](framework/INSTALL.md) and [GUIDELINE.md](framework/GUIDELINE.md). The v0.2 self-evolution architecture is consolidated in [Self-Evolution Harness Design](design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md).
+This document describes the current Mnemon binary and engine architecture. The broader memory harness doctrine lives in [Mnemon Memory Harness](framework/HARNESS.md), with installable runtime artifacts in [INSTALL.md](framework/INSTALL.md) and [GUIDELINE.md](framework/GUIDELINE.md). The formal modular self-evolution harness docs live in [Mnemon Harness](harness/README.md), with historical v0.2 architecture in [Self-Evolution Harness Archive](design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md).
 
 ---
 
@@ -40,9 +40,9 @@ Effective Importance (EI) decay formula, immunity rules, auto-pruning, GC comman
 
 Markdown-installable runtime integration: `SKILL.md`, `INSTALL.md`, `GUIDELINE.md`, the four hook phases (Prime, Remind, Nudge, Compact), agent-led memory decisions, optional setup automation, and lightweight markdown self-evolution.
 
-### [Self-Evolution Harness](design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md)
+### [Self-Evolution Harness](harness/README.md)
 
-The v0.2 architecture for agent-agnostic installation, canonical `.mnemon` filesystem, memory consolidation loop, skill evolution, optional maintenance runner, and proposal-first risk control.
+The formal modular harness docs for agent-agnostic installation, memory loop, skill loop, and future attachable evolution modules. Historical v0.2 context remains in [Self-Evolution Harness Archive](design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md).
 
 ### [8. Design Decisions & Future Direction](design/08-decisions.md)
 

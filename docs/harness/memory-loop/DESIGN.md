@@ -4,6 +4,8 @@ Related visualization: [site/index.html](site/index.html)
 
 Chinese version: [DESIGN.zh.md](DESIGN.zh.md)
 
+Installable MVP assets: [harness/memory-loop](../../../harness/memory-loop/README.md)
+
 The memory loop is the first practical slice of the self-evolution harness. It gives a host agent a prompt-facing working memory while using Mnemon as durable long-term memory. The harness stays small: it installs Markdown policy, hook prompts, protocol skills, and one maintenance subagent around an existing host agent.
 
 ## Design Goal

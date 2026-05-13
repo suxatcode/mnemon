@@ -401,7 +401,7 @@ Harness 失败的表现：
 
 自进化应先从轻量 Markdown loop 开始，而不是先做重型 framework。
 
-完整 v0.2 架构已收敛到 [Self-Evolution Harness 设计](../../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md)。
+正式 modular self-evolution harness 文档见 [Mnemon Harness](../../harness/README.md)。历史 v0.2 架构保留在 [Self-Evolution Harness Archive](../../design/self-evolution-harness/SELF_EVOLUTION_HARNESS.md)。
 
 Mnemon 不应自动改写 runtime 行为。它应帮助 agent 发现重复经验、保存证据，并提出 Markdown 变更候选；这些候选必须由人类或仓库 review 接受后才生效。
 
