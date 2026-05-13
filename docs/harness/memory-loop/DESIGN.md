@@ -20,13 +20,89 @@ The answer is a two-layer memory loop:
 
 This keeps online behavior simple while preserving a path to durable memory.
 
+## Hot/Cold Memory Boundary
+
+The memory loop intentionally separates LLM-native memory from system-native
+memory.
+
+`MEMORY.md` is hot memory. It is model-friendly and eagerly loaded into the
+prompt, so it has the best behavioral effect. It is also expensive: it consumes
+context, attention, and prompt budget, and it can become noisy if it grows
+without quota and consolidation.
+
+Mnemon is cold memory. It is system-friendly: durable, indexed, queryable,
+cheap to keep, and efficient for scattered long-term recall. It is less
+model-native because recalled material must be selected before entering the
+prompt. That trade-off is acceptable because cold memory gives the agent much
+larger capacity and lower online cost.
+
+A computer memory analogy is useful:
+
+```text
+MEMORY.md -> RAM / cache
+Mnemon    -> indexed disk / durable store
+Dreaming  -> writeback + compaction + eviction
+Recall    -> page-in / retrieval into context
+```
+
+The loop should keep high-frequency, high-confidence, currently useful context
+in working memory. Lower-frequency history, scattered facts, decisions, and
+experience should live in Mnemon until a focused recall brings them back.
+
+This boundary is a pattern, not a fixed implementation pair. In the MVP,
+`MEMORY.md` represents the hot memory implementation and Mnemon represents the
+cold memory implementation. Future work can improve either side:
+
+- model-driven filesystem memory, layered Markdown, structured prompt memory,
+  or agent-maintained notes improve the hot, LLM-native side;
+- RAG-enhanced storage, vector indexes, graph memory, hybrid retrieval, or
+  stronger episodic/semantic stores improve the cold, system-native side;
+- better dreaming, promotion, demotion, compaction, and eviction improve the
+  exchange protocol between the two.
+
+The memory-loop contract is therefore:
+
+```text
+LLM-native hot memory
+  <-> consolidation / promotion / demotion
+System-native cold memory
+```
+
+`MEMORY.md` and Mnemon are the first concrete choices for this contract, not the
+only possible choices.
+
+## Memory vs Search/Retrieval
+
+Knowledge bases and external RAG corpora should not be treated as memory by
+default.
+
+Memory is accumulated agent, user, or project state: preferences, decisions,
+experience, failures, conventions, and continuity created through prior work.
+It can be written, consolidated, superseded, forgotten, and recalled.
+
+Knowledge-base retrieval is closer to search. It queries external documents,
+web pages, API docs, papers, company material, or code indexes. These sources
+belong near `web_search`, `docs_search`, `code_search`, and other retrieval
+tools.
+
+The boundary is:
+
+```text
+Memory     -> what this agent/user/project has accumulated
+Search/RAG -> external knowledge sources the agent can query
+```
+
+Search results become memory only when the agent internalizes them as durable
+user, project, or task state. For example, an API documentation result is search
+output; a project decision based on that result may become memory.
+
 ## Core Parts
 
 | Part | Role | Boundary |
 | --- | --- | --- |
 | HostAgent | Runs tasks, receives hooks, and decides whether to load protocol skills or spawn the dreaming subagent. | It does not own the memory storage protocol. |
-| `MEMORY.md` | Prompt-facing working memory loaded during Prime. | It is maintained by `memory_set.md` and the dreaming subagent. |
-| Mnemon | Long-term memory binary and store used for durable recall and write. | It is accessed through `memory_get.md` and the dreaming subagent. |
+| `MEMORY.md` | Prompt-facing hot working memory loaded during Prime. | It is maintained by `memory_set.md` and the dreaming subagent. |
+| Mnemon | Cold long-term memory binary and store used for durable recall and write. | It is accessed through `memory_get.md` and the dreaming subagent. |
 
 Everything else is a harness asset around these three parts.
 

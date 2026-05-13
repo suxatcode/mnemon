@@ -639,7 +639,7 @@
         langAttr: "zh-CN",
         title: "Memory Loop MVP",
         eyebrow: "Mnemon Harness / Memory Loop",
-        summary: "第一版只实现一个清晰的记忆闭环：GUIDE 写 policy，setup 负责安装，hook 给出 prime/remind/nudge/compact 的触发时机，protocol skills 执行在线读写，dreaming subagent 做离线巩固。",
+        summary: "第一版只实现一个清晰的记忆闭环：MEMORY.md 是模型友好的热记忆，Mnemon 是工程友好的冷记忆，GUIDE/hook/protocol/dreaming 负责二者之间的读取、积累和巩固。",
         readingTitle: "阅读顺序",
         reading: [
           "先看三大核心：HostAgent、MEMORY.md、Mnemon。",
@@ -652,8 +652,8 @@
         assetHeading: "五类 Harness 概念",
         cores: [
           { name: "HostAgent", color: "var(--host)", text: "宿主 Agent 的核心引擎。它运行任务、接收 hook 注入，并根据 GUIDE.md 判断是否加载 skill 或启动 subagent。" },
-          { name: "MEMORY.md", color: "var(--working)", text: "工作记忆主体。Prime 直接把它加入 system prompt；memory_set.md 负责在线维护它。" },
-          { name: "Mnemon", color: "var(--longterm)", text: "长期记忆主体。mnemon binary 独立安装；memory_get.md 和 dreaming subagent 通过协议调用它。" }
+          { name: "MEMORY.md", color: "var(--working)", text: "热工作记忆主体。它是 LLM-native memory，Prime 直接加入 system prompt，效果最好但占用上下文。" },
+          { name: "Mnemon", color: "var(--longterm)", text: "冷长期记忆主体。它是 system-native memory，容量更大、成本更低，通过 focused recall 带回上下文。" }
         ],
         assets: [
           { name: "GUIDE", color: "var(--guide)", text: "GUIDE.md 是 policy 文档，只说明何时读、何时写、何时巩固，以及什么值得保留。" },
@@ -663,12 +663,15 @@
           { name: "subagent", color: "var(--capability)", text: "dreaming 是专用维护 subagent，负责 MEMORY.md 压缩、丢弃和写入 Mnemon。" }
         ],
         rulesTitle: "关键规则",
-        rulesIntro: "这五类概念的边界固定后，memory loop 不会把 policy、时机、执行协议和后台维护混在一起。",
+        rulesIntro: "这五类概念的边界固定后，memory loop 不会把 policy、时机、执行协议、后台维护和外部知识检索混在一起。",
         rules: [
+          { name: "冷热分层", color: "var(--working)", text: "MEMORY.md 类似 RAM/cache，优化模型可用性；Mnemon 类似 indexed disk，优化容量、成本和持久召回。" },
+          { name: "实现可替换", color: "var(--longterm)", text: "MEMORY.md 和 Mnemon 是第一组实现。文件系统记忆可增强热侧；RAG、向量、图记忆可增强冷侧；dreaming 优化冷热交换。" },
           { name: "GUIDE 只定义 policy", color: "var(--guide)", text: "GUIDE.md 只回答何时读记忆、何时写记忆、什么值得保留，不绑定 MEMORY.md 或 Mnemon。" },
           { name: "hook 只给时机", color: "var(--hook)", text: "Prime、Remind、Nudge、Compact 都是宿主生命周期插槽，不直接执行复杂记忆操作。" },
           { name: "protocol 绑定方法", color: "var(--capability)", text: "memory_get.md 负责 Mnemon recall；memory_set.md 通过 MNEMON_MEMORY_LOOP_DIR 定位并修改 MEMORY.md。" },
-          { name: "subagent 做巩固", color: "var(--working)", text: "Dreaming 不是普通 hook 或 skill。它是被启动的维护 subagent，先写 Mnemon，再整理 MEMORY.md。" }
+          { name: "subagent 做巩固", color: "var(--working)", text: "Dreaming 不是普通 hook 或 skill。它是被启动的维护 subagent，先写 Mnemon，再整理 MEMORY.md。" },
+          { name: "知识库属于检索", color: "var(--longterm)", text: "外部 RAG、docs search、web search 默认是 retrieval tools。只有被内化为用户、项目或任务状态后才进入 memory。" }
         ],
         flowTitle: "运行数据流",
         flowIntro: "点击阶段，只显示当前阶段的数据流，避免所有箭头同时出现。",
@@ -776,8 +779,10 @@
         },
         matrixRows: [
           ["Host runtime", "HostAgent", "运行任务，接收 hook，决定是否加载 protocol skill 或 subagent。", "不拥有记忆存储协议，只执行被安装的能力。", "var(--host)"],
-          ["Host-facing surface", "MEMORY.md", "作为 working memory 直接进入 system prompt。", "由 memory_set.md 和 dreaming subagent 维护。", "var(--working)"],
-          ["Canonical store", "Mnemon", "作为 long-term memory store 提供 recall 和 write。", "由 mnemon binary + store 承载。", "var(--longterm)"],
+          ["Host-facing surface", "MEMORY.md", "作为 hot working memory 直接进入 system prompt。", "模型友好但昂贵；由 memory_set.md 和 dreaming subagent 维护。", "var(--working)"],
+          ["Canonical store", "Mnemon", "作为 cold long-term memory store 提供 recall 和 write。", "系统友好、容量更大；由 mnemon binary + store 承载。", "var(--longterm)"],
+          ["Memory pattern", "hot <-> cold contract", "协调 LLM-native 热记忆与 system-native 冷记忆。", "MEMORY.md 和 Mnemon 是第一组选择，不是唯一选择。", "var(--capability)"],
+          ["Retrieval tools", "web/docs/code/RAG search", "查询外部知识源，补充当前任务资料。", "默认不是 memory；只有内化为持久状态后才写入记忆。", "var(--host)"],
           ["GUIDE", "GUIDE.md", "说明何时读写记忆、什么值得保留。", "只定义 policy，不绑定存储目标。", "var(--guide)"],
           ["setup", "setup/claude-code + env.sh", "安装四个 hook、两个 protocol skills、dreaming subagent、memory 文件和环境变量。", "只负责挂载，并设置 MNEMON_MEMORY_LOOP_DIR。", "var(--guide)"],
           ["hook", "prime/remind/nudge/compact", "提供宿主生命周期触发点。", "只给时机和短提醒，不承载记忆协议。", "var(--hook)"],
@@ -789,7 +794,7 @@
         langAttr: "en",
         title: "Memory Loop MVP",
         eyebrow: "Mnemon Harness / Memory Loop",
-        summary: "The first version implements one focused memory loop: GUIDE holds policy, setup installs the assets, hooks provide prime/remind/nudge/compact timing, protocol skills handle online read/write, and the dreaming subagent performs offline consolidation.",
+        summary: "The first version implements one focused memory loop: MEMORY.md is model-friendly hot memory, Mnemon is system-friendly cold memory, and GUIDE/hooks/protocols/dreaming manage read, accumulation, and consolidation between them.",
         readingTitle: "Reading Order",
         reading: [
           "Start with the three core parts: HostAgent, MEMORY.md, and Mnemon.",
@@ -802,8 +807,8 @@
         assetHeading: "Five Harness Concepts",
         cores: [
           { name: "HostAgent", color: "var(--host)", text: "The host agent engine. It runs tasks, receives hook injections, and decides whether to load a skill or spawn a subagent according to GUIDE.md." },
-          { name: "MEMORY.md", color: "var(--working)", text: "The working-memory file. Prime injects it into the system prompt; memory_set.md maintains it during online work." },
-          { name: "Mnemon", color: "var(--longterm)", text: "The long-term memory store and binary. It is installed separately; memory_get.md and the dreaming subagent call it through protocols." }
+          { name: "MEMORY.md", color: "var(--working)", text: "The hot working-memory file. It is LLM-native memory: Prime injects it into the system prompt, so it is effective but context-expensive." },
+          { name: "Mnemon", color: "var(--longterm)", text: "The cold long-term memory store. It is system-native memory: larger, cheaper to keep, and paged back into context through focused recall." }
         ],
         assets: [
           { name: "GUIDE", color: "var(--guide)", text: "GUIDE.md is the policy document: when to read, when to write, when to consolidate, and what is worth keeping." },
@@ -813,12 +818,15 @@
           { name: "subagent", color: "var(--capability)", text: "Dreaming is the maintenance subagent for MEMORY.md compaction, eviction, and Mnemon writes." }
         ],
         rulesTitle: "Key Rules",
-        rulesIntro: "With these boundaries fixed, the memory loop does not mix policy, timing, protocol execution, and background maintenance.",
+        rulesIntro: "With these boundaries fixed, the memory loop does not mix policy, timing, protocol execution, background maintenance, and external knowledge retrieval.",
         rules: [
+          { name: "Hot / Cold Split", color: "var(--working)", text: "MEMORY.md behaves like RAM/cache for model usability. Mnemon behaves like indexed disk for capacity, cost, and durable recall." },
+          { name: "Replaceable Implementations", color: "var(--longterm)", text: "MEMORY.md and Mnemon are the first choices. Filesystem memory can improve the hot side; RAG, vector, or graph memory can improve the cold side; dreaming improves the exchange." },
           { name: "GUIDE Defines Policy", color: "var(--guide)", text: "GUIDE.md answers when to read memory, when to write memory, and what is worth keeping. It does not bind MEMORY.md or Mnemon." },
           { name: "Hooks Provide Timing", color: "var(--hook)", text: "Prime, Remind, Nudge, and Compact are host lifecycle slots. They do not perform complex memory operations directly." },
           { name: "Protocols Bind Methods", color: "var(--capability)", text: "memory_get.md performs Mnemon recall; memory_set.md locates and edits MEMORY.md through MNEMON_MEMORY_LOOP_DIR." },
-          { name: "Subagent Consolidates", color: "var(--working)", text: "Dreaming is not a normal hook or skill. It is a spawned maintenance subagent that writes Mnemon first, then organizes MEMORY.md." }
+          { name: "Subagent Consolidates", color: "var(--working)", text: "Dreaming is not a normal hook or skill. It is a spawned maintenance subagent that writes Mnemon first, then organizes MEMORY.md." },
+          { name: "Knowledge Bases Are Retrieval", color: "var(--longterm)", text: "External RAG, docs search, and web search are retrieval tools by default. They become memory only after being internalized as durable user, project, or task state." }
         ],
         flowTitle: "Runtime Flow",
         flowIntro: "Select a phase to isolate its data flow instead of showing every arrow at once.",
@@ -926,8 +934,10 @@
         },
         matrixRows: [
           ["Host runtime", "HostAgent", "Runs tasks, receives hooks, and decides whether to load a protocol skill or subagent.", "Does not own memory storage protocols.", "var(--host)"],
-          ["Host-facing surface", "MEMORY.md", "Enters the system prompt as working memory.", "Maintained by memory_set.md and the dreaming subagent.", "var(--working)"],
-          ["Canonical store", "Mnemon", "Provides recall and write for long-term memory.", "Backed by the mnemon binary and store.", "var(--longterm)"],
+          ["Host-facing surface", "MEMORY.md", "Enters the system prompt as hot working memory.", "Model-friendly but expensive; maintained by memory_set.md and dreaming.", "var(--working)"],
+          ["Canonical store", "Mnemon", "Provides recall and write for cold long-term memory.", "System-friendly with larger capacity; backed by the mnemon binary and store.", "var(--longterm)"],
+          ["Memory pattern", "hot <-> cold contract", "Coordinates LLM-native hot memory with system-native cold memory.", "MEMORY.md and Mnemon are first choices, not the only choices.", "var(--capability)"],
+          ["Retrieval tools", "web/docs/code/RAG search", "Queries external knowledge sources for the current task.", "Not memory by default; write only internalized durable state into memory.", "var(--host)"],
           ["GUIDE", "GUIDE.md", "Explains when to read or write memory and what is worth keeping.", "Defines policy only, not storage targets.", "var(--guide)"],
           ["setup", "setup/claude-code + env.sh", "Installs four hooks, two protocol skills, the dreaming subagent, memory files, and environment variables.", "Mounts assets and sets MNEMON_MEMORY_LOOP_DIR.", "var(--guide)"],
           ["hook", "prime/remind/nudge/compact", "Provides host lifecycle trigger points.", "Provides timing and short reminders only, not memory protocols.", "var(--hook)"],

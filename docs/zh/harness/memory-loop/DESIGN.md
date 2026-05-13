@@ -20,13 +20,80 @@ MVP 要回答一个问题：如何让 HostAgent 在不变成自定义 agent runt
 
 这样在线路径足够简单，同时保留长期记忆能力。
 
+## 热/冷记忆边界
+
+Memory loop 有意区分 LLM-native memory 和 system-native memory。
+
+`MEMORY.md` 是热记忆。它模型友好，并且 eager load 到 prompt 中，所以行为效果
+最好。但它也昂贵：会消耗上下文、注意力和 prompt budget；如果没有 quota 和
+consolidation，也容易积累噪声。
+
+Mnemon 是冷记忆。它系统友好：持久、可索引、可查询、保存成本低，并且适合
+零散长期内容的高效召回。它相对不那么模型原生，因为召回内容必须先被筛选，
+再进入 prompt。但这个取舍是合理的，因为冷记忆给 agent 带来更大的容量和更低
+的在线成本。
+
+可以用计算机内存类比：
+
+```text
+MEMORY.md -> RAM / cache
+Mnemon    -> indexed disk / durable store
+Dreaming  -> writeback + compaction + eviction
+Recall    -> page-in / retrieval into context
+```
+
+高频、高置信、当前有用的上下文应留在 working memory 中。低频历史、零散事实、
+决策和经验应保存在 Mnemon 中，直到 focused recall 再把它们带回上下文。
+
+这个边界是一种 pattern，而不是固定实现组合。在 MVP 中，`MEMORY.md` 代表热
+记忆实现，Mnemon 代表冷记忆实现。未来可以分别增强两侧：
+
+- model-driven filesystem memory、分层 Markdown、structured prompt memory
+  或 agent-maintained notes，都是在增强热的 LLM-native 侧；
+- RAG-enhanced storage、vector indexes、graph memory、hybrid retrieval 或更强的
+  episodic/semantic stores，都是在增强冷的 system-native 侧；
+- 更好的 dreaming、promotion、demotion、compaction 和 eviction，则是在增强二者
+  之间的交换协议。
+
+因此，memory-loop 的 contract 是：
+
+```text
+LLM-native hot memory
+  <-> consolidation / promotion / demotion
+System-native cold memory
+```
+
+`MEMORY.md` 和 Mnemon 是这个 contract 的第一组具体选择，不是唯一可能选择。
+
+## Memory 与 Search/Retrieval 的边界
+
+知识库和外部 RAG corpus 默认不应被视为 memory。
+
+Memory 是 agent、user 或 project 积累出来的状态：偏好、决策、经验、失败、
+约定和连续性。它可以被写入、巩固、替换、遗忘和召回。
+
+Knowledge-base retrieval 更接近 search。它查询外部文档、网页、API docs、
+论文、公司材料或代码索引。这类能力应更接近 `web_search`、`docs_search`、
+`code_search` 和其他 retrieval tools。
+
+边界是：
+
+```text
+Memory     -> 当前 agent/user/project 积累出的状态
+Search/RAG -> agent 可以查询的外部知识源
+```
+
+Search result 只有在被 agent 内化为耐久的 user、project 或 task state 后才会
+成为 memory。例如 API 文档查询结果是 search output；基于这个结果形成的项目
+决策才可能成为 memory。
+
 ## 核心主体
 
 | 主体 | 作用 | 边界 |
 | --- | --- | --- |
 | HostAgent | 运行任务、接收 hooks，并决定是否加载 protocol skills 或启动 dreaming subagent。 | 不拥有记忆存储协议。 |
-| `MEMORY.md` | Prime 阶段加载到 prompt 的工作记忆。 | 由 `memory_set.md` 和 dreaming subagent 维护。 |
-| Mnemon | 长期记忆 binary 和 store，用于持久 recall 与 write。 | 通过 `memory_get.md` 和 dreaming subagent 访问。 |
+| `MEMORY.md` | Prime 阶段加载到 prompt 的热工作记忆。 | 由 `memory_set.md` 和 dreaming subagent 维护。 |
+| Mnemon | 冷长期记忆 binary 和 store，用于持久 recall 与 write。 | 通过 `memory_get.md` 和 dreaming subagent 访问。 |
 
 其他内容都是围绕这三个主体的 harness 资产。
 
