@@ -183,8 +183,8 @@ Harness Modules -> memory、skills、eval、risk、review、audit、policy
 
 | Module | 目的 | 当前参考宿主 |
 | --- | --- | --- |
-| Memory Loop | 增加 working memory、long-term memory 和 dreaming consolidation。 | Claude Code setup 位于 `harness/memory-loop/setup/claude-code`。 |
-| Skill Loop | 增加 active/stale/archived skill lifecycle、evidence capture、curator proposal 和批准后的 lifecycle mutation。 | Claude Code setup 位于 `harness/skill-loop/setup/claude-code`。 |
+| Memory Loop | 增加 working memory、long-term memory 和 dreaming consolidation。 | Claude Code setup 位于 `harness/setup/install.sh --host claude-code --module memory-loop`。 |
+| Skill Loop | 增加 active/stale/archived skill lifecycle、evidence capture、curator proposal 和批准后的 lifecycle mutation。 | Claude Code setup 位于 `harness/setup/install.sh --host claude-code --module skill-loop`。 |
 
 ## 与 Skill Packs 的关系
 

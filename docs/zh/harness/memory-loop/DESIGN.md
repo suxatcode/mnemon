@@ -4,7 +4,7 @@
 
 英文版本：[DESIGN.md](../../../harness/memory-loop/DESIGN.md)
 
-可安装 MVP 资产：[harness/memory-loop](../../../../harness/memory-loop/README.md)
+可安装 MVP 资产：[harness/modules/memory-loop](../../../../harness/modules/memory-loop/README.md)
 
 Memory loop 是 self-evolution harness 的第一个可落地切片。它给 HostAgent 提供一份面向 prompt 的工作记忆，同时使用 Mnemon 作为持久长期记忆。Harness 本身保持很小：围绕已有 HostAgent 安装 Markdown policy、hook prompt、protocol skills 和一个维护型 subagent。
 
@@ -102,7 +102,7 @@ Search result 只有在被 agent 内化为耐久的 user、project 或 task stat
 | 概念 | Memory Loop 资产 | 职责 | 边界 |
 | --- | --- | --- | --- |
 | GUIDE | `GUIDE.md` | 定义何时读、何时写、何时压缩、何时巩固。 | 只写 policy，不绑定存储目标。 |
-| setup | `setup/claude-code` + `env.sh` | 安装 hooks、protocol skills、dreaming subagent、memory 文件和环境变量。 | 只负责安装，不参与 runtime 判断。 |
+| setup | `harness/setup` + host projection | 安装 hooks、protocol skills、dreaming subagent、memory 文件和环境变量。 | 只负责安装，不参与 runtime 判断。 |
 | hook | `prime/remind/nudge/compact` | 提供 Host 生命周期时机和短提醒。 | 不承载复杂推理或存储协议。 |
 | protocol | `memory_get.md` / `memory_set.md` | 定义在线 Mnemon recall 和在线 `MEMORY.md` 编辑。 | 只有 GUIDE 判断需要时才由 HostAgent 调用。 |
 | subagent | `dreaming` | 将 `MEMORY.md` 巩固到 Mnemon，并重写工作记忆。 | 后台或显式维护流程，不是每轮在线行为。 |

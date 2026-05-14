@@ -20,6 +20,8 @@ host surface projection，以及可选的 daemon scheduling。
 | 主题 | 设计 |
 | --- | --- |
 | Modular Agent Harness | [中文](modular-agent/DESIGN.md) / [EN](../../harness/modular-agent/DESIGN.md) |
+| Loop Module Standard | [中文](LOOP_MODULE_STANDARD.md) / [EN](../../harness/LOOP_MODULE_STANDARD.md) |
+| Host Projection | [中文](HOST_PROJECTION.md) / [EN](../../harness/HOST_PROJECTION.md) |
 | Harness Roadmap | [中文](ROADMAP.md) / [EN](../../harness/ROADMAP.md) |
 | Memory Loop | [中文](memory-loop/DESIGN.md) / [EN](../../harness/memory-loop/DESIGN.md) / [site](../../site/memory-loop/site.html) |
 | Skill Loop | [中文](skill-loop/DESIGN.md) / [EN](../../harness/skill-loop/DESIGN.md) / [site](../../site/skill-loop/site.html) |
@@ -28,18 +30,30 @@ host surface projection，以及可选的 daemon scheduling。
 
 | Harness Module | 实现 |
 | --- | --- |
-| Memory Loop | [harness/memory-loop](../../../harness/memory-loop/README.md) |
-| Skill Loop | [harness/skill-loop](../../../harness/skill-loop/README.md) |
+| Memory Loop | [harness/modules/memory-loop](../../../harness/modules/memory-loop/README.md) |
+| Skill Loop | [harness/modules/skill-loop](../../../harness/modules/skill-loop/README.md) |
+
+## 仓库布局
+
+| 目录 | 作用 |
+| --- | --- |
+| `harness/modules/` | Canonical、host-agnostic loop modules。 |
+| `harness/hosts/` | Host projection adapters，例如 Claude Code，以及后续 Codex 支持。 |
+| `harness/setup/` | 统一 install、status 和 uninstall 入口，用来组合 modules 与 hosts。 |
+| `harness/<loop>/` | 为旧安装路径保留的兼容 wrapper。 |
 
 ## 词汇
 
 | 概念 | 含义 |
 | --- | --- |
+| loop module | 一个可挂载 harness loop 的标准包结构。 |
 | GUIDE | Markdown policy，用来判断某个 loop 何时应该行动。 |
 | setup | 安装并挂载到宿主 agent。 |
 | hook | Prime、Remind、Nudge、Compact 等宿主生命周期时机。 |
 | protocol | 定义可复用操作的 Markdown skill。 |
 | subagent | 用于较重 review 或 consolidation 的后台维护 agent。 |
+| projection | 把 canonical loop assets 渲染到 `.claude`、`.codex` 或其他 runtime surface 的宿主特定过程。 |
+| host manifest | 机器可读记录，描述已投影 loops、paths、lifecycle mappings 和 host capabilities。 |
 | daemon | 可选的 harness maintenance runner，用于调度模块后台工作。 |
 | substrate | Mnemon 拥有的运行时基座，用于 module state、setup、projection、scheduling 和跨模块协议。 |
 
