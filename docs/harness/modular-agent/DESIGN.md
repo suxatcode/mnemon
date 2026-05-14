@@ -195,8 +195,8 @@ locks, and status.
 
 | Module | Purpose | Current Reference Host |
 | --- | --- | --- |
-| Memory Loop | Adds working memory, long-term memory, and dreaming consolidation. | Claude Code setup under `harness/memory-loop/setup/claude-code`. |
-| Skill Loop | Adds active/stale/archived skill lifecycle, evidence capture, curator proposals, and approved lifecycle mutation. | Claude Code setup under `harness/skill-loop/setup/claude-code`. |
+| Memory Loop | Adds working memory, long-term memory, and dreaming consolidation. | Claude Code setup under `harness/setup/install.sh --host claude-code --module memory-loop`. |
+| Skill Loop | Adds active/stale/archived skill lifecycle, evidence capture, curator proposals, and approved lifecycle mutation. | Claude Code setup under `harness/setup/install.sh --host claude-code --module skill-loop`. |
 
 ## Relationship To Skill Packs
 

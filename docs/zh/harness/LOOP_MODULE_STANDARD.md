@@ -30,7 +30,7 @@ loop、prompt assembly、tool routing、native skill discovery、权限模型和
 每个可安装 loop module 应该遵循这个结构：
 
 ```text
-harness/<loop-name>/
+harness/modules/<loop-name>/
 ├── README.md
 ├── module.json
 ├── env.sh
@@ -44,13 +44,24 @@ harness/<loop-name>/
 │   └── <protocol-skill>.md
 ├── subagents/
 │   └── <maintenance-agent>.md
-└── setup/
-    ├── claude-code/
-    │   ├── install.sh
-    │   └── uninstall.sh
-    └── <host-adapter>/
-        ├── install.sh
-        └── uninstall.sh
+```
+
+Host-specific projection logic 位于 modules 之外：
+
+```text
+harness/hosts/<host>/
+├── projector.sh
+├── templates/
+└── scripts/
+```
+
+Shared setup entrypoints 负责组合 modules 和 hosts：
+
+```text
+harness/setup/
+├── install.sh
+├── status.sh
+└── uninstall.sh
 ```
 
 如果某个 loop 的契约需要额外 runtime 文件，可以加入该目录，例如 Memory Loop
@@ -66,7 +77,7 @@ harness/<loop-name>/
 | `hooks/*.md` | 是 | 与宿主无关的 lifecycle reminders。描述 agent 在生命周期边界应考虑什么。 |
 | `skills/*.md` | 通常是 | 用于在线可复用操作的 protocol skills。它们定义流程，不定义宿主安装方式。 |
 | `subagents/*.md` | 可选 | 用于较重 review、consolidation 或 proposal generation 的维护角色。没有 native subagent 的宿主可以降级为人工或定时 job。 |
-| `setup/<host>/` | 至少一个 | Host-specific projection adapter，把 module 安装或移除到某个宿主 runtime。 |
+| `harness/hosts/<host>/` | 整体至少一个 host | Host-specific projection adapter，把 modules 安装或移除到某个宿主 runtime。 |
 
 ## 生命周期事件
 
@@ -162,7 +173,7 @@ projection surfaces。
     "loop_runtime": []
   },
   "host_adapters": {
-    "claude-code": "setup/claude-code"
+    "claude-code": "../../hosts/claude-code"
   }
 }
 ```
@@ -194,4 +205,3 @@ projection surfaces。
 - setup、status 和 uninstall 行为必须明确、可审计。
 - 卸载时保留用户状态，除非用户显式传入破坏性选项。
 - 新增或修改公开 harness 概念时，同步维护英文和中文文档。
-

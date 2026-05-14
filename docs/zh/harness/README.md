@@ -30,8 +30,17 @@ host surface projection，以及可选的 daemon scheduling。
 
 | Harness Module | 实现 |
 | --- | --- |
-| Memory Loop | [harness/memory-loop](../../../harness/memory-loop/README.md) |
-| Skill Loop | [harness/skill-loop](../../../harness/skill-loop/README.md) |
+| Memory Loop | [harness/modules/memory-loop](../../../harness/modules/memory-loop/README.md) |
+| Skill Loop | [harness/modules/skill-loop](../../../harness/modules/skill-loop/README.md) |
+
+## 仓库布局
+
+| 目录 | 作用 |
+| --- | --- |
+| `harness/modules/` | Canonical、host-agnostic loop modules。 |
+| `harness/hosts/` | Host projection adapters，例如 Claude Code，以及后续 Codex 支持。 |
+| `harness/setup/` | 统一 install、status 和 uninstall 入口，用来组合 modules 与 hosts。 |
+| `harness/<loop>/` | 为旧安装路径保留的兼容 wrapper。 |
 
 ## 词汇
 

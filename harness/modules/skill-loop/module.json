@@ -43,6 +43,6 @@
     ]
   },
   "host_adapters": {
-    "claude-code": "setup/claude-code"
+    "claude-code": "../../hosts/claude-code"
   }
 }

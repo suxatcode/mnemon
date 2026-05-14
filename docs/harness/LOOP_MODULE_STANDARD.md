@@ -32,7 +32,7 @@ permission model, and UI.
 Every installable loop module should follow this shape:
 
 ```text
-harness/<loop-name>/
+harness/modules/<loop-name>/
 ├── README.md
 ├── module.json
 ├── env.sh
@@ -46,13 +46,24 @@ harness/<loop-name>/
 │   └── <protocol-skill>.md
 ├── subagents/
 │   └── <maintenance-agent>.md
-└── setup/
-    ├── claude-code/
-    │   ├── install.sh
-    │   └── uninstall.sh
-    └── <host-adapter>/
-        ├── install.sh
-        └── uninstall.sh
+```
+
+Host-specific projection logic lives outside modules:
+
+```text
+harness/hosts/<host>/
+├── projector.sh
+├── templates/
+└── scripts/
+```
+
+Shared setup entrypoints compose modules and hosts:
+
+```text
+harness/setup/
+├── install.sh
+├── status.sh
+└── uninstall.sh
 ```
 
 Loop-specific runtime files may be added when they are part of the loop
@@ -68,7 +79,7 @@ contract, such as `MEMORY.md` for the Memory Loop.
 | `hooks/*.md` | Yes | Host-agnostic lifecycle reminders. They describe what the agent should consider at a lifecycle boundary. |
 | `skills/*.md` | Usually | Protocol skills for reusable online operations. These define procedures, not host-specific installation. |
 | `subagents/*.md` | Optional | Maintenance roles for heavier review, consolidation, or proposal generation. Hosts without native subagents may run them as manual or scheduled jobs. |
-| `setup/<host>/` | At least one | Host-specific projection adapter that installs or removes the module from a host runtime. |
+| `harness/hosts/<host>/` | At least one host overall | Host-specific projection adapter that installs or removes modules from a host runtime. |
 
 ## Lifecycle Events
 
@@ -166,7 +177,7 @@ Each loop module should include a `module.json` file with this stable shape:
     "loop_runtime": []
   },
   "host_adapters": {
-    "claude-code": "setup/claude-code"
+    "claude-code": "../../hosts/claude-code"
   }
 }
 ```
@@ -199,4 +210,3 @@ The same standard concepts map differently across hosts:
 - Preserve user state on uninstall unless a destructive flag is explicit.
 - Document English and Chinese behavior together when adding or changing public
   harness concepts.
-

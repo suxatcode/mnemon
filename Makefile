@@ -10,7 +10,7 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: deps build install uninstall test unit vet docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
+.PHONY: deps build install uninstall test unit vet harness-validate docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
 
 .DEFAULT_GOAL := help
 
@@ -44,6 +44,9 @@ unit: ## Run Go unit tests
 
 vet: ## Run go vet static analysis
 	go vet ./...
+
+harness-validate: ## Validate harness module manifests and declared asset paths
+	bash scripts/validate_harness_modules.sh
 
 # ── Containers / Deployment ──────────────────────────────────────────
 

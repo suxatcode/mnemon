@@ -4,7 +4,7 @@ Related visualization: [site.html](../../site/memory-loop/site.html)
 
 Chinese version: [DESIGN.md](../../zh/harness/memory-loop/DESIGN.md)
 
-Installable MVP assets: [harness/memory-loop](../../../harness/memory-loop/README.md)
+Installable MVP assets: [harness/modules/memory-loop](../../../harness/modules/memory-loop/README.md)
 
 The memory loop is the first practical slice of the self-evolution harness. It gives a host agent a prompt-facing working memory while using Mnemon as durable long-term memory. The harness stays small: it installs Markdown policy, hook prompts, protocol skills, and one maintenance subagent around an existing host agent.
 
@@ -111,7 +111,7 @@ Everything else is a harness asset around these three parts.
 | Concept | Memory Loop Asset | Responsibility | Boundary |
 | --- | --- | --- | --- |
 | GUIDE | `GUIDE.md` | Defines when to read, write, compact, and consolidate memory. | Policy only; it does not bind storage targets. |
-| setup | `setup/claude-code` + `env.sh` | Installs hooks, protocol skills, dreaming subagent, memory files, and environment variables. | Installation only; not a runtime decision maker. |
+| setup | `harness/setup` + host projection | Installs hooks, protocol skills, dreaming subagent, memory files, and environment variables. | Installation only; not a runtime decision maker. |
 | hook | `prime/remind/nudge/compact` | Provides host lifecycle timing and short reminders. | No heavy reasoning or storage protocol. |
 | protocol | `memory_get.md` / `memory_set.md` | Defines online recall from Mnemon and online edits to `MEMORY.md`. | Called by the host only when GUIDE says memory work is useful. |
 | subagent | `dreaming` | Consolidates `MEMORY.md` into Mnemon and rewrites working memory. | Background or explicit maintenance, not every-turn online behavior. |

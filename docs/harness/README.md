@@ -35,8 +35,17 @@ projection into host surfaces, and optional daemon scheduling.
 
 | Harness Module | Implementation |
 | --- | --- |
-| Memory Loop | [harness/memory-loop](../../harness/memory-loop/README.md) |
-| Skill Loop | [harness/skill-loop](../../harness/skill-loop/README.md) |
+| Memory Loop | [harness/modules/memory-loop](../../harness/modules/memory-loop/README.md) |
+| Skill Loop | [harness/modules/skill-loop](../../harness/modules/skill-loop/README.md) |
+
+## Repository Layout
+
+| Directory | Role |
+| --- | --- |
+| `harness/modules/` | Canonical host-agnostic loop modules. |
+| `harness/hosts/` | Host projection adapters such as Claude Code and future Codex support. |
+| `harness/setup/` | Shared install, status, and uninstall entrypoints that compose modules with hosts. |
+| `harness/<loop>/` | Compatibility wrappers for older install paths. |
 
 ## Vocabulary
 
