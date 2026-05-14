@@ -9,6 +9,7 @@ the loop into its own runtime without a custom adapter.
 ```text
 harness/memory-loop/
 ├── README.md
+├── module.json
 ├── env.sh
 ├── GUIDE.md
 ├── MEMORY.md
@@ -47,6 +48,7 @@ harness/memory-loop/
 
 | Asset | Purpose |
 | --- | --- |
+| `module.json` | Machine-readable loop manifest for standard lifecycle events, assets, state, and host adapters. |
 | `env.sh` | Runtime config: memory directory, env path, and dreaming threshold. |
 | `GUIDE.md` | Policy: when to read memory, when to write memory, and what is worth keeping. |
 | `hooks/*.md` | Four lifecycle reminders: Prime, Remind, Nudge, and Compact. |

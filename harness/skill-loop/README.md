@@ -9,6 +9,7 @@ the canonical skill lifecycle state and the evidence used to evolve it.
 ```text
 harness/skill-loop/
 ├── README.md
+├── module.json
 ├── env.sh
 ├── GUIDE.md
 ├── hooks/
@@ -47,6 +48,7 @@ harness/skill-loop/
 
 | Asset | Purpose |
 | --- | --- |
+| `module.json` | Machine-readable loop manifest for standard lifecycle events, assets, state, and host adapters. |
 | `env.sh` | Runtime config: canonical skill library, host skill surface, usage log, and proposal paths. |
 | `GUIDE.md` | Policy for evidence, review triggers, lifecycle movement, and proposal-first changes. |
 | `hooks/*.md` | Four lifecycle reminders. Prime syncs active skills; Nudge records evidence; Compact may trigger review; Remind is no-op by default. |
