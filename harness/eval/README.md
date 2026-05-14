@@ -20,6 +20,12 @@ turn:
 make codex-app-eval
 ```
 
+Run the real memory/skill scenario suite with:
+
+```bash
+make codex-app-eval-suite
+```
+
 To run an actual Codex turn, use:
 
 ```bash
@@ -42,3 +48,13 @@ Each eval run has:
 - `.mnemon/`: canonical Mnemon harness state
 - `logs/`: app-server logs
 - `reports/`: machine-readable eval reports
+
+## Scenario Suite
+
+The default suite covers:
+
+- `memory-skip-local`: visible workspace context should not trigger recall
+- `memory-focused-recall`: relevant seeded long-term memory should be recalled
+- `memory-write-decision`: durable decisions should update `MEMORY.md`
+- `memory-no-pollution`: transient tokens should not be stored
+- `skill-observe-evidence`: reusable workflow evidence should append JSONL

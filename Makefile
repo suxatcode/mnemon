@@ -10,7 +10,7 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: deps build install uninstall test unit vet harness-validate codex-app-eval docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
+.PHONY: deps build install uninstall test unit vet harness-validate codex-app-eval codex-app-eval-suite docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
 
 .DEFAULT_GOAL := help
 
@@ -50,6 +50,9 @@ harness-validate: ## Validate harness module manifests and declared asset paths
 
 codex-app-eval: ## Run real Codex app-server harness smoke eval
 	python3 scripts/codex_app_server_eval.py
+
+codex-app-eval-suite: ## Run real Codex app-server memory/skill scenario suite
+	python3 scripts/codex_app_server_eval.py --suite
 
 # ── Containers / Deployment ──────────────────────────────────────────
 

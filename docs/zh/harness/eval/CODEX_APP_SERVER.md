@@ -16,6 +16,16 @@ codex app-server --listen stdio://
 make codex-app-eval
 ```
 
+memory/skill 场景套件会启动真实 Codex turn，并断言 loop 行为：
+
+```bash
+make codex-app-eval-suite
+```
+
+当前套件覆盖：本地上下文应跳过 memory recall、相关长期记忆应被 recall、持久
+决策应写入 `MEMORY.md`、临时信息不应污染 memory，以及 skill evidence
+应写入 JSONL。
+
 如果需要触发真实 Codex turn，可以显式开启：
 
 ```bash

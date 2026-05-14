@@ -238,7 +238,13 @@ This skill is projected by the Mnemon Codex host adapter.
 
 - Canonical loop directory: \`${CANONICAL_MODULE_DIR}\`
 - Runtime env file: \`${runtime_file}\`
-- If \`${loop_dir_var}\` is not already exported, use the canonical loop directory above.
+- Before following the procedure, source the runtime env file when the expected
+  environment variables are not already exported.
+- The canonical loop directory is the location for \`GUIDE.md\`, runtime files,
+  and loop state. Do not look for loop-owned \`GUIDE.md\`, \`MEMORY.md\`, usage
+  logs, proposals, or skill libraries in the workspace root.
+- If \`${loop_dir_var}\` is not already exported, use the canonical loop
+  directory above.
 EOF
 }
 
@@ -252,6 +258,7 @@ install_memory_loop() {
 
   mkdir -p "${CONFIG_DIR}/skills/memory_get" "${CONFIG_DIR}/skills/memory_set" "${CONFIG_DIR}/mnemon-memory-loop"
   write_runtime_env "${CONFIG_DIR}/mnemon-memory-loop" "MNEMON_MEMORY_LOOP_ENV" "MNEMON_MEMORY_LOOP_DIR"
+  install_file "${MODULE_DIR}/GUIDE.md" "${CONFIG_DIR}/mnemon-memory-loop/GUIDE.md" 0644
   install_file "${MODULE_DIR}/skills/memory_get.md" "${CONFIG_DIR}/skills/memory_get/SKILL.md" 0644
   install_file "${MODULE_DIR}/skills/memory_set.md" "${CONFIG_DIR}/skills/memory_set/SKILL.md" 0644
   append_codex_runtime_note "${CONFIG_DIR}/skills/memory_get/SKILL.md" "MNEMON_MEMORY_LOOP_DIR" "${CONFIG_DIR}/mnemon-memory-loop/env.sh"
@@ -285,6 +292,7 @@ install_skill_loop() {
     "${HOST_SKILLS_DIR}/skill_manage" \
     "${CONFIG_DIR}/mnemon-skill-loop"
   write_runtime_env "${CONFIG_DIR}/mnemon-skill-loop" "MNEMON_SKILL_LOOP_ENV" "MNEMON_SKILL_LOOP_DIR"
+  install_file "${MODULE_DIR}/GUIDE.md" "${CONFIG_DIR}/mnemon-skill-loop/GUIDE.md" 0644
   cat >> "${CONFIG_DIR}/mnemon-skill-loop/env.sh" <<EOF
 export MNEMON_SKILL_LOOP_LIBRARY_DIR="${CANONICAL_MODULE_DIR}/skills"
 export MNEMON_SKILL_LOOP_ACTIVE_DIR="${CANONICAL_MODULE_DIR}/skills/active"

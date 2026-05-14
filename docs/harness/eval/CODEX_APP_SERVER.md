@@ -16,6 +16,17 @@ harness-injected `.codex` skills and `.mnemon` state:
 make codex-app-eval
 ```
 
+The memory/skill scenario suite starts real Codex turns and asserts loop
+behavior:
+
+```bash
+make codex-app-eval-suite
+```
+
+The suite currently covers local-context memory skip, focused long-term recall,
+durable `MEMORY.md` writes, transient no-pollution behavior, and skill evidence
+logging.
+
 To trigger a real Codex turn, opt in explicitly:
 
 ```bash

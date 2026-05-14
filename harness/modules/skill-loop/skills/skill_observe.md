@@ -33,8 +33,11 @@ host-specific default.
    - `outcome`: `positive`, `negative`, `neutral`, or `unknown`
    - `note`: short evidence note
    - `source`: `user`, `agent`, `repo`, or `manual`
-4. Keep notes short and avoid raw conversation excerpts.
-5. If evidence is sensitive or uncertain, skip it or record a sanitized note.
+4. Use `source: "user"` only for explicit user feedback or user-requested
+   lifecycle evidence. Use `source: "agent"` when the agent infers reusable
+   workflow evidence from its own turn.
+5. Keep notes short and avoid raw conversation excerpts.
+6. If evidence is sensitive or uncertain, skip it or record a sanitized note.
 
 ## Example
 
