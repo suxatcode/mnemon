@@ -6,6 +6,7 @@
 .codex/
 .openclaw/
 .supervisor/
+.mnemon/
 .env
 .mnemon-dev/
 
