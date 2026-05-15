@@ -784,7 +784,7 @@
           ["Memory pattern", "hot <-> cold contract", "协调 LLM-native 热记忆与 system-native 冷记忆。", "MEMORY.md 和 Mnemon 是第一组选择，不是唯一选择。", "var(--capability)"],
           ["Retrieval tools", "web/docs/code/RAG search", "查询外部知识源，补充当前任务资料。", "默认不是 memory；只有内化为持久状态后才写入记忆。", "var(--host)"],
           ["GUIDE", "GUIDE.md", "说明何时读写记忆、什么值得保留。", "只定义 policy，不绑定存储目标。", "var(--guide)"],
-          ["setup", "setup/claude-code + env.sh", "安装四个 hook、两个 protocol skills、dreaming subagent、memory 文件和环境变量。", "只负责挂载，并设置 MNEMON_MEMORY_LOOP_DIR。", "var(--guide)"],
+          ["setup", "harness/setup + env.sh", "安装四个 hook、两个 protocol skills、dreaming subagent、memory 文件和环境变量。", "只负责挂载，并设置 MNEMON_MEMORY_LOOP_DIR。", "var(--guide)"],
           ["hook", "prime/remind/nudge/compact", "提供宿主生命周期触发点。", "只给时机和短提醒，不承载记忆协议。", "var(--hook)"],
           ["protocol", "memory_get.md / memory_set.md", "提供读长期记忆和写工作记忆的在线方法。", "绑定 Mnemon recall 与 MEMORY.md 编辑规则。", "var(--capability)"],
           ["subagent", "dreaming", "维护、巩固和清理工作记忆。", "绑定 Mnemon write 与 MEMORY.md compact / eviction。", "var(--capability)"]
@@ -939,7 +939,7 @@
           ["Memory pattern", "hot <-> cold contract", "Coordinates LLM-native hot memory with system-native cold memory.", "MEMORY.md and Mnemon are first choices, not the only choices.", "var(--capability)"],
           ["Retrieval tools", "web/docs/code/RAG search", "Queries external knowledge sources for the current task.", "Not memory by default; write only internalized durable state into memory.", "var(--host)"],
           ["GUIDE", "GUIDE.md", "Explains when to read or write memory and what is worth keeping.", "Defines policy only, not storage targets.", "var(--guide)"],
-          ["setup", "setup/claude-code + env.sh", "Installs four hooks, two protocol skills, the dreaming subagent, memory files, and environment variables.", "Mounts assets and sets MNEMON_MEMORY_LOOP_DIR.", "var(--guide)"],
+          ["setup", "harness/setup + env.sh", "Installs four hooks, two protocol skills, the dreaming subagent, memory files, and environment variables.", "Mounts assets and sets MNEMON_MEMORY_LOOP_DIR.", "var(--guide)"],
           ["hook", "prime/remind/nudge/compact", "Provides host lifecycle trigger points.", "Provides timing and short reminders only, not memory protocols.", "var(--hook)"],
           ["protocol", "memory_get.md / memory_set.md", "Provides the online methods for long-term recall and working-memory writes.", "Binds Mnemon recall and MEMORY.md editing rules.", "var(--capability)"],
           ["subagent", "dreaming", "Maintains, consolidates, and cleans working memory.", "Binds Mnemon write with MEMORY.md compaction and eviction.", "var(--capability)"]
