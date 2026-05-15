@@ -208,6 +208,15 @@ def setup_workspace(args: argparse.Namespace, root: Path) -> tuple[Path, Path, P
         env["MNEMON_SKILL_LOOP_ARCHIVED_DIR"] = str(skill_dir / "skills" / "archived")
         env["MNEMON_SKILL_LOOP_USAGE_FILE"] = str(skill_dir / "skills" / ".usage.jsonl")
         env["MNEMON_SKILL_LOOP_PROPOSALS_DIR"] = str(skill_dir / "proposals")
+    if "eval-loop" in args.modules:
+        eval_dir = mnemon_dir / "harness" / "eval-loop"
+        env["MNEMON_EVAL_LOOP_ENV"] = str(eval_dir / "env.sh")
+        env["MNEMON_EVAL_LOOP_DIR"] = str(eval_dir)
+        env["MNEMON_EVAL_LOOP_SCRATCH_DIR"] = str(eval_dir / "scratch")
+        env["MNEMON_EVAL_LOOP_CANDIDATES_DIR"] = str(eval_dir / "candidates")
+        env["MNEMON_EVAL_LOOP_REPORTS_DIR"] = str(eval_dir / "reports")
+        env["MNEMON_EVAL_LOOP_ARTIFACTS_DIR"] = str(eval_dir / "artifacts")
+        env["MNEMON_EVAL_LOOP_RETIRED_DIR"] = str(eval_dir / "retired")
     if args.isolated_codex_home:
         codex_home = run_root / "codex-home"
         codex_home.mkdir(parents=True, exist_ok=True)
@@ -302,6 +311,7 @@ class Scenario:
 
 
 SKILL_LOOP_EXPECTED_SKILLS = ["skill_observe", "skill_curate", "skill_author", "skill_manage"]
+EVAL_LOOP_EXPECTED_SKILLS = ["eval_plan", "eval_run", "eval_analyze", "eval_improve"]
 
 
 def setup_none(workspace: Path, mnemon_dir: Path, env: dict[str, str]) -> None:
@@ -1128,7 +1138,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--module",
         dest="modules",
         action="append",
-        choices=["memory-loop", "skill-loop"],
+        choices=["memory-loop", "skill-loop", "eval-loop"],
         default=[],
         help="Harness module to install. May be repeated. Defaults to memory-loop.",
     )
@@ -1163,6 +1173,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             expected.extend(["memory_get", "memory_set"])
         if "skill-loop" in args.modules:
             expected.extend(SKILL_LOOP_EXPECTED_SKILLS)
+        if "eval-loop" in args.modules:
+            expected.extend(EVAL_LOOP_EXPECTED_SKILLS)
         args.expected_skills = expected
     return args
 

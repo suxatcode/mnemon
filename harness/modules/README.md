@@ -5,7 +5,8 @@ This directory contains canonical, host-agnostic loop modules.
 ```text
 harness/modules/
 ├── memory-loop/
-└── skill-loop/
+├── skill-loop/
+└── eval-loop/
 ```
 
 Each module follows the Loop Module Standard and declares its assets in

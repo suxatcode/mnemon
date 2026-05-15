@@ -30,6 +30,7 @@ projection into host surfaces, and optional daemon scheduling.
 | Harness Roadmap | [EN](ROADMAP.md) / [中文](../zh/harness/ROADMAP.md) |
 | Memory Loop | [EN](memory-loop/DESIGN.md) / [中文](../zh/harness/memory-loop/DESIGN.md) / [site](../site/memory-loop/site.html) |
 | Skill Loop | [EN](skill-loop/DESIGN.md) / [中文](../zh/harness/skill-loop/DESIGN.md) / [site](../site/skill-loop/site.html) |
+| Eval Loop | [EN](eval-loop/DESIGN.md) / [中文](../zh/harness/eval-loop/DESIGN.md) |
 
 ## Installable Assets
 
@@ -37,6 +38,7 @@ projection into host surfaces, and optional daemon scheduling.
 | --- | --- |
 | Memory Loop | [harness/modules/memory-loop](../../harness/modules/memory-loop/README.md) |
 | Skill Loop | [harness/modules/skill-loop](../../harness/modules/skill-loop/README.md) |
+| Eval Loop | [harness/modules/eval-loop](../../harness/modules/eval-loop/README.md) |
 
 ## Repository Layout
 

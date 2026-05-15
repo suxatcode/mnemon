@@ -2,6 +2,16 @@
 
 This directory documents eval modes for host-wrapped loop testing.
 
+The canonical eval loop module lives under:
+
+```text
+harness/modules/eval-loop/
+```
+
+Use `harness/eval/` for project-local runner notes and app-server operation
+details. Use `harness/modules/eval-loop/` for reusable eval-loop policy,
+scenarios, suites, rubrics, protocol skills, and lifecycle guidance.
+
 ## Codex App-Server Eval
 
 The Codex app-server eval uses the real Codex app-server protocol instead of a
@@ -36,6 +46,12 @@ Run the longer skill-loop regression suite with:
 
 ```bash
 make codex-skill-deep-eval
+```
+
+Run the eval-loop projection smoke check with:
+
+```bash
+make codex-eval-loop-smoke
 ```
 
 To run an actual Codex turn, use:

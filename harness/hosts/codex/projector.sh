@@ -20,6 +20,9 @@ Memory loop install options:
 Skill loop install options:
   --host-skills-dir DIR
 
+Eval loop install options:
+  --host-skills-dir DIR
+
 Uninstall options:
   --purge-memory
   --purge-library
@@ -95,7 +98,7 @@ if [[ -z "${MODULE}" ]]; then
   usage >&2
   exit 2
 fi
-if [[ "${MODULE}" != "memory-loop" && "${MODULE}" != "skill-loop" ]]; then
+if [[ "${MODULE}" != "memory-loop" && "${MODULE}" != "skill-loop" && "${MODULE}" != "eval-loop" ]]; then
   echo "unsupported module for Codex: ${MODULE}" >&2
   exit 1
 fi
@@ -321,6 +324,61 @@ EOF
   echo "Host skills:  ${HOST_SKILLS_DIR}"
 }
 
+install_eval_loop() {
+  ensure_python
+  [[ -n "${HOST_SKILLS_DIR}" ]] || HOST_SKILLS_DIR="${CONFIG_DIR}/skills"
+  copy_common_canonical_assets
+  mkdir -p \
+    "${CANONICAL_MODULE_DIR}/scratch" \
+    "${CANONICAL_MODULE_DIR}/candidates" \
+    "${CANONICAL_MODULE_DIR}/reports" \
+    "${CANONICAL_MODULE_DIR}/artifacts" \
+    "${CANONICAL_MODULE_DIR}/retired" \
+    "${CANONICAL_MODULE_DIR}/scenarios" \
+    "${CANONICAL_MODULE_DIR}/suites" \
+    "${CANONICAL_MODULE_DIR}/rubrics" \
+    "${HOST_SKILLS_DIR}/eval_plan" \
+    "${HOST_SKILLS_DIR}/eval_run" \
+    "${HOST_SKILLS_DIR}/eval_analyze" \
+    "${HOST_SKILLS_DIR}/eval_improve" \
+    "${CONFIG_DIR}/mnemon-eval-loop"
+
+  cp -R "${MODULE_DIR}/scenarios/." "${CANONICAL_MODULE_DIR}/scenarios/"
+  cp -R "${MODULE_DIR}/suites/." "${CANONICAL_MODULE_DIR}/suites/"
+  cp -R "${MODULE_DIR}/rubrics/." "${CANONICAL_MODULE_DIR}/rubrics/"
+
+  write_runtime_env "${CONFIG_DIR}/mnemon-eval-loop" "MNEMON_EVAL_LOOP_ENV" "MNEMON_EVAL_LOOP_DIR"
+  install_file "${MODULE_DIR}/GUIDE.md" "${CONFIG_DIR}/mnemon-eval-loop/GUIDE.md" 0644
+  cat >> "${CONFIG_DIR}/mnemon-eval-loop/env.sh" <<EOF
+export MNEMON_EVAL_LOOP_SCRATCH_DIR="${CANONICAL_MODULE_DIR}/scratch"
+export MNEMON_EVAL_LOOP_CANDIDATES_DIR="${CANONICAL_MODULE_DIR}/candidates"
+export MNEMON_EVAL_LOOP_REPORTS_DIR="${CANONICAL_MODULE_DIR}/reports"
+export MNEMON_EVAL_LOOP_ARTIFACTS_DIR="${CANONICAL_MODULE_DIR}/artifacts"
+export MNEMON_EVAL_LOOP_RETIRED_DIR="${CANONICAL_MODULE_DIR}/retired"
+export MNEMON_EVAL_LOOP_SCENARIOS_DIR="${CANONICAL_MODULE_DIR}/scenarios"
+export MNEMON_EVAL_LOOP_SUITES_DIR="${CANONICAL_MODULE_DIR}/suites"
+export MNEMON_EVAL_LOOP_RUBRICS_DIR="${CANONICAL_MODULE_DIR}/rubrics"
+export MNEMON_EVAL_LOOP_HOST_SKILLS_DIR="${HOST_SKILLS_DIR}"
+export MNEMON_EVAL_LOOP_DEFAULT_HOST="${MNEMON_EVAL_LOOP_DEFAULT_HOST:-codex}"
+export MNEMON_EVAL_LOOP_DEFAULT_SUITE="${MNEMON_EVAL_LOOP_DEFAULT_SUITE:-smoke}"
+EOF
+
+  install_file "${MODULE_DIR}/skills/eval_plan.md" "${HOST_SKILLS_DIR}/eval_plan/SKILL.md" 0644
+  install_file "${MODULE_DIR}/skills/eval_run.md" "${HOST_SKILLS_DIR}/eval_run/SKILL.md" 0644
+  install_file "${MODULE_DIR}/skills/eval_analyze.md" "${HOST_SKILLS_DIR}/eval_analyze/SKILL.md" 0644
+  install_file "${MODULE_DIR}/skills/eval_improve.md" "${HOST_SKILLS_DIR}/eval_improve/SKILL.md" 0644
+  append_codex_runtime_note "${HOST_SKILLS_DIR}/eval_plan/SKILL.md" "MNEMON_EVAL_LOOP_DIR" "${CONFIG_DIR}/mnemon-eval-loop/env.sh"
+  append_codex_runtime_note "${HOST_SKILLS_DIR}/eval_run/SKILL.md" "MNEMON_EVAL_LOOP_DIR" "${CONFIG_DIR}/mnemon-eval-loop/env.sh"
+  append_codex_runtime_note "${HOST_SKILLS_DIR}/eval_analyze/SKILL.md" "MNEMON_EVAL_LOOP_DIR" "${CONFIG_DIR}/mnemon-eval-loop/env.sh"
+  append_codex_runtime_note "${HOST_SKILLS_DIR}/eval_improve/SKILL.md" "MNEMON_EVAL_LOOP_DIR" "${CONFIG_DIR}/mnemon-eval-loop/env.sh"
+
+  write_host_manifest "${CONFIG_DIR}"
+  echo "Installed Mnemon eval loop for Codex."
+  echo "Config:       ${CONFIG_DIR}"
+  echo "State:        ${CANONICAL_MODULE_DIR}"
+  echo "Host skills:  ${HOST_SKILLS_DIR}"
+}
+
 status_module() {
   echo "Codex ${MODULE}:"
   echo "  config:   ${CONFIG_DIR}"
@@ -375,12 +433,40 @@ uninstall_skill_loop() {
   echo "Removed Mnemon skill loop from ${CONFIG_DIR}."
 }
 
+uninstall_eval_loop() {
+  local env_path="${CONFIG_DIR}/mnemon-eval-loop/env.sh"
+  if [[ -f "${env_path}" ]]; then
+    # shellcheck source=/dev/null
+    source "${env_path}"
+  fi
+  local host_skills_dir="${MNEMON_EVAL_LOOP_HOST_SKILLS_DIR:-${HOST_SKILLS_DIR:-${CONFIG_DIR}/skills}}"
+  rm -rf "${host_skills_dir}/eval_plan"
+  rm -rf "${host_skills_dir}/eval_run"
+  rm -rf "${host_skills_dir}/eval_analyze"
+  rm -rf "${host_skills_dir}/eval_improve"
+  rm -rf "${CONFIG_DIR}/mnemon-eval-loop"
+  rm -rf "${CANONICAL_MODULE_DIR}/scenarios"
+  rm -rf "${CANONICAL_MODULE_DIR}/suites"
+  rm -rf "${CANONICAL_MODULE_DIR}/rubrics"
+  rm -f "${CANONICAL_MODULE_DIR}/GUIDE.md" "${CANONICAL_MODULE_DIR}/env.sh" "${CANONICAL_MODULE_DIR}/module.json"
+  rmdir "${CANONICAL_MODULE_DIR}/retired" 2>/dev/null || true
+  rmdir "${CANONICAL_MODULE_DIR}/artifacts" 2>/dev/null || true
+  rmdir "${CANONICAL_MODULE_DIR}/reports" 2>/dev/null || true
+  rmdir "${CANONICAL_MODULE_DIR}/candidates" 2>/dev/null || true
+  rmdir "${CANONICAL_MODULE_DIR}/scratch" 2>/dev/null || true
+  rmdir "${CANONICAL_MODULE_DIR}" 2>/dev/null || true
+  remove_host_manifest_module
+  echo "Removed Mnemon eval loop from ${CONFIG_DIR}."
+}
+
 case "${ACTION}:${MODULE}" in
   install:memory-loop) install_memory_loop ;;
   install:skill-loop) install_skill_loop ;;
-  status:memory-loop|status:skill-loop) status_module ;;
+  install:eval-loop) install_eval_loop ;;
+  status:memory-loop|status:skill-loop|status:eval-loop) status_module ;;
   uninstall:memory-loop) uninstall_memory_loop ;;
   uninstall:skill-loop) uninstall_skill_loop ;;
+  uninstall:eval-loop) uninstall_eval_loop ;;
   *)
     echo "unsupported action/module: ${ACTION}/${MODULE}" >&2
     exit 1

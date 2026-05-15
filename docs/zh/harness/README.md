@@ -25,6 +25,7 @@ host surface projection，以及可选的 daemon scheduling。
 | Harness Roadmap | [中文](ROADMAP.md) / [EN](../../harness/ROADMAP.md) |
 | Memory Loop | [中文](memory-loop/DESIGN.md) / [EN](../../harness/memory-loop/DESIGN.md) / [site](../../site/memory-loop/site.html) |
 | Skill Loop | [中文](skill-loop/DESIGN.md) / [EN](../../harness/skill-loop/DESIGN.md) / [site](../../site/skill-loop/site.html) |
+| Eval Loop | [中文](eval-loop/DESIGN.md) / [EN](../../harness/eval-loop/DESIGN.md) |
 
 ## 可安装资产
 
@@ -32,6 +33,7 @@ host surface projection，以及可选的 daemon scheduling。
 | --- | --- |
 | Memory Loop | [harness/modules/memory-loop](../../../harness/modules/memory-loop/README.md) |
 | Skill Loop | [harness/modules/skill-loop](../../../harness/modules/skill-loop/README.md) |
+| Eval Loop | [harness/modules/eval-loop](../../../harness/modules/eval-loop/README.md) |
 
 ## 仓库布局
 
