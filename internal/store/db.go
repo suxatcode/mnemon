@@ -96,11 +96,17 @@ func ReadActive(baseDir string) string {
 	if name == "" {
 		return DefaultStoreName
 	}
+	if !ValidStoreName(name) {
+		return DefaultStoreName
+	}
 	return name
 }
 
 // WriteActive writes the active store name to <baseDir>/active.
 func WriteActive(baseDir, name string) error {
+	if !ValidStoreName(name) {
+		return fmt.Errorf("invalid store name %q", name)
+	}
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return err
 	}
@@ -119,7 +125,7 @@ func ListStores(baseDir string) ([]string, error) {
 	}
 	var names []string
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() && ValidStoreName(e.Name()) {
 			names = append(names, e.Name())
 		}
 	}
@@ -129,6 +135,9 @@ func ListStores(baseDir string) ([]string, error) {
 
 // StoreExists checks whether the named store directory exists.
 func StoreExists(baseDir, name string) bool {
+	if !ValidStoreName(name) {
+		return false
+	}
 	fi, err := os.Stat(StoreDir(baseDir, name))
 	return err == nil && fi.IsDir()
 }
