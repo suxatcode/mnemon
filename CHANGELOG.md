@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Deduplication false positives on scientific and domain-specific text:
+  - Removed bare `"not"` from negation words — it appears in virtually all
+    scientific prose and caused unrelated records to be classified as CONFLICT.
+  - Gated negation-word check behind similarity ≥ 0.7 — at borderline
+    similarity, shared domain vocabulary is not a reliable conflict signal.
+  - Raised cosine dedup threshold from 0.70 to 0.85 — same-domain
+    different-fact pairs (e.g. survey records at different locations) produce
+    cosine ~0.75 with nomic-embed-text and were incorrectly triggering UPDATE.
+  - Switched token dedup from bidirectional-max (`ContentSimilarity`) to
+    Jaccard (`|A∩B|/|A∪B|`) — penalises texts that share vocabulary but
+    differ in most tokens, preventing formulaic records from scoring as UPDATE.
+
 ## [0.1.4] - 2026-05-16
 
 ### Added
