@@ -62,3 +62,36 @@ func TestAddClaudeHooksSelectiveReplacesExistingMnemonHooks(t *testing.T) {
 		t.Fatal("enabled compact hook should be registered")
 	}
 }
+
+func TestAddCodexHooksReplacesExistingMnemonHooks(t *testing.T) {
+	data := map[string]any{
+		"hooks": map[string]any{
+			"SessionStart": []any{
+				map[string]any{"hooks": []any{map[string]any{"command": "/old/mnemon/prime.sh"}}},
+				map[string]any{"hooks": []any{map[string]any{"command": "/keep/custom.sh"}}},
+			},
+			"UserPromptSubmit": []any{
+				map[string]any{"hooks": []any{map[string]any{"command": "/old/mnemon/user_prompt.sh"}}},
+			},
+			"Stop": []any{
+				map[string]any{"hooks": []any{map[string]any{"command": "/old/mnemon/stop.sh"}}},
+			},
+		},
+	}
+
+	addCodexHooks(data, "/new/hooks")
+
+	hooks := data["hooks"].(map[string]any)
+	sessionStart := hooks["SessionStart"].([]any)
+	if len(sessionStart) != 2 {
+		t.Fatalf("expected kept custom hook plus new prime hook: %#v", sessionStart)
+	}
+	userPrompt := hooks["UserPromptSubmit"].([]any)
+	if len(userPrompt) != 1 {
+		t.Fatalf("expected one new remind hook: %#v", userPrompt)
+	}
+	stop := hooks["Stop"].([]any)
+	if len(stop) != 1 {
+		t.Fatalf("expected one new stop hook: %#v", stop)
+	}
+}

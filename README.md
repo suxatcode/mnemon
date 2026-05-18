@@ -87,6 +87,15 @@ mnemon setup
 
 `mnemon setup` auto-detects Claude Code, then interactively deploys skill, hooks, and behavioral guide. Start a new session — memory just works.
 
+### Codex
+
+```bash
+mnemon setup --target codex --yes
+```
+
+One command deploys the mnemon skill, prompt files, and Codex lifecycle hooks
+(`SessionStart`, `UserPromptSubmit`, `Stop`) in `.codex/hooks.json`.
+
 ### [OpenClaw](https://github.com/openclaw/openclaw)
 
 ```bash

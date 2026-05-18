@@ -6,6 +6,9 @@
 - Run the E2E suite with `bash scripts/e2e_test.sh` or `make test`.
 - Validate harness module manifests with `make harness-validate` when changing
   harness module assets.
+- Treat `harness/` as an experimental, not-yet-released harness layer. Do not
+  use it as an implementation dependency for release-path commands such as
+  `mnemon setup`; formal integrations belong under `cmd/` and `internal/`.
 - Treat `.claude/`, `.codex/`, `.openclaw/`, and similar host directories as
   local projection surfaces, not canonical project state.
 
