@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Nanobot integration: `mnemon setup --target nanobot` deploys a skill file to
+  `.nanobot/skills/mnemon/SKILL.md` (local) or `~/.nanobot/workspace/skills/mnemon/SKILL.md`
+  (global, recommended). `mnemon setup --eject` removes it. Detection is automatic
+  when the `nanobot` binary or `~/.nanobot/workspace/` directory is present.
+
 ## [0.1.5] - 2026-05-17
 
 ### Fixed

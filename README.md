@@ -105,6 +105,14 @@ NanoClaw runs agents inside Linux containers. Use the `/add-mnemon` skill to int
 
 The skill is available at `.claude/skills/add-mnemon/` in the NanoClaw repo.
 
+### [Nanobot](https://github.com/HKUDS/nanobot)
+
+```bash
+mnemon setup --target nanobot --global --yes
+```
+
+One command writes a skill file to `~/.nanobot/workspace/skills/mnemon/SKILL.md`. Memory is shared across all Nanobot sessions and projects. Use `--global` (recommended) because Nanobot discovers skills from the global workspace directory.
+
 ### Uninstall
 
 ```bash
@@ -156,6 +164,7 @@ memory is useful.
 
 - **Zero user-side operation** — install once; supported runtimes can use hooks, minimal runtimes can use persistent rules
 - **LLM-supervised** — the host LLM decides what to remember, update, and forget; no embedded LLM, no API keys
+- **Multi-framework support** — Claude Code (hooks), OpenClaw (plugins), Nanobot (skills), and more
 - **Markdown-installable harness** — `SKILL.md`, `INSTALL.md`, `GUIDELINE.md`, and four lifecycle reminders
 - **Four-graph architecture** — temporal, entity, causal, and semantic edges, not just vector similarity
 - **Intent-native protocol** — three primitives (`remember`, `link`, `recall`) map to the LLM's cognitive vocabulary, not database syntax; structured JSON output with signal transparency
@@ -173,6 +182,8 @@ All your local agentic AIs — across sessions and frameworks — sharing one po
                 │
   OpenClaw ─────┤
                 │
+  Nanobot ──────┤
+                │
   NanoClaw ─────┤
                 ├──▶  ~/.mnemon  ◀── shared memory
   OpenCode ─────┤
@@ -182,9 +193,9 @@ All your local agentic AIs — across sessions and frameworks — sharing one po
 
 The foundation is in place: a single `~/.mnemon` database that any agent can
 read and write. Claude Code setup automates hook installation; OpenClaw can use
-plugin hooks; NanoClaw integrates via container skills and volume mounts. The
-same harness can be installed in any LLM CLI that supports skills, rules,
-system prompts, or event hooks.
+plugin hooks; Nanobot integrates via skill files; NanoClaw integrates via
+container skills and volume mounts. The same harness can be installed in any
+LLM CLI that supports skills, rules, system prompts, or event hooks.
 
 The longer-term direction is a **memory gateway**: protocol decoupled from storage engine. The current SQLite backend is the first adapter; the protocol surface (`remember / link / recall`) can sit on top of PostgreSQL, Neo4j, or any graph database. Agent-side optimization (when to recall, what to remember) and storage-side optimization (indexing, graph algorithms) evolve independently. See [Future Direction](docs/design/08-decisions.md#82-future-direction) for details.
 
