@@ -87,7 +87,7 @@ mnemon setup
 
 `mnemon setup` auto-detects Claude Code, then interactively deploys skill, hooks, and behavioral guide. Start a new session — memory just works.
 
-### Codex
+### [Codex](https://github.com/openai/codex)
 
 ```bash
 mnemon setup --target codex --yes
