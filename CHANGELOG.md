@@ -7,11 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-05-18
+
 ### Added
+- Codex integration: `mnemon setup --target codex` deploys the mnemon skill,
+  prompt files, and Codex lifecycle hooks (`SessionStart`, `UserPromptSubmit`,
+  `Stop`) into `.codex/` or `~/.codex/`. `mnemon setup --eject --target codex`
+  removes the installed Codex surface while preserving unrelated hooks.
 - Nanobot integration: `mnemon setup --target nanobot` deploys a skill file to
   `.nanobot/skills/mnemon/SKILL.md` (local) or `~/.nanobot/workspace/skills/mnemon/SKILL.md`
   (global, recommended). `mnemon setup --eject` removes it. Detection is automatic
   when the `nanobot` binary or `~/.nanobot/workspace/` directory is present.
+
+### Note
+- Harness modules remain experimental and are not part of the v0.1.6 public
+  stability guarantee. Release-path integrations are implemented under `cmd/`
+  and `internal/`.
 
 ## [0.1.5] - 2026-05-17
 
@@ -85,7 +96,8 @@ Initial public release.
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - Comprehensive documentation with Chinese translations
 
-[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/mnemon-dev/mnemon/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/mnemon-dev/mnemon/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/mnemon-dev/mnemon/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/mnemon-dev/mnemon/compare/v0.1.2...v0.1.3
