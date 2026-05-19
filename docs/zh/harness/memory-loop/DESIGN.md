@@ -1,6 +1,6 @@
 # Memory Loop MVP 设计
 
-相关可视化页面：[site.html](../../../site/memory-loop/site.html)
+相关可视化页面：[memory-loop](../../../site/memory-loop/index.html)
 
 英文版本：[DESIGN.md](../../../harness/memory-loop/DESIGN.md)
 

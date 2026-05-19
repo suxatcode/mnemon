@@ -1,6 +1,6 @@
 # Memory Loop MVP Design
 
-Related visualization: [site.html](../../site/memory-loop/site.html)
+Related visualization: [memory-loop](../../site/memory-loop/index.html)
 
 Chinese version: [DESIGN.md](../../zh/harness/memory-loop/DESIGN.md)
 

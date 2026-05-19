@@ -27,6 +27,10 @@ Thumbs.db
 # Go
 vendor/
 
+# Python
+__pycache__/
+*.py[cod]
+
 # Mnemon data (local dev)
 *.db
 *.db-wal

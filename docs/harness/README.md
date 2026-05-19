@@ -28,8 +28,8 @@ projection into host surfaces, and optional daemon scheduling.
 | Loop Module Standard | [EN](LOOP_MODULE_STANDARD.md) / [中文](../zh/harness/LOOP_MODULE_STANDARD.md) |
 | Host Projection | [EN](HOST_PROJECTION.md) / [中文](../zh/harness/HOST_PROJECTION.md) |
 | Harness Roadmap | [EN](ROADMAP.md) / [中文](../zh/harness/ROADMAP.md) |
-| Memory Loop | [EN](memory-loop/DESIGN.md) / [中文](../zh/harness/memory-loop/DESIGN.md) / [site](../site/memory-loop/site.html) |
-| Skill Loop | [EN](skill-loop/DESIGN.md) / [中文](../zh/harness/skill-loop/DESIGN.md) / [site](../site/skill-loop/site.html) |
+| Memory Loop | [EN](memory-loop/DESIGN.md) / [中文](../zh/harness/memory-loop/DESIGN.md) / [site](../site/memory-loop/index.html) |
+| Skill Loop | [EN](skill-loop/DESIGN.md) / [中文](../zh/harness/skill-loop/DESIGN.md) / [site](../site/skill-loop/index.html) |
 | Eval Loop | [EN](eval-loop/DESIGN.md) / [中文](../zh/harness/eval-loop/DESIGN.md) |
 
 ## Installable Assets

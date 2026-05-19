@@ -1,6 +1,6 @@
 # Skill Loop MVP Design
 
-Related visualization: [site.html](../../site/skill-loop/site.html)
+Related visualization: [skill-loop](../../site/skill-loop/index.html)
 
 Installable MVP assets: [harness/modules/skill-loop](../../../harness/modules/skill-loop/README.md)
 
