@@ -12,26 +12,43 @@ MVP 的边界是“可见性治理”和“生命周期治理”：哪些 skill 
 
 ## 生命周期控制平面位置
 
-在生命周期控制平面里，`skill-loop` 是一个 `LoopModule`。它声明 skill visibility
-policy、observation 和 management protocols、curator maintenance，以及
-canonical skill lifecycle state contract。
+在生命周期控制平面里，`skill-loop` 把 skill visibility 和 skill lifecycle state
+变成 lifecycle-native capability，同时不替换宿主原生 skill runtime。
 
-这个 loop 通过 host binding 进入宿主：
+按照统一控制模型：
+
+| Layer | Skill-loop 形态 |
+| --- | --- |
+| State | `.mnemon` skill library、active/stale/archived state、evidence、proposals、reports 和 skill-loop status。 |
+| Intent | 让正确的 skills 对宿主可见，同时保留 stale 和 archived skills 用于 review、recovery 和 design memory。 |
+| Reality | Host skill surface、实际 active projection、skill usage evidence、missing 或 misleading skills、curator findings 和 review decisions。 |
+| Reconcile | 同步 active skills、记录 evidence、提出 lifecycle changes、执行已批准变更，并在 Prime 刷新宿主可见性。 |
+
+实体 profile 保持轻量：
+
+| Entity | Profile | 作用 |
+| --- | --- | --- |
+| `skill-loop` | Template | 可复用 lifecycle capability package。 |
+| skill binding | Controlled | 将 skill visibility 和 lifecycle policy 绑定到某个 host skill surface。 |
+| host skill surface | Surface | 宿主原生 discovery surface，例如 `.codex/skills` 或 `.claude/skills`。 |
+| usage signals and curator findings | Evidence | skill usefulness、missing skills、stale skills 或 workflow repetition 等观测证据。 |
+| proposals, reviews, audits | Governance | canonical skill lifecycle mutation 之前的可 review 变更记录。 |
+
+这个 loop 通过 projection 和 observation surfaces 进入宿主：
 
 ```text
-LoopModule(skill-loop)
-  -> HostBinding(host + skill surface)
-  -> Reconcile
-  -> HostAdapter
-  -> Projection(.codex/skills, .claude/skills, or another host surface)
-  -> Status
-  -> next Reconcile
+State(.mnemon skill library)
+  -> Intent(the right skills should be visible)
+  -> Projection(active skills into host skill surface)
+  -> Reality(host usage, evidence, missing or stale skills)
+  -> Reconcile(observe, curate, propose, manage, no-op)
+  -> State(active/stale/archived, reports, proposals, status)
 ```
 
 HostAgent 消费被投影的 active skill surface，并继续拥有原生 skill discovery 和
-执行。`.mnemon` 保存 canonical skill library 和 evidence。宿主 skill 目录是
-可重新生成的视图；当 projection status 与声明的 binding 漂移时，可以由
-reconcile 修复。
+执行。Mnemon 拥有 canonical skill state、evidence、proposal-first governance 和
+reconcile boundary。宿主 skill 目录仍然是可重新生成的视图；当 Reality 与 Intent
+漂移时，可以刷新。
 
 ## 目标
 

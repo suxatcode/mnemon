@@ -10,26 +10,49 @@ The memory loop is the first practical slice of the self-evolution harness. It g
 
 ## Lifecycle Control Plane Position
 
-In the lifecycle control plane, `memory-loop` is a `LoopModule`. It declares the
-portable memory policy, lifecycle prompts, protocol skills, dreaming subagent,
-and runtime state contract.
+In the lifecycle control plane, `memory-loop` is the first practical proof that
+an external capability can become lifecycle-native without turning Mnemon into a
+host agent runtime.
 
-The loop becomes active through a host binding:
+Using the shared control model:
+
+| Layer | Memory-loop shape |
+| --- | --- |
+| State | `MEMORY.md`, Mnemon long-term stores, reports, manifests, and memory-loop status under `.mnemon`. |
+| Intent | Keep useful agent, user, and project continuity available across lifecycle boundaries. |
+| Reality | The host prompt, current task, working-memory contents, recall results, context pressure, and consolidation state. |
+| Reconcile | Decide whether to read, write, compact, consolidate, or leave memory unchanged, then write status or durable state. |
+
+The entity profiles are intentionally light:
+
+| Entity | Profile | Role |
+| --- | --- | --- |
+| `memory-loop` | Template | Reusable lifecycle capability package. |
+| memory binding | Controlled | Binds memory behavior to a host lifecycle such as Prime, Remind, Nudge, Compact, and maintenance. |
+| hot/cold memory surfaces | Surface | `MEMORY.md`, Mnemon recall/write, host hooks, and protocol skills. |
+| recall/write/consolidation evidence | Evidence | Observed memory usefulness, context pressure, stale entries, and durable write results. |
+| memory proposals or audits | Governance | Future reviewable records for risky memory changes or policy changes. |
+
+In this framing, `MEMORY.md` is not the model. It is the first hot-memory
+surface. Mnemon long-term storage is not the model either. It is the first
+cold-memory surface. The model is the lifecycle loop that keeps useful
+continuity aligned with reality.
+
+The loop becomes active through projection and observation surfaces:
 
 ```text
-LoopModule(memory-loop)
-  -> HostBinding(host + lifecycle surfaces)
-  -> Reconcile
-  -> HostAdapter
-  -> Projection(.codex / .claude / other host surface)
-  -> Status
-  -> next Reconcile
+State(.mnemon memory state)
+  -> Intent(memory should help this lifecycle boundary)
+  -> Projection(hooks, GUIDE, memory_get, memory_set, dreaming)
+  -> Reality(host prompt, task, context pressure, recall/write outcomes)
+  -> Reconcile(read, write, compact, consolidate, no-op)
+  -> State(MEMORY.md, Mnemon store, reports, status)
 ```
 
-The HostAgent consumes the projection and still owns execution. `.mnemon` keeps
-the canonical memory-loop state, including `MEMORY.md`, manifests, and durable
-Mnemon stores. Host directories are generated views that can be repaired when
-projection status drifts from the declared binding.
+The HostAgent consumes the projection and still owns execution. Mnemon owns the
+durable state, profile model, and reconcile boundary. Host directories remain
+generated views that can be repaired when projected memory assets drift from the
+declared lifecycle intent.
 
 ## Design Goal
 

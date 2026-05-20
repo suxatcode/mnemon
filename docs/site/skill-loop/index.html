@@ -316,7 +316,7 @@
 
     .control-path-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 1px;
       background: var(--line);
     }
@@ -773,23 +773,22 @@
         langAttr: "zh-CN",
         title: "Skill Loop MVP",
         eyebrow: "Mnemon Harness / Skill Loop",
-        summary: "第一版 skill loop 与 memory loop 使用同一套 harness 概念：GUIDE 写 policy，setup 负责安装和挂载，hook 仍按 Prime/Remind/Nudge/Compact 理解，protocol skills 记录和迁移 skill state，curator subagent 做后台审阅与提案。",
+        summary: "skill-loop 把 skill visibility 和 skill lifecycle state 做成 lifecycle-native capability：Mnemon 保存 skill State，声明可见性 Intent，观察 HostAgent 的 skill Reality，并通过 Reconcile 执行 observe、curate、propose、manage 或 no-op。",
         readingTitle: "阅读顺序",
         reading: [
-          "先看三大核心：HostAgent、Host Skill Surface、Skill Library。",
-          "再看五类支撑概念：GUIDE、setup、hook、protocol、subagent。",
-          "最后切换阶段，看 Prime、Nudge、Observe、Curator、Manage 如何闭合成 loop。"
+          "先看 skill-loop 如何映射 State、Intent、Projection、Reality、Reconcile。",
+          "再看 host skill surface 与 `.mnemon` canonical library 如何分工。",
+          "最后切换阶段，看 Prime、Nudge、Observe、Curator、Manage 如何形成闭环。"
         ],
         controlTitle: "生命周期控制位置",
-        controlIntro: "skill-loop 在整体控制平面里是一个 LoopModule。它声明 skill lifecycle policy，并通过 host adapter 把 active skill 集合投影到宿主原生 skill surface。",
-        controlFeedback: "Status 反馈到下一次 Reconcile；canonical skill state 保留在 .mnemon，宿主 skill surface 只是 projection。",
+        controlIntro: "skill-loop 不替换宿主的 skill runtime。它把可见性、证据和迁移状态纳入同一条生命周期主干：保存状态，声明意图，投影给宿主，观察现实，再对齐差距。",
+        controlFeedback: "Reconcile 的结果写回 State；canonical skill state 保留在 .mnemon，宿主 skill surface 只是 active skill 的 projection。",
         controlSteps: [
-          { name: "LoopModule", color: "var(--library)", text: "skill-loop 声明 GUIDE、hooks、skill_observe、skill_curate、skill_manage 和 curator。" },
-          { name: "HostBinding", color: "var(--guide)", text: "声明 skill-loop 绑定到哪个 host，以及 active skills 应投影到哪个 host skill surface。" },
-          { name: "Reconcile", color: "var(--protocol)", text: "检查 active skill projection 是否缺失、过期、漂移，或与 host capability 不兼容。" },
-          { name: "HostAdapter", color: "var(--host)", text: "把 .mnemon/skills/active 渲染、同步或挂载到 .codex、.claude 或其他 host surface。" },
-          { name: "Projection", color: "var(--active)", text: "HostAgent 使用生成的 host-native skill files；stale 和 archived 默认不进入这个 surface。" },
-          { name: "Status", color: "var(--curator)", text: "记录 projection 状态、usage evidence、proposal/report，并反馈给下一次维护和 reconcile。" }
+          { name: "State", color: "var(--library)", text: "`.mnemon` skill library 保存 active/stale/archived、usage evidence、proposal、report 和 skill-loop status。" },
+          { name: "Intent", color: "var(--guide)", text: "当前应该可见的 skill 集合，以及 stale/archived 应如何保留、审阅、恢复或隔离。" },
+          { name: "Projection", color: "var(--active)", text: "Prime 把 active skills 同步、挂载或渲染到 `.codex/skills`、`.claude/skills` 等 host-native surface。" },
+          { name: "Reality", color: "var(--host)", text: "HostAgent 实际发现和使用了哪些 skill，哪些缺失、误导、过期，哪些流程重复出现。" },
+          { name: "Reconcile", color: "var(--protocol)", text: "根据 Reality 决定 observe、curate、propose、manage 或 no-op，并把结果写回 State。" }
         ],
         componentsTitle: "System Components",
         componentsIntro: "Skill loop 的核心不是冷热存储，而是可见性治理：哪些 skill 当前可被发现，哪些进入维护，哪些仅保留历史。",
@@ -844,7 +843,7 @@
           prime: {
             title: "Prime",
             tag: "hook",
-            summary: "Prime 不把所有 skill 内容注入 prompt。它负责把 `.mnemon/skills/active` 单向同步或挂载到 HostAgent 的原生 skill 发现面，让 HostAgent 自己完成 skill discovery。",
+            summary: "Prime 是 skill-loop 的 Projection 边界。它不把所有 skill 内容注入 prompt，而是把 canonical State 中的 active 集合投影到 HostAgent 原生 skill 发现面。",
             short: "active skills -> host surface",
             events: [
               { kind: "arrow", from: "library", to: "surface", y: 94, label: "sync active skills" },
@@ -852,7 +851,7 @@
               { kind: "action", actor: "host", y: 210, label: "discover skills natively" }
             ],
             details: [
-              ["input", "GUIDE + `.mnemon/skills/active` + setup bindings"],
+              ["input", "Intent policy + `.mnemon/skills/active` + setup bindings"],
               ["action", "Prime hook 同步、挂载或生成 host-native skill files"],
               ["boundary", "`.mnemon` 是 source of truth；host-native 目录是 generated view"]
             ]
@@ -860,7 +859,7 @@
           nudge: {
             title: "Nudge",
             tag: "hook",
-            summary: "Nudge 是 agent loop stop 阶段的一句 hook prompt。它不写规则，只提醒 LLM 按 GUIDE 判断本轮是否产生 skill usage evidence 或 reusable workflow signal；如果有，应加载 skill_observe。",
+            summary: "Nudge 是 Reality 观察边界。它不写规则，只提醒 HostAgent 按 Intent policy 判断本轮是否产生 skill usage evidence 或 reusable workflow signal；如果有，应加载 skill_observe。",
             short: "stop hook -> skill_observe",
             events: [
               { kind: "arrow", from: "surface", to: "host", y: 74, label: "native skill use outside harness" },
@@ -870,14 +869,14 @@
             ],
             details: [
               ["trigger", "agent loop stop 阶段的 Nudge hook"],
-              ["action", "只提醒 LLM 按 GUIDE 判断是否需要记录 skill signal"],
+              ["action", "只提醒 HostAgent 按 Intent policy 判断是否需要记录 skill signal"],
               ["boundary", "Nudge 不写 sidecar、不生成 skill、不做 review"]
             ]
           },
           observe: {
             title: "skill_observe",
             tag: "protocol",
-            summary: "skill_observe 是在线轻量能力。它按照 GUIDE 和协议，把 skill view/use/patch evidence 或 reusable workflow signal 写入 usage sidecar 或 signal report。",
+            summary: "skill_observe 是在线轻量 Reconcile。它把本轮观察到的 skill view/use/patch evidence 或 reusable workflow signal 写入 State，但不决定生命周期迁移。",
             short: "write usage / signal",
             events: [
               { kind: "arrow", from: "host", to: "protocol", y: 78, label: "load skill_observe.md" },
@@ -894,7 +893,7 @@
           curate: {
             title: "Curator",
             tag: "subagent",
-            summary: "Curator 是后台或手动维护入口。它读取 usage sidecar、signal reports 和 skill library，拉起 curator subagent 检查是否应 patch、consolidate、create、stale 或 archive，并默认生成 proposal/report。",
+            summary: "Curator 是低频维护 reconciler。它读取 evidence 与 skill library，检查是否应 patch、consolidate、create、stale 或 archive，并默认生成 proposal/report。",
             short: "evidence -> proposal",
             events: [
               { kind: "arrow", from: "host", to: "protocol", y: 78, label: "load skill_curate.md" },
@@ -912,7 +911,7 @@
           manage: {
             title: "skill_manage",
             tag: "protocol",
-            summary: "被批准的迁移由 skill_manage 执行：patch、consolidate、active -> stale、stale -> archived、restore。它只改 `.mnemon` canonical state，不直接刷新 HostAgent；新的可见 skill 集合会在下一次 Prime 同步到 host skill surface。",
+            summary: "skill_manage 执行已批准的生命周期迁移：patch、consolidate、active -> stale、stale -> archived、restore。它只改 `.mnemon` State；新的可见集合由下一次 Prime 投影到 HostAgent。",
             short: "skill_manage -> next Prime",
             events: [
               { kind: "arrow", from: "curator", to: "protocol", y: 76, label: "approved proposal" },
@@ -930,36 +929,35 @@
         },
         matrixRows: [
           ["Host runtime", "HostAgent", "运行 ReAct loop，接收 hook，决定是否加载 protocol skill 或 curator subagent。", "不拥有 canonical skill state。", "var(--host)"],
-          ["Host-facing surface", "Host Skill Surface", "HostAgent 原生 skill discovery 读取的位置。", "由 Prime 从 `.mnemon/skills/active` 单向同步或挂载生成。", "var(--active)"],
-          ["Canonical store", ".mnemon Skill Library", "保存 active/stale/archived skills 和 `.usage.json`。", "canonical source of truth，host-native 目录只是 generated view。", "var(--library)"],
-          ["GUIDE", "GUIDE", "定义 skill evidence、review trigger、protected/pinned、proposal-first 等判断规则。", "只定义 policy，不执行迁移。", "var(--guide)"],
+          ["Projection surface", "Host Skill Surface", "HostAgent 原生 skill discovery 读取的位置。", "由 Prime 从 `.mnemon/skills/active` 单向同步或挂载生成。", "var(--active)"],
+          ["Skill State", ".mnemon Skill Library", "保存 active/stale/archived skills、usage evidence、proposal 和 report。", "canonical source of truth，host-native 目录只是 generated view。", "var(--library)"],
+          ["Intent policy", "GUIDE", "定义 skill evidence、review trigger、protected/pinned、proposal-first 等判断规则。", "只定义 policy，不执行迁移。", "var(--guide)"],
           ["setup", "setup + bindings", "安装 hooks、protocol skills、curator subagent，并配置 host-native skill surface binding。", "只负责挂载，不参与每次 runtime 判断。", "var(--setup)"],
           ["hook", "prime/remind/nudge/compact", "提供同步、观察提醒和低频 review 触发边界；Remind 通常 no-op。", "只给时机和短提醒，规则在 GUIDE 中。", "var(--hook)"],
-          ["protocol", "skill_observe / skill_manage / skill_curate", "定义 observe/manage/curate 的跨 HostAgent 操作方法。", "通过 `MNEMON_HARNESS_DIR` 定位 `.mnemon`。", "var(--protocol)"],
-          ["subagent", "curator", "低频审阅、合并、迁移和报告。", "默认 proposal-first；批准后由 skill_manage 修改状态。", "var(--curator)"]
+          ["Reconcile protocol", "skill_observe / skill_manage / skill_curate", "定义 observe/manage/curate 的跨 HostAgent 操作方法。", "通过 `MNEMON_HARNESS_DIR` 定位 `.mnemon`。", "var(--protocol)"],
+          ["Maintenance reconciler", "curator", "低频审阅、合并、迁移和报告。", "默认 proposal-first；批准后由 skill_manage 修改状态。", "var(--curator)"]
         ]
       },
       en: {
         langAttr: "en",
         title: "Skill Loop MVP",
         eyebrow: "Mnemon Harness / Skill Loop",
-        summary: "The first skill loop uses the same harness vocabulary as the memory loop: GUIDE holds policy, setup installs and mounts assets, hooks provide Prime/Remind/Nudge/Compact timing, protocol skills record and migrate skill state, and the curator subagent performs background review and proposals.",
+        summary: "skill-loop turns skill visibility and skill lifecycle state into a lifecycle-native capability: Mnemon keeps skill State, declares visibility Intent, observes HostAgent skill Reality, and Reconciles by observing, curating, proposing, managing, or no-oping.",
         readingTitle: "Reading Order",
         reading: [
-          "Start with the three core parts: HostAgent, Host Skill Surface, and Skill Library.",
-          "Then read the five harness concepts: GUIDE, setup, hook, protocol, and subagent.",
+          "Start with how skill-loop maps to State, Intent, Projection, Reality, and Reconcile.",
+          "Then read how the host skill surface and `.mnemon` canonical library divide responsibility.",
           "Finally switch phases to see how Prime, Nudge, Observe, Curator, and Manage close the loop."
         ],
         controlTitle: "Lifecycle Control Position",
-        controlIntro: "skill-loop is one LoopModule in the lifecycle control plane. It declares skill lifecycle policy and uses host adapters to project the active skill set into the host-native skill surface.",
-        controlFeedback: "Status feeds the next Reconcile; canonical skill state remains in .mnemon, while the host skill surface is only a projection.",
+        controlIntro: "skill-loop does not replace the host skill runtime. It puts visibility, evidence, and migration state on one lifecycle path: keep state, declare intent, project into the host, observe reality, and reconcile the gap.",
+        controlFeedback: "Reconcile writes results back into State; canonical skill state remains in .mnemon, while the host skill surface is only the active-skill projection.",
         controlSteps: [
-          { name: "LoopModule", color: "var(--library)", text: "skill-loop declares GUIDE, hooks, skill_observe, skill_curate, skill_manage, and the curator." },
-          { name: "HostBinding", color: "var(--guide)", text: "Declares which host receives skill-loop and which host skill surface should receive active skills." },
-          { name: "Reconcile", color: "var(--protocol)", text: "Checks whether active skill projection is missing, stale, drifted, or incompatible with host capabilities." },
-          { name: "HostAdapter", color: "var(--host)", text: "Renders, syncs, or mounts .mnemon/skills/active into .codex, .claude, or another host surface." },
-          { name: "Projection", color: "var(--active)", text: "The HostAgent uses generated host-native skill files; stale and archived skills stay out by default." },
-          { name: "Status", color: "var(--curator)", text: "Records projection status, usage evidence, proposals, and reports for maintenance and the next reconcile." }
+          { name: "State", color: "var(--library)", text: "The `.mnemon` skill library stores active/stale/archived skills, usage evidence, proposals, reports, and skill-loop status." },
+          { name: "Intent", color: "var(--guide)", text: "The skills that should be visible now, plus how stale and archived skills should be preserved, reviewed, restored, or isolated." },
+          { name: "Projection", color: "var(--active)", text: "Prime syncs, mounts, or renders active skills into host-native surfaces such as `.codex/skills` or `.claude/skills`." },
+          { name: "Reality", color: "var(--host)", text: "What the HostAgent actually discovered and used, what was missing or misleading, and which workflows repeated." },
+          { name: "Reconcile", color: "var(--protocol)", text: "Decides observe, curate, propose, manage, or no-op from Reality, then writes the result back into State." }
         ],
         componentsTitle: "System Components",
         componentsIntro: "The skill loop is not a hot/cold storage split. It governs visibility: which skills are discoverable now, which need maintenance, and which remain historical.",
@@ -1014,7 +1012,7 @@
           prime: {
             title: "Prime",
             tag: "hook",
-            summary: "Prime does not inject every skill body into the prompt. It syncs or mounts `.mnemon/skills/active` into the host-native discovery surface so the HostAgent can discover skills natively.",
+            summary: "Prime is the skill-loop Projection boundary. It does not inject every skill body into the prompt; it projects the active set from canonical State into the host-native discovery surface.",
             short: "active skills -> host surface",
             events: [
               { kind: "arrow", from: "library", to: "surface", y: 94, label: "sync active skills" },
@@ -1022,7 +1020,7 @@
               { kind: "action", actor: "host", y: 210, label: "discover skills natively" }
             ],
             details: [
-              ["input", "GUIDE + `.mnemon/skills/active` + setup bindings"],
+              ["input", "Intent policy + `.mnemon/skills/active` + setup bindings"],
               ["action", "Prime hook syncs, mounts, or generates host-native skill files"],
               ["boundary", "`.mnemon` is the source of truth; host-native directories are generated views"]
             ]
@@ -1030,7 +1028,7 @@
           nudge: {
             title: "Nudge",
             tag: "hook",
-            summary: "Nudge is a one-line hook prompt at the agent-loop stop boundary. It does not carry rules; it asks the model to follow GUIDE and decide whether this turn produced skill evidence or a reusable workflow signal.",
+            summary: "Nudge is a Reality observation boundary. It does not carry rules; it asks the HostAgent to follow Intent policy and decide whether this turn produced skill evidence or a reusable workflow signal.",
             short: "stop hook -> skill_observe",
             events: [
               { kind: "arrow", from: "surface", to: "host", y: 74, label: "native skill use outside harness" },
@@ -1040,14 +1038,14 @@
             ],
             details: [
               ["trigger", "Nudge hook at the agent-loop stop boundary"],
-              ["action", "Only reminds the model to follow GUIDE and decide whether to record a skill signal"],
+              ["action", "Only reminds the HostAgent to follow Intent policy and decide whether to record a skill signal"],
               ["boundary", "Nudge does not write sidecars, generate skills, or run review"]
             ]
           },
           observe: {
             title: "skill_observe",
             tag: "protocol",
-            summary: "skill_observe is the lightweight online protocol. It writes skill view/use/patch evidence or reusable workflow signals into the usage sidecar or signal report.",
+            summary: "skill_observe is the lightweight online Reconcile path. It writes observed skill view/use/patch evidence or reusable workflow signals into State, without deciding lifecycle migration.",
             short: "write usage / signal",
             events: [
               { kind: "arrow", from: "host", to: "protocol", y: 78, label: "load skill_observe.md" },
@@ -1064,7 +1062,7 @@
           curate: {
             title: "Curator",
             tag: "subagent",
-            summary: "Curator is the background or manual maintenance entry point. It reads usage sidecars, signal reports, and the skill library, then reviews whether to patch, consolidate, create, stale, or archive.",
+            summary: "Curator is the low-frequency maintenance reconciler. It reads evidence and the skill library, then reviews whether to patch, consolidate, create, stale, or archive.",
             short: "evidence -> proposal",
             events: [
               { kind: "arrow", from: "host", to: "protocol", y: 78, label: "load skill_curate.md" },
@@ -1082,7 +1080,7 @@
           manage: {
             title: "skill_manage",
             tag: "protocol",
-            summary: "Approved migrations are applied by skill_manage: patch, consolidate, active -> stale, stale -> archived, or restore. It changes only `.mnemon` canonical state; new visibility appears after the next Prime sync.",
+            summary: "skill_manage applies approved lifecycle migrations: patch, consolidate, active -> stale, stale -> archived, or restore. It changes only `.mnemon` State; new visibility appears after the next Prime projection.",
             short: "skill_manage -> next Prime",
             events: [
               { kind: "arrow", from: "curator", to: "protocol", y: 76, label: "approved proposal" },
@@ -1100,13 +1098,13 @@
         },
         matrixRows: [
           ["Host runtime", "HostAgent", "Runs the ReAct loop, receives hooks, and decides whether to load protocol skills or the curator subagent.", "Does not own canonical skill state.", "var(--host)"],
-          ["Host-facing surface", "Host Skill Surface", "The location read by host-native skill discovery.", "Generated or mounted by Prime from `.mnemon/skills/active`.", "var(--active)"],
-          ["Canonical store", ".mnemon Skill Library", "Stores active/stale/archived skills and `.usage.json`.", "Canonical source of truth; host-native directories are generated views.", "var(--library)"],
-          ["GUIDE", "GUIDE", "Defines skill evidence, review triggers, protected/pinned rules, and proposal-first policy.", "Defines policy only; it does not migrate state.", "var(--guide)"],
+          ["Projection surface", "Host Skill Surface", "The location read by host-native skill discovery.", "Generated or mounted by Prime from `.mnemon/skills/active`.", "var(--active)"],
+          ["Skill State", ".mnemon Skill Library", "Stores active/stale/archived skills, usage evidence, proposals, and reports.", "Canonical source of truth; host-native directories are generated views.", "var(--library)"],
+          ["Intent policy", "GUIDE", "Defines skill evidence, review triggers, protected/pinned rules, and proposal-first policy.", "Defines policy only; it does not migrate state.", "var(--guide)"],
           ["setup", "setup + bindings", "Installs hooks, protocol skills, curator subagent, and host-native skill surface bindings.", "Mounts assets only; it does not participate in each runtime decision.", "var(--setup)"],
           ["hook", "prime/remind/nudge/compact", "Provides sync, observation reminders, and low-frequency review trigger boundaries; Remind is usually a no-op.", "Provides timing and short reminders only; rules live in GUIDE.", "var(--hook)"],
-          ["protocol", "skill_observe / skill_manage / skill_curate", "Defines cross-HostAgent methods for observe, manage, and curate.", "Locates `.mnemon` through `MNEMON_HARNESS_DIR`.", "var(--protocol)"],
-          ["subagent", "curator", "Performs low-frequency review, consolidation, migration, and reports.", "Proposal-first by default; approved changes are applied by skill_manage.", "var(--curator)"]
+          ["Reconcile protocol", "skill_observe / skill_manage / skill_curate", "Defines cross-HostAgent methods for observe, manage, and curate.", "Locates `.mnemon` through `MNEMON_HARNESS_DIR`.", "var(--protocol)"],
+          ["Maintenance reconciler", "curator", "Performs low-frequency review, consolidation, migration, and reports.", "Proposal-first by default; approved changes are applied by skill_manage.", "var(--curator)"]
         ]
       }
     };

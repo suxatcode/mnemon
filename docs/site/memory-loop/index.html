@@ -311,7 +311,7 @@
 
     .control-path-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 1px;
       background: var(--line);
     }
@@ -757,23 +757,22 @@
         langAttr: "zh-CN",
         title: "Memory Loop MVP",
         eyebrow: "Mnemon Harness / Memory Loop",
-        summary: "第一版只实现一个清晰的记忆闭环：MEMORY.md 是模型友好的热记忆，Mnemon 是工程友好的冷记忆，GUIDE/hook/protocol/dreaming 负责二者之间的读取、积累和巩固。",
+        summary: "Memory-loop 是生命周期控制平面的第一个完整证明：Mnemon 保存记忆 State，声明跨生命周期可用的记忆 Intent，观察 HostAgent 的 Reality，并通过 Reconcile 决定 read、write、compact、consolidate 或 no-op。",
         readingTitle: "阅读顺序",
         reading: [
-          "先看三大核心：HostAgent、MEMORY.md、Mnemon。",
-          "再看五类支撑概念：GUIDE、setup、hook、protocol、subagent。",
-          "最后切换阶段，看每个 hook 如何把判断交给 skill 或 subagent。"
+          "先看 memory-loop 如何落入 State / Intent / Reality / Reconcile。",
+          "再看热记忆、冷记忆和执行 surface 如何协作。",
+          "最后切换阶段，看每个 lifecycle boundary 如何触发 read、write 或 consolidation。"
         ],
         controlTitle: "生命周期控制位置",
-        controlIntro: "memory-loop 在整体控制平面里是一个 LoopModule。它先被声明和绑定，再由 HostAdapter 投影到宿主；运行结果和状态回到 .mnemon，供下一次 reconcile 使用。",
-        controlFeedback: "Status 反馈到下一次 Reconcile；记忆真实状态保留在 .mnemon，而不是宿主 projection 目录。",
+        controlIntro: "memory-loop 不是一个外部 memory service，而是一个 lifecycle-native capability。它把热记忆、冷记忆、hook、protocol 和 dreaming 放进同一个控制闭环。",
+        controlFeedback: "Memory status and durable state feed the next lifecycle pass.",
         controlSteps: [
-          { name: "LoopModule", color: "var(--working)", text: "memory-loop 声明 GUIDE、hooks、memory_get、memory_set、dreaming 和 MEMORY.md 状态契约。" },
-          { name: "HostBinding", color: "var(--guide)", text: "声明 memory-loop 应绑定到 Codex、Claude Code 或其他 host，并启用对应 lifecycle surface。" },
-          { name: "Reconcile", color: "var(--capability)", text: "检查 projection 是否存在、过期或漂移，并决定是否重新生成宿主可见资产。" },
-          { name: "HostAdapter", color: "var(--host)", text: "把同一 memory-loop 渲染成 host-native skills、hooks、env 和 runtime 指针。" },
-          { name: "Projection", color: "var(--hook)", text: "HostAgent 消费 .codex 或 .claude 中生成的 skill、hook、instruction 和 env 文件。" },
-          { name: "Status", color: "var(--longterm)", text: "记录 projection 状态、manifest 和 .mnemon/harness/memory-loop 的 canonical runtime state。" }
+          { name: "State", color: "var(--longterm)", text: ".mnemon 保存 MEMORY.md、Mnemon store、reports、manifests 和 memory-loop status。" },
+          { name: "Intent", color: "var(--guide)", text: "记忆应该在 Prime、Remind、Nudge、Compact 和 maintenance 中帮助 HostAgent 保持连续性。" },
+          { name: "Projection", color: "var(--hook)", text: "GUIDE、hooks、memory_get、memory_set、dreaming 和 env 被投影成 host-readable surface。" },
+          { name: "Reality", color: "var(--host)", text: "Host prompt、当前任务、上下文压力、recall/write 结果和 stale working memory 构成现实状态。" },
+          { name: "Reconcile", color: "var(--capability)", text: "根据现实决定 read、write、compact、consolidate 或 no-op，并把结果写回 State。" }
         ],
         componentsTitle: "系统组成",
         componentsIntro: "这里先固定三大核心主体，再用统一的五类 harness 概念描述安装、触发、协议和后台维护。",
@@ -823,7 +822,7 @@
           prime: {
             title: "Prime",
             tag: "hook",
-            summary: "Prime 是唯一的直接加载路径：把 MEMORY.md 和 GUIDE.md 加入 HostAgent 的 system prompt。",
+            summary: "Prime 是唯一的直接加载路径：把热 State（MEMORY.md）和 Intent policy（GUIDE.md）投影进 HostAgent 的 system prompt。",
             short: "MEMORY.md + GUIDE.md -> prompt",
             events: [
               { kind: "arrow", from: "working", to: "host", y: 96, label: "MEMORY.md 内容" },
@@ -832,14 +831,14 @@
             ],
             details: [
               ["input", "MEMORY.md + GUIDE.md"],
-              ["action", "直接加入 system prompt"],
+              ["action", "把 hot State 和 Intent policy 投影到 prompt"],
               ["boundary", "不调用 memory_get，不触发 Mnemon recall"]
             ]
           },
           recall: {
             title: "Remind / Recall",
             tag: "hook + protocol",
-            summary: "Remind 只触发读记忆判断；如果需要读取，HostAgent 加载 memory_get.md protocol skill，并按其中协议调用 Mnemon。",
+            summary: "Remind 观察当前任务 Reality，并触发读记忆判断；如果需要读取，HostAgent 加载 memory_get.md，把 cold State page-in 到上下文。",
             short: "GUIDE -> memory_get.md -> Mnemon",
             events: [
               { kind: "arrow", from: "guide", to: "host", y: 82, label: "是否读记忆？" },
@@ -849,14 +848,14 @@
             ],
             details: [
               ["trigger", "Remind hook"],
-              ["action", "memory_get.md protocol skill 定义 recall 方法"],
+              ["action", "memory_get.md 将当前 Reality 映射成有界 recall"],
               ["boundary", "GUIDE.md 不需要知道长期记忆细节"]
             ]
           },
           nudge: {
             title: "Nudge / Accumulate",
             tag: "hook + protocol",
-            summary: "Nudge 只触发写记忆判断；如果需要积累，HostAgent 加载 memory_set.md protocol skill，并按 MNEMON_MEMORY_LOOP_DIR 定位 MEMORY.md。",
+            summary: "Nudge 观察新产生的 Reality，并触发写记忆判断；如果值得保留，memory_set.md 把它 reconcile 进 hot State。",
             short: "GUIDE -> memory_set.md -> $DIR/MEMORY.md",
             events: [
               { kind: "arrow", from: "guide", to: "host", y: 82, label: "是否写记忆？" },
@@ -866,14 +865,14 @@
             ],
             details: [
               ["trigger", "Nudge hook"],
-              ["action", "memory_set.md protocol skill 定义 MEMORY.md 编辑规则"],
+              ["action", "memory_set.md 将有用 Reality 写入 MEMORY.md"],
               ["boundary", "在线积累不直接写 Mnemon"]
             ]
           },
           compact: {
             title: "Compact",
             tag: "hook + protocol",
-            summary: "Compact 与 Nudge 共享 memory_set.md，只是触发点在上下文压缩边界前，用来保存即将丢失的重要信息。",
+            summary: "Compact 是上下文压缩前的 reconcile boundary：复用 memory_set.md，把即将丢失但仍有价值的 Reality 写入 hot State。",
             short: "pre-compact -> memory_set.md -> $DIR/MEMORY.md",
             events: [
               { kind: "arrow", from: "guide", to: "host", y: 82, label: "压缩前是否保存？" },
@@ -890,7 +889,7 @@
           dreaming: {
             title: "Dreaming",
             tag: "spawned subagent",
-            summary: "Dreaming 是专用维护 subagent。每次触发时通过 MNEMON_MEMORY_LOOP_DIR 读取完整 MEMORY.md，按规则写入 Mnemon，并整理工作记忆。",
+            summary: "Dreaming 是维护型 reconciler。它读取完整 hot State，筛选 durable Reality 写入 Mnemon cold State，并整理工作记忆。",
             short: "subagent -> Mnemon + MEMORY.md compact",
             events: [
               { kind: "arrow", from: "host", to: "capability", y: 78, label: "启动 dreaming subagent" },
@@ -901,45 +900,44 @@
             ],
             details: [
               ["trigger", "MEMORY.md 超长、compact 前、主动要求"],
-              ["action", "启动专用 dreaming subagent"],
+              ["action", "把 hot State 巩固到 cold State，并压缩 working memory"],
               ["boundary", "负责巩固和清理，不参与每次在线读写判断"]
             ]
           }
         },
         matrixRows: [
           ["Host runtime", "HostAgent", "运行任务，接收 hook，决定是否加载 protocol skill 或 subagent。", "不拥有记忆存储协议，只执行被安装的能力。", "var(--host)"],
-          ["Host-facing surface", "MEMORY.md", "作为 hot working memory 直接进入 system prompt。", "模型友好但昂贵；由 memory_set.md 和 dreaming subagent 维护。", "var(--working)"],
-          ["Canonical store", "Mnemon", "作为 cold long-term memory store 提供 recall 和 write。", "系统友好、容量更大；由 mnemon binary + store 承载。", "var(--longterm)"],
+          ["Hot State", "MEMORY.md", "作为 hot working memory 直接进入 system prompt。", "模型友好但昂贵；由 memory_set.md 和 dreaming subagent 维护。", "var(--working)"],
+          ["Cold State", "Mnemon", "作为 cold long-term memory store 提供 recall 和 write。", "系统友好、容量更大；由 mnemon binary + store 承载。", "var(--longterm)"],
           ["Memory pattern", "hot <-> cold contract", "协调 LLM-native 热记忆与 system-native 冷记忆。", "MEMORY.md 和 Mnemon 是第一组选择，不是唯一选择。", "var(--capability)"],
           ["Retrieval tools", "web/docs/code/RAG search", "查询外部知识源，补充当前任务资料。", "默认不是 memory；只有内化为持久状态后才写入记忆。", "var(--host)"],
-          ["GUIDE", "GUIDE.md", "说明何时读写记忆、什么值得保留。", "只定义 policy，不绑定存储目标。", "var(--guide)"],
+          ["Intent policy", "GUIDE.md", "说明何时读写记忆、什么值得保留。", "只定义 policy，不绑定存储目标。", "var(--guide)"],
           ["setup", "harness/setup + env.sh", "安装四个 hook、两个 protocol skills、dreaming subagent、memory 文件和环境变量。", "只负责挂载，并设置 MNEMON_MEMORY_LOOP_DIR。", "var(--guide)"],
           ["hook", "prime/remind/nudge/compact", "提供宿主生命周期触发点。", "只给时机和短提醒，不承载记忆协议。", "var(--hook)"],
-          ["protocol", "memory_get.md / memory_set.md", "提供读长期记忆和写工作记忆的在线方法。", "绑定 Mnemon recall 与 MEMORY.md 编辑规则。", "var(--capability)"],
-          ["subagent", "dreaming", "维护、巩固和清理工作记忆。", "绑定 Mnemon write 与 MEMORY.md compact / eviction。", "var(--capability)"]
+          ["reconcile protocol", "memory_get.md / memory_set.md", "提供读长期记忆和写工作记忆的在线方法。", "绑定 Mnemon recall 与 MEMORY.md 编辑规则。", "var(--capability)"],
+          ["maintenance reconciler", "dreaming", "维护、巩固和清理工作记忆。", "绑定 Mnemon write 与 MEMORY.md compact / eviction。", "var(--capability)"]
         ]
       },
       en: {
         langAttr: "en",
         title: "Memory Loop MVP",
         eyebrow: "Mnemon Harness / Memory Loop",
-        summary: "The first version implements one focused memory loop: MEMORY.md is model-friendly hot memory, Mnemon is system-friendly cold memory, and GUIDE/hooks/protocols/dreaming manage read, accumulation, and consolidation between them.",
+        summary: "memory-loop is the first complete proof of the lifecycle control plane: Mnemon keeps memory State, declares continuity Intent across lifecycle boundaries, observes HostAgent Reality, and Reconciles by reading, writing, compacting, consolidating, or no-oping.",
         readingTitle: "Reading Order",
         reading: [
-          "Start with the three core parts: HostAgent, MEMORY.md, and Mnemon.",
-          "Then read the five harness concepts: GUIDE, setup, hook, protocol, and subagent.",
-          "Finally switch phases to see how each hook delegates to a skill or subagent."
+          "Start with how memory-loop maps to State / Intent / Reality / Reconcile.",
+          "Then read how hot memory, cold memory, and execution surfaces cooperate.",
+          "Finally switch phases to see how each lifecycle boundary triggers read, write, or consolidation."
         ],
         controlTitle: "Lifecycle Control Position",
-        controlIntro: "memory-loop is one LoopModule in the lifecycle control plane. It is declared, bound to a host, projected by a HostAdapter, and observed through status so the next reconcile can repair drift.",
-        controlFeedback: "Status feeds the next Reconcile; durable memory state remains in .mnemon, not in the host projection directory.",
+        controlIntro: "memory-loop is not an external memory service. It is a lifecycle-native capability that puts hot memory, cold memory, hooks, protocols, and dreaming inside one control loop.",
+        controlFeedback: "Memory status and durable state feed the next lifecycle pass.",
         controlSteps: [
-          { name: "LoopModule", color: "var(--working)", text: "memory-loop declares GUIDE, hooks, memory_get, memory_set, dreaming, and the MEMORY.md state contract." },
-          { name: "HostBinding", color: "var(--guide)", text: "Declares that memory-loop should bind to Codex, Claude Code, or another host with specific lifecycle surfaces." },
-          { name: "Reconcile", color: "var(--capability)", text: "Checks whether projection is missing, stale, or drifted, then decides whether host-visible assets need repair." },
-          { name: "HostAdapter", color: "var(--host)", text: "Renders the same memory-loop into host-native skills, hooks, env files, and runtime pointers." },
-          { name: "Projection", color: "var(--hook)", text: "The HostAgent consumes generated skills, hooks, instructions, and env files under .codex or .claude." },
-          { name: "Status", color: "var(--longterm)", text: "Records projection condition, manifests, and canonical runtime state under .mnemon/harness/memory-loop." }
+          { name: "State", color: "var(--longterm)", text: ".mnemon keeps MEMORY.md, Mnemon stores, reports, manifests, and memory-loop status." },
+          { name: "Intent", color: "var(--guide)", text: "Memory should help the HostAgent preserve continuity across Prime, Remind, Nudge, Compact, and maintenance." },
+          { name: "Projection", color: "var(--hook)", text: "GUIDE, hooks, memory_get, memory_set, dreaming, and env are projected as host-readable surfaces." },
+          { name: "Reality", color: "var(--host)", text: "The host prompt, current task, context pressure, recall/write outcomes, and stale working memory form observed reality." },
+          { name: "Reconcile", color: "var(--capability)", text: "Decide whether to read, write, compact, consolidate, or no-op, then write outcomes back into State." }
         ],
         componentsTitle: "System Components",
         componentsIntro: "This keeps the three core runtime parts stable, then describes installation, timing, protocol execution, and background maintenance through one shared harness vocabulary.",
@@ -989,7 +987,7 @@
           prime: {
             title: "Prime",
             tag: "hook",
-            summary: "Prime is the only direct loading path: it injects MEMORY.md and GUIDE.md into the HostAgent system prompt.",
+            summary: "Prime is the only direct loading path: it projects hot State (MEMORY.md) and Intent policy (GUIDE.md) into the HostAgent system prompt.",
             short: "MEMORY.md + GUIDE.md -> prompt",
             events: [
               { kind: "arrow", from: "working", to: "host", y: 96, label: "MEMORY.md content" },
@@ -998,14 +996,14 @@
             ],
             details: [
               ["input", "MEMORY.md + GUIDE.md"],
-              ["action", "Inject both into the system prompt"],
+              ["action", "Project hot State and Intent policy into the prompt"],
               ["boundary", "Does not call memory_get or trigger Mnemon recall"]
             ]
           },
           recall: {
             title: "Remind / Recall",
             tag: "hook + protocol",
-            summary: "Remind only prompts the read-memory decision. If recall is needed, the HostAgent loads the memory_get.md protocol skill and follows its Mnemon protocol.",
+            summary: "Remind observes current task Reality and prompts the read-memory decision. If recall is needed, memory_get.md pages cold State into context.",
             short: "GUIDE -> memory_get.md -> Mnemon",
             events: [
               { kind: "arrow", from: "guide", to: "host", y: 82, label: "read memory?" },
@@ -1015,14 +1013,14 @@
             ],
             details: [
               ["trigger", "Remind hook"],
-              ["action", "memory_get.md protocol skill defines the recall method"],
+              ["action", "memory_get.md maps current Reality into bounded recall"],
               ["boundary", "GUIDE.md does not need long-term storage details"]
             ]
           },
           nudge: {
             title: "Nudge / Accumulate",
             tag: "hook + protocol",
-            summary: "Nudge only prompts the write-memory decision. If accumulation is needed, the HostAgent loads the memory_set.md protocol skill and locates MEMORY.md through MNEMON_MEMORY_LOOP_DIR.",
+            summary: "Nudge observes newly produced Reality and prompts the write-memory decision. If it is worth keeping, memory_set.md reconciles it into hot State.",
             short: "GUIDE -> memory_set.md -> $DIR/MEMORY.md",
             events: [
               { kind: "arrow", from: "guide", to: "host", y: 82, label: "write memory?" },
@@ -1032,14 +1030,14 @@
             ],
             details: [
               ["trigger", "Nudge hook"],
-              ["action", "memory_set.md protocol skill defines MEMORY.md editing rules"],
+              ["action", "memory_set.md writes useful Reality into MEMORY.md"],
               ["boundary", "Online accumulation does not write Mnemon directly"]
             ]
           },
           compact: {
             title: "Compact",
             tag: "hook + protocol",
-            summary: "Compact shares memory_set.md with Nudge, but it runs before context compaction to preserve important information that may be lost.",
+            summary: "Compact is the pre-compaction reconcile boundary: it reuses memory_set.md to write valuable soon-to-be-lost Reality into hot State.",
             short: "pre-compact -> memory_set.md -> $DIR/MEMORY.md",
             events: [
               { kind: "arrow", from: "guide", to: "host", y: 82, label: "save before compact?" },
@@ -1056,7 +1054,7 @@
           dreaming: {
             title: "Dreaming",
             tag: "spawned subagent",
-            summary: "Dreaming is a dedicated maintenance subagent. On each trigger it reads the full MEMORY.md through MNEMON_MEMORY_LOOP_DIR, writes durable material to Mnemon, then compacts working memory.",
+            summary: "Dreaming is the maintenance reconciler. It reads full hot State, writes durable Reality into Mnemon cold State, then compacts working memory.",
             short: "subagent -> Mnemon + MEMORY.md compact",
             events: [
               { kind: "arrow", from: "host", to: "capability", y: 78, label: "spawn dreaming subagent" },
@@ -1067,22 +1065,22 @@
             ],
             details: [
               ["trigger", "MEMORY.md quota, pre-compact, or explicit request"],
-              ["action", "Spawn the dedicated dreaming subagent"],
+              ["action", "Consolidate hot State into cold State and compact working memory"],
               ["boundary", "Handles consolidation and cleanup, not online read/write decisions"]
             ]
           }
         },
         matrixRows: [
           ["Host runtime", "HostAgent", "Runs tasks, receives hooks, and decides whether to load a protocol skill or subagent.", "Does not own memory storage protocols.", "var(--host)"],
-          ["Host-facing surface", "MEMORY.md", "Enters the system prompt as hot working memory.", "Model-friendly but expensive; maintained by memory_set.md and dreaming.", "var(--working)"],
-          ["Canonical store", "Mnemon", "Provides recall and write for cold long-term memory.", "System-friendly with larger capacity; backed by the mnemon binary and store.", "var(--longterm)"],
+          ["Hot State", "MEMORY.md", "Enters the system prompt as hot working memory.", "Model-friendly but expensive; maintained by memory_set.md and dreaming.", "var(--working)"],
+          ["Cold State", "Mnemon", "Provides recall and write for cold long-term memory.", "System-friendly with larger capacity; backed by the mnemon binary and store.", "var(--longterm)"],
           ["Memory pattern", "hot <-> cold contract", "Coordinates LLM-native hot memory with system-native cold memory.", "MEMORY.md and Mnemon are first choices, not the only choices.", "var(--capability)"],
           ["Retrieval tools", "web/docs/code/RAG search", "Queries external knowledge sources for the current task.", "Not memory by default; write only internalized durable state into memory.", "var(--host)"],
-          ["GUIDE", "GUIDE.md", "Explains when to read or write memory and what is worth keeping.", "Defines policy only, not storage targets.", "var(--guide)"],
+          ["Intent policy", "GUIDE.md", "Explains when to read or write memory and what is worth keeping.", "Defines policy only, not storage targets.", "var(--guide)"],
           ["setup", "harness/setup + env.sh", "Installs four hooks, two protocol skills, the dreaming subagent, memory files, and environment variables.", "Mounts assets and sets MNEMON_MEMORY_LOOP_DIR.", "var(--guide)"],
           ["hook", "prime/remind/nudge/compact", "Provides host lifecycle trigger points.", "Provides timing and short reminders only, not memory protocols.", "var(--hook)"],
-          ["protocol", "memory_get.md / memory_set.md", "Provides the online methods for long-term recall and working-memory writes.", "Binds Mnemon recall and MEMORY.md editing rules.", "var(--capability)"],
-          ["subagent", "dreaming", "Maintains, consolidates, and cleans working memory.", "Binds Mnemon write with MEMORY.md compaction and eviction.", "var(--capability)"]
+          ["reconcile protocol", "memory_get.md / memory_set.md", "Provides the online methods for long-term recall and working-memory writes.", "Binds Mnemon recall and MEMORY.md editing rules.", "var(--capability)"],
+          ["maintenance reconciler", "dreaming", "Maintains, consolidates, and cleans working memory.", "Binds Mnemon write with MEMORY.md compaction and eviction.", "var(--capability)"]
         ]
       }
     };

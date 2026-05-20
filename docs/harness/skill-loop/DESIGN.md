@@ -10,26 +10,44 @@ The MVP is intentionally a visibility and lifecycle harness. It decides which sk
 
 ## Lifecycle Control Plane Position
 
-In the lifecycle control plane, `skill-loop` is a `LoopModule`. It declares
-skill visibility policy, observation and management protocols, curator
-maintenance, and the canonical skill lifecycle state contract.
+In the lifecycle control plane, `skill-loop` makes skill visibility and skill
+lifecycle state a lifecycle-native capability without replacing the host's
+native skill runtime.
 
-The loop becomes active through a host binding:
+Using the shared control model:
+
+| Layer | Skill-loop shape |
+| --- | --- |
+| State | `.mnemon` skill library, active/stale/archived state, evidence, proposals, reports, and skill-loop status. |
+| Intent | Keep the right skills visible to the host while preserving stale and archived skills for review, recovery, and design memory. |
+| Reality | Host skill surface, actual active projection, skill usage evidence, missing or misleading skills, curator findings, and review decisions. |
+| Reconcile | Sync active skills, record evidence, propose lifecycle changes, apply approved changes, and refresh host visibility at Prime. |
+
+The entity profiles are intentionally light:
+
+| Entity | Profile | Role |
+| --- | --- | --- |
+| `skill-loop` | Template | Reusable lifecycle capability package. |
+| skill binding | Controlled | Binds skill visibility and lifecycle policy to one host skill surface. |
+| host skill surface | Surface | Host-native discovery surface such as `.codex/skills` or `.claude/skills`. |
+| usage signals and curator findings | Evidence | Observed skill usefulness, missing skills, stale skills, or workflow repetition. |
+| proposals, reviews, audits | Governance | Reviewable changes before canonical skill lifecycle mutation. |
+
+The loop becomes active through projection and observation surfaces:
 
 ```text
-LoopModule(skill-loop)
-  -> HostBinding(host + skill surface)
-  -> Reconcile
-  -> HostAdapter
-  -> Projection(.codex/skills, .claude/skills, or another host surface)
-  -> Status
-  -> next Reconcile
+State(.mnemon skill library)
+  -> Intent(the right skills should be visible)
+  -> Projection(active skills into host skill surface)
+  -> Reality(host usage, evidence, missing or stale skills)
+  -> Reconcile(observe, curate, propose, manage, no-op)
+  -> State(active/stale/archived, reports, proposals, status)
 ```
 
 The HostAgent consumes the projected active skill surface and still owns native
-skill discovery and execution. `.mnemon` keeps the canonical skill library and
-evidence. Host skill directories are generated views that can be repaired when
-projection status drifts from the declared binding.
+skill discovery and execution. Mnemon owns canonical skill state, evidence,
+proposal-first governance, and the reconcile boundary. Host skill directories
+remain generated views that can be refreshed when Reality drifts from Intent.
 
 ## Goals
 

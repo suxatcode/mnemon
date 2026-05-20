@@ -10,26 +10,46 @@ Memory loop 是 self-evolution harness 的第一个可落地切片。它给 Host
 
 ## 生命周期控制平面位置
 
-在生命周期控制平面里，`memory-loop` 是一个 `LoopModule`。它声明可迁移的记忆
-policy、lifecycle prompts、protocol skills、dreaming subagent 和 runtime state
-contract。
+在生命周期控制平面里，`memory-loop` 是第一个实际证明：外部能力可以变成
+lifecycle-native capability，而不需要让 Mnemon 变成宿主 agent runtime。
 
-这个 loop 通过 host binding 进入宿主：
+按照统一控制模型：
+
+| Layer | Memory-loop 形态 |
+| --- | --- |
+| State | `.mnemon` 下的 `MEMORY.md`、Mnemon long-term stores、reports、manifests 和 memory-loop status。 |
+| Intent | 让有用的 agent、user、project continuity 能跨 lifecycle boundaries 保持可用。 |
+| Reality | host prompt、当前任务、working-memory 内容、recall 结果、context pressure 和 consolidation 状态。 |
+| Reconcile | 判断是否 read、write、compact、consolidate 或 no-op，并写回 status 或 durable state。 |
+
+实体 profile 保持轻量：
+
+| Entity | Profile | 作用 |
+| --- | --- | --- |
+| `memory-loop` | Template | 可复用 lifecycle capability package。 |
+| memory binding | Controlled | 将 memory 行为绑定到 Prime、Remind、Nudge、Compact 和 maintenance 等宿主生命周期。 |
+| hot/cold memory surfaces | Surface | `MEMORY.md`、Mnemon recall/write、host hooks 和 protocol skills。 |
+| recall/write/consolidation evidence | Evidence | memory usefulness、context pressure、stale entries 和 durable write results。 |
+| memory proposals or audits | Governance | 未来用于高风险 memory change 或 policy change 的可 review 记录。 |
+
+在这个 framing 里，`MEMORY.md` 不是模型本身，而是第一个 hot-memory surface。
+Mnemon long-term storage 也不是模型本身，而是第一个 cold-memory surface。模型是
+让有用 continuity 与 reality 持续对齐的 lifecycle loop。
+
+这个 loop 通过 projection 和 observation surfaces 进入宿主：
 
 ```text
-LoopModule(memory-loop)
-  -> HostBinding(host + lifecycle surfaces)
-  -> Reconcile
-  -> HostAdapter
-  -> Projection(.codex / .claude / other host surface)
-  -> Status
-  -> next Reconcile
+State(.mnemon memory state)
+  -> Intent(memory should help this lifecycle boundary)
+  -> Projection(hooks, GUIDE, memory_get, memory_set, dreaming)
+  -> Reality(host prompt, task, context pressure, recall/write outcomes)
+  -> Reconcile(read, write, compact, consolidate, no-op)
+  -> State(MEMORY.md, Mnemon store, reports, status)
 ```
 
-HostAgent 消费 projection，并继续拥有执行。`.mnemon` 保存 memory-loop 的
-canonical state，包括 `MEMORY.md`、manifests 和持久 Mnemon stores。宿主目录是
-可重新生成的视图；当 projection status 与声明的 binding 漂移时，可以由
-reconcile 修复。
+HostAgent 消费 projection，并继续拥有执行。Mnemon 拥有 durable state、profile
+model 和 reconcile boundary。宿主目录仍然是可重新生成的视图；当 projected memory
+assets 与声明的 lifecycle intent 漂移时，可以由 reconcile 修复。
 
 ## 设计目标
 
