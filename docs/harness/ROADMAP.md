@@ -6,10 +6,10 @@ This roadmap describes how Mnemon Harness should grow from the current MVP
 loops into a broader modular-agent governance layer. It is directional, not a
 fixed release schedule.
 
-The principle is simple: build one loop at a time, keep each module useful on
+The principle is simple: build one loop at a time, keep each loop useful on
 its own, and avoid turning Mnemon into a replacement agent runtime.
 
-The roadmap is memory-driven rather than module-driven. Memory is the continuity
+The roadmap is memory-driven rather than loop-driven. Memory is the continuity
 point that lets agent experience become durable state. Other loops should
 strengthen, govern, or operate around that state instead of becoming isolated
 features.
@@ -26,11 +26,11 @@ Mnemon already has two installable MVP harness loops.
 Both MVP loops use the same harness vocabulary:
 
 - GUIDE files define loop policy.
-- setup scripts mount the loop into a host agent.
+- ops scripts mount the loop into a host agent.
 - hooks inject lifecycle prompts at host-defined moments.
 - protocol skills expose reusable operations.
 - subagents run heavier maintenance work.
-- Mnemon-owned state keeps module data outside the host runtime.
+- Mnemon-owned state keeps loop data outside the host runtime.
 
 Claude Code is the first reference host because it exposes hooks, skills,
 subagents, and project/user configuration. The architecture should remain
@@ -54,9 +54,9 @@ understand what changed.
 
 Focus: make multiple loops easier to operate together.
 
-This phase should introduce the minimum shared substrate needed by modules:
+This phase should introduce the minimum shared substrate needed by loops:
 
-- module registry and version metadata
+- loop registry and version metadata
 - canonical filesystem layout
 - shared state, reports, proposals, and audit records
 - locks, leases, queues, and background job status
@@ -65,13 +65,13 @@ This phase should introduce the minimum shared substrate needed by modules:
 
 `mnemon-daemon` should be a harness maintenance runner, not an agent runtime. It
 can run dreaming, curator review, eval jobs, risk scans, audit writing, and
-other offline module work.
+other offline loop work.
 
 ## Phase 3: Goal Loop
 
 Focus: support long-horizon work without replacing the host agent.
 
-A future `mnemon-goal` module should maintain durable goal state:
+A future `mnemon-goal` loop should maintain durable goal state:
 
 - objectives
 - milestones
@@ -89,7 +89,7 @@ risk review, human review, audit, and policy reminders.
 
 Focus: add control, quality, and accountability around self-evolution.
 
-Likely modules:
+Likely loops:
 
 - Eval Loop: tests, benchmarks, checklists, and outcome feedback.
 - Risk Loop: scan proposed memory, skill, policy, or setup changes.

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "codex.skill",
+  "host": "codex",
+  "loop": "skill",
+  "projection_path": ".codex",
+  "runtime_surface": ".codex/mnemon-skill",
+  "lifecycle_mapping": {
+    "prime": "thread/start developer instructions",
+    "remind": "user prompt guidance",
+    "nudge": "turn completion guidance",
+    "compact": "thread compact guidance"
+  },
+  "reconcile": ["observe", "curate", "propose", "manage", "no-op"]
+}
+

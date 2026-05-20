@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "name": "codex.eval",
+  "host": "codex",
+  "loop": "eval",
+  "projection_path": ".codex",
+  "runtime_surface": ".codex/mnemon-eval",
+  "lifecycle_mapping": {
+    "prime": "thread/start developer instructions",
+    "remind": "user prompt guidance",
+    "nudge": "turn completion guidance",
+    "compact": "thread compact guidance",
+    "maintenance": "app-server eval"
+  },
+  "reconcile": ["plan", "run", "analyze", "improve", "retire", "no-op"]
+}
+

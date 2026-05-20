@@ -10,7 +10,7 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: deps build install uninstall test unit vet harness-validate codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-loop-smoke docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
+.PHONY: deps build install uninstall test unit vet harness-validate codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
 
 .DEFAULT_GOAL := help
 
@@ -45,8 +45,8 @@ unit: ## Run Go unit tests
 vet: ## Run go vet static analysis
 	go vet ./...
 
-harness-validate: ## Validate harness module manifests and declared asset paths
-	bash scripts/validate_harness_modules.sh
+harness-validate: ## Validate harness loop manifests and declared asset paths
+	bash scripts/validate_harness_loops.sh
 
 codex-app-eval: ## Run real Codex app-server harness smoke eval
 	python3 scripts/codex_app_server_eval.py
@@ -60,8 +60,8 @@ codex-memory-deep-eval: ## Run deep real Codex app-server memory regression suit
 codex-skill-deep-eval: ## Run deep real Codex app-server skill regression suite
 	python3 scripts/codex_app_server_eval.py --suite --suite-name skill-deep
 
-codex-eval-loop-smoke: ## Run real Codex app-server eval-loop projection smoke check
-	python3 scripts/codex_app_server_eval.py --module eval-loop
+codex-eval-smoke: ## Run real Codex app-server eval projection smoke check
+	python3 scripts/codex_app_server_eval.py --loop eval
 
 # ── Containers / Deployment ──────────────────────────────────────────
 

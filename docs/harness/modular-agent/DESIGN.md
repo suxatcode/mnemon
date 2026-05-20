@@ -8,13 +8,13 @@ that replaces them.
 
 Mnemon does not own the agent runtime, but it does own a harness runtime
 substrate. That substrate is the system layer that makes independent harness
-modules installable, composable, scheduled, auditable, and safe to combine with a
+loops installable, composable, scheduled, auditable, and safe to combine with a
 host agent.
 
 ## Thesis
 
 Any host agent that supports standard extension points can gain self-evolution
-capabilities by installing Mnemon harness modules.
+capabilities by installing Mnemon harness loops.
 
 The host agent owns the ReAct loop:
 
@@ -60,14 +60,14 @@ The host runtime still owns low-level execution: UI, permissions, tool routing,
 sandboxing, model calls, and session management. Mnemon focuses on the
 attachable behavioral layer that can be installed around that runtime.
 
-This is why the architecture emphasizes harness modules instead of a new agent
+This is why the architecture emphasizes harness loops instead of a new agent
 framework. The goal is to turn advanced agent behavior into portable,
-inspectable, installable modules.
+inspectable, installable loops.
 
 However, skill, hook, and Markdown assets are not sufficient by themselves once
-multiple modules need to cooperate. Mnemon needs its own substrate for:
+multiple loops need to cooperate. Mnemon needs its own substrate for:
 
-- module registry and versioning
+- loop registry and versioning
 - canonical filesystem layout
 - environment and configuration resolution
 - hook binding and prompt injection boundaries
@@ -75,7 +75,7 @@ multiple modules need to cooperate. Mnemon needs its own substrate for:
 - proposal, report, audit, and state schemas
 - locks, leases, queues, and background job status
 - setup, uninstall, upgrade, and recovery paths
-- cross-module protocols
+- cross-loop protocols
 
 This substrate is still not an agent runtime. It does not own the ReAct loop,
 talk to users, or replace host tool routing.
@@ -95,7 +95,7 @@ experience -> memory -> skills -> goals -> eval / risk / review / audit
 ```
 
 Memory is the continuity point. Skill evolution depends on remembered evidence
-and repeated workflows. Goal modules depend on durable objective state. Eval,
+and repeated workflows. Goal loops depend on durable objective state. Eval,
 risk, review, and audit loops depend on records of decisions, changes, and
 outcomes. Backup and replication protect that memory-centered harness state.
 
@@ -113,16 +113,16 @@ state.
 | Prompt assembly | Host agent | Decides which context enters the model. |
 | Tool routing | Host agent | Chooses and executes tools under the host permission model. |
 | Native skills | Host agent | Discovers and invokes skills using the host's own runtime. |
-| Evolution modules | Mnemon harness | Adds memory, skill evolution, evaluation, and review loops through attachable assets. |
+| Evolution loops | Mnemon harness | Adds memory, skill evolution, evaluation, and review loops through attachable assets. |
 | Canonical state | Mnemon harness | Stores durable memory, skill lifecycle state, evidence, proposals, and reports. |
-| Harness substrate | Mnemon harness | Provides module registry, filesystem layout, environment, setup, projection, reports, proposals, locks, queues, and cross-module protocols. |
-| Maintenance runner | Mnemon harness | Optionally schedules background module jobs without becoming an agent runtime. |
+| Harness substrate | Mnemon harness | Provides loop registry, filesystem layout, environment, setup, projection, reports, proposals, locks, queues, and cross-loop protocols. |
+| Maintenance runner | Mnemon harness | Optionally schedules background loop jobs without becoming an agent runtime. |
 
-This split keeps Mnemon portable. A host can adopt one module without adopting a
+This split keeps Mnemon portable. A host can adopt one loop without adopting a
 new runtime.
 
 It also prevents the opposite mistake: Mnemon should not be treated as only a
-pile of Markdown skills. The harness substrate is what lets modules coordinate
+pile of Markdown skills. The harness substrate is what lets loops coordinate
 without becoming a monolithic agent framework.
 
 ## Execution Plane And Governance Loops
@@ -152,8 +152,8 @@ without mixing all of those concerns into one agent framework.
 | Hooks | Install lifecycle nudges at Prime, Remind, Nudge, Compact, or equivalent host events. |
 | Skills | Expose reusable protocol operations such as `memory_get`, `memory_set`, `skill_observe`, and `skill_manage`. |
 | Subagents | Run heavier maintenance jobs such as dreaming and curator review outside the online task path. |
-| Daemon | Optionally schedule background maintenance for installed modules. |
-| Filesystem | Store canonical module state in predictable directories and project/user scopes. |
+| Daemon | Optionally schedule background maintenance for installed loops. |
+| Filesystem | Store canonical loop state in predictable directories and project/user scopes. |
 | Environment | Let protocol skills resolve paths without hard-coding a specific host agent. |
 
 The minimal requirement is a hook-like lifecycle mechanism. Skills and subagents
@@ -163,9 +163,9 @@ protocols directly.
 ## Harness Daemon
 
 `mnemon-daemon` is the proposed harness daemon: a background maintenance runner
-for installed Mnemon modules.
+for installed Mnemon loops.
 
-It is useful because some module work should not run inside the online ReAct
+It is useful because some loop work should not run inside the online ReAct
 loop:
 
 - dreaming for memory consolidation
@@ -173,7 +173,7 @@ loop:
 - evaluation jobs
 - risk scans
 - audit and report writing
-- leases, locks, queues, and module status
+- leases, locks, queues, and loop status
 
 The daemon is not a host agent and not a second runtime. It must not converse
 with users, take over task execution, route tools for the host, or bypass
@@ -183,20 +183,20 @@ The intended boundary is:
 
 ```text
 Host Agent      -> online task execution and user interaction
-mnemon-daemon   -> offline harness maintenance and scheduled module jobs
-Harness Modules -> memory, skills, eval, risk, review, audit, policy
+mnemon-daemon   -> offline harness maintenance and scheduled loop jobs
+Harness Loops -> memory, skills, eval, risk, review, audit, policy
 ```
 
-For the MVP, modules can still run manually or through host hooks. The daemon
-becomes important when multiple modules need shared scheduling, logs, reports,
+For the MVP, loops can still run manually or through host hooks. The daemon
+becomes important when multiple loops need shared scheduling, logs, reports,
 locks, and status.
 
 ## Current Modules
 
 | Module | Purpose | Current Reference Host |
 | --- | --- | --- |
-| Memory Loop | Adds working memory, long-term memory, and dreaming consolidation. | Claude Code setup under `harness/setup/install.sh --host claude-code --module memory-loop`. |
-| Skill Loop | Adds active/stale/archived skill lifecycle, evidence capture, curator proposals, and approved lifecycle mutation. | Claude Code setup under `harness/setup/install.sh --host claude-code --module skill-loop`. |
+| Memory Loop | Adds working memory, long-term memory, and dreaming consolidation. | Claude Code setup under `harness/ops/install.sh --host claude-code --loop memory`. |
+| Skill Loop | Adds active/stale/archived skill lifecycle, evidence capture, curator proposals, and approved lifecycle mutation. | Claude Code setup under `harness/ops/install.sh --host claude-code --loop skill`. |
 
 ## Relationship To Skill Packs
 
@@ -211,10 +211,10 @@ Mnemon sits at a different layer:
 ```text
 Host Agent
   -> task/workflow skill packs
-  -> Mnemon harness modules
+  -> Mnemon harness loops
 ```
 
-Task skills help the agent do work. Mnemon harness modules help the agent manage
+Task skills help the agent do work. Mnemon harness loops help the agent manage
 memory, skill lifecycle, evaluation, risk, audit, review, and policy around that
 work.
 
@@ -224,7 +224,7 @@ only another skill pack.
 
 ## Memory Differentiator
 
-The memory module uses a hot/cold memory model:
+The memory loop uses a hot/cold memory model:
 
 - Working memory is model-friendly. It is small Markdown context loaded into the
   prompt and maintained by the agent.
@@ -243,12 +243,12 @@ The same harness pattern can support more loops:
 - Eval loop: collect outcomes, run benchmarks, and feed failures into proposals.
 - Risk loop: scan proposed skill or memory changes before they become active.
 - Review loop: coordinate human approval, checkpoints, and release gates.
-- Audit loop: record which module acted, why it acted, and what changed.
+- Audit loop: record which loop acted, why it acted, and what changed.
 - Policy loop: maintain host-specific safety and permission guidance.
 - Backup / replication loop: preserve and restore harness state across machines,
   nodes, or host-agent environments.
 
-Each module should remain independently installable. Modules may optionally use
+Each loop should remain independently installable. Modules may optionally use
 `mnemon-daemon` for background scheduling, but should not require it for the
 basic install path.
 
@@ -259,7 +259,7 @@ coordination can remain a later design.
 
 ## Composable Module Flow
 
-Harness modules should compose through explicit state and proposal boundaries,
+Harness loops should compose through explicit state and proposal boundaries,
 not by silently calling each other.
 
 Example:
@@ -273,18 +273,18 @@ Skill Loop produces a skill proposal
 ```
 
 The same pattern can apply to memory consolidation, policy updates, benchmark
-failures, or host setup changes. A module may create evidence or a proposal;
-another module may review, scan, approve, or record it. The host agent remains
+failures, or host setup changes. A loop may create evidence or a proposal;
+another loop may review, scan, approve, or record it. The host agent remains
 the runtime that decides when to invoke these capabilities.
 
 ## Long-Horizon Goal Modules
 
-A future `mnemon-goal` module can use this architecture to support long-horizon
+A future `mnemon-goal` loop can use this architecture to support long-horizon
 agent work without becoming a task runtime itself.
 
 `mnemon-goal` would maintain objective state, milestones, blockers, decisions,
 handoffs, and progress reports. Around a long-running goal, it can repeatedly
-coordinate other harness modules:
+coordinate other harness loops:
 
 - Memory Loop recalls context at the start and preserves durable decisions after
   milestones.
@@ -297,7 +297,7 @@ coordinate other harness modules:
 - `mnemon-daemon` can detect stale, blocked, or due goals and schedule
   maintenance jobs.
 
-This makes `mnemon-goal` an orchestrating harness module: it coordinates
+This makes `mnemon-goal` an orchestrating harness loop: it coordinates
 memory, skills, evaluation, risk, review, audit, and policy around a durable
 objective while the host agent continues to execute the actual work.
 
@@ -317,13 +317,13 @@ the most complete combinations of hooks, skills, subagents, filesystem
 configuration, and project/user scopes.
 
 That makes Claude Code a strong experimental mount point for Mnemon harness
-modules:
+loops:
 
-- hooks can carry Prime, Remind, Nudge, Compact, and future module triggers
+- hooks can carry Prime, Remind, Nudge, Compact, and future loop triggers
 - skills can expose portable protocol operations
 - subagents can run dreaming, curator review, and other maintenance work
 - project and user config can validate local and global install scopes
-- settings files can make setup and uninstall repeatable
+- settings files can make ops and uninstall repeatable
 
 Claude Code is a reference host, not the only supported runtime. Its role is to
 validate the harness attachment model. The architecture should remain portable

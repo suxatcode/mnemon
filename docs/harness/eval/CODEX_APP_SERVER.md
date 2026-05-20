@@ -2,7 +2,7 @@
 
 This eval mode uses the real Codex app-server rather than a mock server. It
 creates an isolated run directory under `.testdata`, projects Mnemon loop
-modules into a generated workspace, then starts:
+loops into a generated workspace, then starts:
 
 ```bash
 codex app-server --listen stdio://
@@ -27,7 +27,7 @@ The suite currently covers local-context memory skip, focused long-term recall,
 durable `MEMORY.md` writes, transient no-pollution behavior, and skill evidence
 logging.
 
-For longer memory-loop regression, run:
+For longer memory regression, run:
 
 ```bash
 make codex-memory-deep-eval
@@ -37,7 +37,7 @@ The deep memory suite adds noisy recall filtering, stale-memory supersession,
 uncertain-preference rejection, secret-like value rejection, and multi-turn
 continuity through persisted `MEMORY.md`.
 
-For longer skill-loop regression, run:
+For longer skill regression, run:
 
 ```bash
 make codex-skill-deep-eval

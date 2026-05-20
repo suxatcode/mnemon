@@ -1,0 +1,15 @@
+{
+  "name": "smoke",
+  "description": "Fast checks for eval setup and core interface-loop behavior.",
+  "host": "codex",
+  "lifecycle": "promoted",
+  "scenarios": [
+    "ops/host-projection-smoke",
+    "memory/project-preference-recall",
+    "skill/skill-creation-reuse"
+  ],
+  "rubrics": [
+    "eval-asset-quality",
+    "interface-loop-behavior"
+  ]
+}

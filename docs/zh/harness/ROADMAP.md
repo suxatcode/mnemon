@@ -5,10 +5,10 @@
 这份 roadmap 描述 Mnemon Harness 如何从当前 MVP loops，逐步成长为更完整的
 modular-agent governance layer。它是方向性路线图，不是固定 release schedule。
 
-核心原则很简单：一次做好一个 loop，让每个 module 都能独立产生价值，同时不把
+核心原则很简单：一次做好一个 loop，让每个 loop 都能独立产生价值，同时不把
 Mnemon 做成替代宿主的 agent runtime。
 
-这份路线图是 memory-driven 的，而不是 module-driven 的。Memory 是让 agent
+这份路线图是 memory-driven 的，而不是 loop-driven 的。Memory 是让 agent
 经验变成持久状态的连续性中心。其他 loop 应该围绕这些状态进行增强、治理或
 运行，而不是变成彼此割裂的功能。
 
@@ -24,11 +24,11 @@ Mnemon 已经有两个可安装的 MVP harness loops。
 这两个 MVP loops 使用同一套 harness 词汇：
 
 - GUIDE 文件定义 loop policy。
-- setup scripts 将 loop 挂载到宿主 agent。
+- ops scripts 将 loop 挂载到宿主 agent。
 - hooks 在宿主定义的生命周期时机注入提示。
 - protocol skills 暴露可复用操作。
 - subagents 执行较重的维护工作。
-- Mnemon-owned state 把 module 数据保存在宿主 runtime 之外。
+- Mnemon-owned state 把 loop 数据保存在宿主 runtime 之外。
 
 Claude Code 是第一个 reference host，因为它提供 hooks、skills、subagents 和
 project/user configuration。架构仍应保持可移植，面向其他具备类似扩展点的
@@ -52,9 +52,9 @@ project/user configuration。架构仍应保持可移植，面向其他具备类
 
 重点：让多个 loops 更容易协同运行。
 
-这一阶段应该引入 modules 所需的最小共享 substrate：
+这一阶段应该引入 loops 所需的最小共享 substrate：
 
-- module registry 和 version metadata
+- loop registry 和 version metadata
 - canonical filesystem layout
 - shared state、reports、proposals 和 audit records
 - locks、leases、queues 和 background job status
@@ -63,13 +63,13 @@ project/user configuration。架构仍应保持可移植，面向其他具备类
 
 `mnemon-daemon` 应该是 harness maintenance runner，而不是 agent runtime。它可以
 运行 dreaming、curator review、eval jobs、risk scans、audit writing，以及其他
-离线 module 工作。
+离线 loop 工作。
 
 ## Phase 3：Goal Loop
 
 重点：支持长程任务，但不替代宿主 agent。
 
-未来的 `mnemon-goal` module 应维护 durable goal state：
+未来的 `mnemon-goal` loop 应维护 durable goal state：
 
 - objectives
 - milestones
@@ -87,7 +87,7 @@ review、audit 和 policy reminders。
 
 重点：为自进化增加控制、质量和问责能力。
 
-可能的 modules：
+可能的 loops：
 
 - Eval Loop：tests、benchmarks、checklists 和 outcome feedback。
 - Risk Loop：扫描 proposed memory、skill、policy 或 setup changes。

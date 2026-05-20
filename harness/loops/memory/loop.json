@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "name": "memory",
+  "version": "0.1.0",
+  "description": "Connects prompt-facing working memory, Mnemon long-term memory, and dreaming consolidation.",
+  "control_model": {
+    "state": [
+      "MEMORY.md",
+      ".mnemon stores",
+      "reports",
+      "manifests",
+      "memory status"
+    ],
+    "intent": "Keep useful agent, user, and project continuity available across lifecycle boundaries.",
+    "reality": [
+      "host prompt",
+      "current task",
+      "working-memory contents",
+      "recall results",
+      "context pressure",
+      "consolidation state"
+    ],
+    "reconcile": [
+      "read",
+      "write",
+      "compact",
+      "consolidate",
+      "no-op"
+    ]
+  },
+  "entity_profiles": {
+    "template": "memory",
+    "controlled": [
+      "memory binding"
+    ],
+    "surface": [
+      "MEMORY.md",
+      "Mnemon recall/write",
+      "host hooks",
+      "protocol skills"
+    ],
+    "evidence": [
+      "recall usefulness",
+      "write results",
+      "context pressure",
+      "stale working memory"
+    ],
+    "governance": [
+      "memory proposals",
+      "memory audits"
+    ]
+  },
+  "surfaces": {
+    "projection": [
+      "GUIDE.md",
+      "hooks",
+      "memory_get",
+      "memory_set",
+      "dreaming",
+      "runtime env"
+    ],
+    "observation": [
+      "hook output",
+      "MEMORY.md length",
+      "recall results",
+      "write outcomes",
+      "dreaming reports"
+    ]
+  },
+  "lifecycle_events": [
+    "prime",
+    "remind",
+    "nudge",
+    "compact"
+  ],
+  "assets": {
+    "guide": "GUIDE.md",
+    "env": "env.sh",
+    "runtime_files": [
+      "MEMORY.md"
+    ],
+    "hooks": {
+      "prime": "hooks/prime.md",
+      "remind": "hooks/remind.md",
+      "nudge": "hooks/nudge.md",
+      "compact": "hooks/compact.md"
+    },
+    "skills": [
+      "skills/memory_get.md",
+      "skills/memory_set.md"
+    ],
+    "subagents": [
+      "subagents/dreaming.md"
+    ]
+  },
+  "state": {
+    "canonical": [
+      ".mnemon/data",
+      ".mnemon/reports",
+      ".mnemon/proposals",
+      ".mnemon/audit"
+    ],
+    "loop_runtime": [
+      "MEMORY.md"
+    ]
+  },
+  "host_adapters": {
+    "claude-code": "../../hosts/claude-code",
+    "codex": "../../hosts/codex"
+  }
+}

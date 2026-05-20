@@ -2,11 +2,11 @@
 
 Chinese version: [HOST_PROJECTION.md](../zh/harness/HOST_PROJECTION.md)
 
-This document defines how a Mnemon loop module is projected into a concrete
+This document defines how a Mnemon loop template is projected into a concrete
 host runtime such as Claude Code, Codex, OpenClaw, or a future app-server eval
 host.
 
-The loop module standard defines the canonical package shape. Host projection
+The loop standard defines the canonical package shape. Host projection
 defines how that package becomes visible and executable inside a host runtime.
 
 ## Principle
@@ -16,9 +16,9 @@ projections that can be regenerated.
 
 ```text
 .mnemon/
-  canonical state, loop modules, reports, proposals, audit
+  canonical state, loop templates, reports, proposals, audit
       |
-      | projected by setup/<host>
+      | projected by harness/hosts/<host> through harness/ops
       v
 .claude/ or .codex/
   host-readable skills, hooks, config, and pointers back to .mnemon
@@ -31,17 +31,22 @@ The projection adapter should not create an independent copy of truth. It should
 render enough host-native files for the host to discover and use the loop while
 keeping durable state under `.mnemon`.
 
+Projection and observation are separate surfaces. Projection lets the host see
+Mnemon's Intent. Observation lets Mnemon see enough Reality to write status,
+collect evidence, and run future reconcile actions.
+
 ## Responsibilities
 
 A host projection adapter owns these responsibilities:
 
 | Responsibility | Description |
 | --- | --- |
-| Path resolution | Resolve project root, host config directory, canonical `.mnemon`, active store, and loop module path. |
+| Path resolution | Resolve project root, host config directory, canonical `.mnemon`, active store, and loop template path. |
 | Asset projection | Render or copy host-readable GUIDE, hooks, protocol skills, and subagents. |
 | Hook registration | Register host lifecycle hooks when the host supports them. |
 | Environment injection | Make `MNEMON_DATA_DIR`, `MNEMON_STORE`, `MNEMON_HARNESS_DIR`, and loop-specific env visible to hooks and skills. |
 | Manifest writing | Record what was projected and where under `.mnemon/hosts/<host>/manifest.json`. |
+| Status writing | Record the installed loop control model under `.mnemon/harness/<loop>/status.json`. |
 | Validation | Detect missing assets, stale projections, incompatible host capabilities, and path conflicts. |
 | Uninstall | Remove host projection files while preserving canonical `.mnemon` state by default. |
 
@@ -51,7 +56,7 @@ A host projection adapter should not:
 
 - Reimplement Mnemon memory storage or retrieval.
 - Move canonical state into `.claude`, `.codex`, or another host directory.
-- Hide host-specific behavior inside loop module root files.
+- Hide host-specific behavior inside loop template root files.
 - Mutate user-owned host config outside declared projection sections.
 - Delete memory, reports, proposals, or audit records unless the user explicitly
   requests destructive cleanup.
@@ -65,8 +70,10 @@ The target canonical layout is:
 ├── data/
 │   └── <store>/mnemon.db
 ├── harness/
-│   ├── memory-loop/
-│   └── skill-loop/
+│   ├── memory/
+│   │   └── status.json
+│   └── skill/
+│       └── status.json
 ├── reports/
 ├── proposals/
 ├── audit/
@@ -166,21 +173,28 @@ Recommended shape:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "host": "codex",
-  "installed_at": "2026-05-14T00:00:00Z",
+  "updated_at": "2026-05-20T00:00:00Z",
   "project_root": "/path/to/project",
   "mnemon_dir": "/path/to/project/.mnemon",
   "store": "default",
   "loops": {
-    "memory-loop": {
-      "module_path": ".mnemon/harness/memory-loop",
-      "module_version": "0.1.0",
-      "projection_path": ".codex",
-      "projected_assets": {
-        "skills": [".codex/skills/memory_get.md"],
-        "hooks": [".codex/hooks/prime.sh"],
-        "subagents": []
+    "memory": {
+      "loop_path": ".mnemon/harness/memory",
+      "loop_version": "0.1.0",
+      "state_path": ".mnemon/harness/memory",
+      "intent_policy": ".mnemon/harness/memory/GUIDE.md",
+      "status_path": ".mnemon/harness/memory/status.json",
+      "projection": {
+        "path": ".codex",
+        "surfaces": ["GUIDE.md", "hooks", "memory_get", "memory_set", "runtime env"]
+      },
+      "reality": {
+        "surfaces": ["hook output", "MEMORY.md length", "recall results", "write outcomes"]
+      },
+      "reconcile": {
+        "actions": ["read", "write", "compact", "consolidate", "no-op"]
       },
       "lifecycle_mapping": {
         "prime": "session-init",
@@ -193,7 +207,10 @@ Recommended shape:
 }
 ```
 
-The manifest is the bridge between setup, status, uninstall, and eval tooling.
+The manifest is the bridge between ops, status, uninstall, eval tooling, and
+future reconcile tooling. Each installed loop also writes `status.json` in its
+canonical state directory so loop-local state can be inspected without reading
+host-specific configuration.
 
 ## Setup Contract
 
@@ -201,15 +218,17 @@ All host adapters should support the same high-level operations:
 
 ```text
 install
-  validate loop module manifests
+  validate loop manifests
   resolve canonical .mnemon
   install canonical loop assets if needed
   render host projection
   register hooks/config
   write host manifest
+  write loop status
 
 status
   read host manifest
+  read loop status
   validate projected files exist
   validate registered hooks/config
   report stale or missing projections
@@ -233,7 +252,7 @@ behavior. It should use the same projection contract as real hosts:
 eval orchestrator
     |
     | create isolated workspace and .mnemon
-    | run setup/<host>/install
+    | run harness/ops/install.sh
     | start host app server
     v
 host app server
@@ -250,7 +269,7 @@ Eval should test host behavior under harness influence, not only Mnemon CLI
 CRUD. Useful assertions include:
 
 - The app server uses the isolated `.mnemon`.
-- The expected loop module versions are installed.
+- The expected loop template versions are installed.
 - Lifecycle events are invoked through the declared mapping.
 - Recall decisions affect later task behavior.
 - Writeback decisions create durable memory only when justified.
@@ -259,10 +278,9 @@ CRUD. Useful assertions include:
 ## Quality Rules
 
 - Projection files should be small and generated from canonical assets.
-- Host-specific behavior belongs in `setup/<host>/` or generated adapter files.
+- Host-specific behavior belongs in `harness/hosts/<host>/` or generated adapter files.
 - Setup should be repeatable and idempotent where practical.
 - Uninstall should be conservative and preserve canonical state.
 - Manifest paths should be relative when possible and absolute when required for
   runtime execution.
 - Public projection behavior must be documented in both English and Chinese.
-

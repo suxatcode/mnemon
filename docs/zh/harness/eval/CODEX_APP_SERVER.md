@@ -1,7 +1,7 @@
 # Codex App-Server Eval
 
 这个 eval 模式使用真实的 Codex app-server，而不是 mock server。它会在
-`.testdata` 下创建一次性的隔离运行目录，把 Mnemon loop module 投影到生成的
+`.testdata` 下创建一次性的隔离运行目录，把 Mnemon loop template 投影到生成的
 workspace 中，然后启动：
 
 ```bash

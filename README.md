@@ -229,7 +229,7 @@ Different agents/processes can use different stores via the `MNEMON_STORE` envir
 
 **How do I customize the behavior?**
 Edit the generated guideline (`~/.mnemon/prompt/guide.md` in current setup
-flows) or use the installable [memory loop GUIDE](harness/modules/memory-loop/GUIDE.md)
+flows) or use the installable [memory loop GUIDE](harness/loops/memory/GUIDE.md)
 as the source. The skill file should stay focused on command syntax.
 
 **What is sub-agent delegation?**
@@ -270,8 +270,8 @@ See [Development and Deployment](docs/DEPLOYMENT.md) for Docker, Compose, Ollama
 ## Documentation
 
 - [Modular Self-Evolution Harness](docs/harness/README.md) — formal harness docs for modular agent, memory loop, and skill loop design
-- [Memory Loop Harness](harness/modules/memory-loop/README.md) — installable memory loop assets
-- [Skill Loop Harness](harness/modules/skill-loop/README.md) — installable skill loop assets
+- [Memory Loop Harness](harness/loops/memory/README.md) — installable memory loop assets
+- [Skill Loop Harness](harness/loops/skill/README.md) — installable skill loop assets
 - [Design & Architecture](docs/DESIGN.md) — current engine architecture, algorithms, integration design
 - [Usage & Reference](docs/USAGE.md) — CLI commands, embedding support, architecture overview
 - [Architecture Diagrams](docs/diagrams/) — system architecture, pipelines, lifecycle management

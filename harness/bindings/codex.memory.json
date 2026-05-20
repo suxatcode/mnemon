@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "codex.memory",
+  "host": "codex",
+  "loop": "memory",
+  "projection_path": ".codex",
+  "runtime_surface": ".codex/mnemon-memory",
+  "lifecycle_mapping": {
+    "prime": "thread/start developer instructions",
+    "remind": "user prompt guidance",
+    "nudge": "turn completion guidance",
+    "compact": "thread compact guidance"
+  },
+  "reconcile": ["read", "write", "compact", "consolidate", "no-op"]
+}
+

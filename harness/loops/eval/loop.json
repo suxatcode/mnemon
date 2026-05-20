@@ -1,0 +1,139 @@
+{
+  "schema_version": 2,
+  "name": "eval",
+  "version": "0.1.0",
+  "description": "Runs scenario-driven harness evaluations, collects evidence, and curates improvements without making eval assets canonical by default.",
+  "loop_type": "feedback",
+  "direct_interface_effect": false,
+  "primary_host": "codex",
+  "control_model": {
+    "state": [
+      "scenarios",
+      "suites",
+      "rubrics",
+      "scratch",
+      "candidates",
+      "reports",
+      "artifacts",
+      "eval status"
+    ],
+    "intent": "Turn lifecycle behavior into scenario evidence and promote only reviewed improvements.",
+    "reality": [
+      "HostAgent eval runs",
+      "scenario outcomes",
+      "rubric findings",
+      "artifact diffs",
+      "regression signals"
+    ],
+    "reconcile": [
+      "plan",
+      "run",
+      "analyze",
+      "improve",
+      "retire",
+      "no-op"
+    ]
+  },
+  "entity_profiles": {
+    "template": "eval",
+    "controlled": [
+      "eval binding"
+    ],
+    "surface": [
+      "eval protocol skills",
+      "scenario files",
+      "suite files",
+      "rubrics",
+      "app-server"
+    ],
+    "evidence": [
+      "eval reports",
+      "artifacts",
+      "rubric findings",
+      "regression signals"
+    ],
+    "governance": [
+      "candidate improvements",
+      "reviewed promotions",
+      "retired assets"
+    ]
+  },
+  "surfaces": {
+    "projection": [
+      "eval_plan",
+      "eval_run",
+      "eval_analyze",
+      "eval_improve",
+      "scenarios",
+      "suites",
+      "rubrics",
+      "runtime env"
+    ],
+    "observation": [
+      "app-server transcripts",
+      "eval reports",
+      "artifacts",
+      "scenario results"
+    ]
+  },
+  "lifecycle_events": [
+    "prime",
+    "remind",
+    "nudge",
+    "compact"
+  ],
+  "assets": {
+    "guide": "GUIDE.md",
+    "env": "env.sh",
+    "runtime_files": [
+      "suites/smoke.json",
+      "suites/regression.json",
+      "rubrics/eval-asset-quality.md",
+      "rubrics/interface-loop-behavior.md",
+      "scenarios/memory/project-preference-recall.md",
+      "scenarios/skill/skill-creation-reuse.md",
+      "scenarios/docs/bilingual-doc-sync.md",
+      "scenarios/ops/host-projection-smoke.md"
+    ],
+    "hooks": {
+      "prime": "hooks/prime.md",
+      "remind": "hooks/remind.md",
+      "nudge": "hooks/nudge.md",
+      "compact": "hooks/compact.md"
+    },
+    "skills": [
+      "skills/eval_plan.md",
+      "skills/eval_run.md",
+      "skills/eval_analyze.md",
+      "skills/eval_improve.md"
+    ],
+    "subagents": [
+      "subagents/evaluator.md"
+    ]
+  },
+  "state": {
+    "canonical": [
+      ".mnemon/data",
+      ".mnemon/reports",
+      ".mnemon/proposals",
+      ".mnemon/audit"
+    ],
+    "loop_runtime": [
+      "scratch",
+      "candidates",
+      "reports",
+      "artifacts",
+      "retired"
+    ]
+  },
+  "eval_asset_lifecycle": [
+    "ephemeral",
+    "candidate",
+    "promoted",
+    "canonical",
+    "retired"
+  ],
+  "host_adapters": {
+    "codex": "../../hosts/codex"
+  }
+}

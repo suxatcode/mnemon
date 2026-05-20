@@ -195,11 +195,11 @@ def setup_workspace(args: argparse.Namespace, root: Path) -> tuple[Path, Path, P
     env = dict(os.environ)
     env["MNEMON_HARNESS_STATE_DIR"] = str(mnemon_dir)
     env["MNEMON_DATA_DIR"] = str(mnemon_dir / "data")
-    if "memory-loop" in args.modules:
-        env["MNEMON_MEMORY_LOOP_ENV"] = str(mnemon_dir / "harness" / "memory-loop" / "env.sh")
-        env["MNEMON_MEMORY_LOOP_DIR"] = str(mnemon_dir / "harness" / "memory-loop")
-    if "skill-loop" in args.modules:
-        skill_dir = mnemon_dir / "harness" / "skill-loop"
+    if "memory" in args.loops:
+        env["MNEMON_MEMORY_LOOP_ENV"] = str(mnemon_dir / "harness" / "memory" / "env.sh")
+        env["MNEMON_MEMORY_LOOP_DIR"] = str(mnemon_dir / "harness" / "memory")
+    if "skill" in args.loops:
+        skill_dir = mnemon_dir / "harness" / "skill"
         env["MNEMON_SKILL_LOOP_ENV"] = str(skill_dir / "env.sh")
         env["MNEMON_SKILL_LOOP_DIR"] = str(skill_dir)
         env["MNEMON_SKILL_LOOP_LIBRARY_DIR"] = str(skill_dir / "skills")
@@ -208,8 +208,8 @@ def setup_workspace(args: argparse.Namespace, root: Path) -> tuple[Path, Path, P
         env["MNEMON_SKILL_LOOP_ARCHIVED_DIR"] = str(skill_dir / "skills" / "archived")
         env["MNEMON_SKILL_LOOP_USAGE_FILE"] = str(skill_dir / "skills" / ".usage.jsonl")
         env["MNEMON_SKILL_LOOP_PROPOSALS_DIR"] = str(skill_dir / "proposals")
-    if "eval-loop" in args.modules:
-        eval_dir = mnemon_dir / "harness" / "eval-loop"
+    if "eval" in args.loops:
+        eval_dir = mnemon_dir / "harness" / "eval"
         env["MNEMON_EVAL_LOOP_ENV"] = str(eval_dir / "env.sh")
         env["MNEMON_EVAL_LOOP_DIR"] = str(eval_dir)
         env["MNEMON_EVAL_LOOP_SCRATCH_DIR"] = str(eval_dir / "scratch")
@@ -223,10 +223,10 @@ def setup_workspace(args: argparse.Namespace, root: Path) -> tuple[Path, Path, P
         env["CODEX_HOME"] = str(codex_home)
     env = ensure_mnemon_binary(root, run_root, env)
 
-    install = root / "harness" / "setup" / "install.sh"
-    modules = args.modules
-    for module in modules:
-        cmd = ["bash", str(install), "--host", "codex", "--module", module, "--config-dir", str(workspace / ".codex")]
+    install = root / "harness" / "ops" / "install.sh"
+    loops = args.loops
+    for loop in loops:
+        cmd = ["bash", str(install), "--host", "codex", "--loop", loop, "--config-dir", str(workspace / ".codex")]
         run(cmd, workspace, env)
     return run_root, workspace, mnemon_dir, env
 
@@ -295,14 +295,14 @@ class Scenario:
     def __init__(
         self,
         name: str,
-        modules: list[str],
+        loops: list[str],
         expected_skills: list[str],
         prompt: str | list[str],
         setup: Callable[[Path, Path, dict[str, str]], None],
         assert_result: Callable[[dict[str, Any], Path, Path, dict[str, str]], list[dict[str, Any]]],
     ) -> None:
         self.name = name
-        self.modules = modules
+        self.loops = loops
         self.expected_skills = expected_skills
         self.prompts = prompt if isinstance(prompt, list) else [prompt]
         self.prompt = self.prompts[0]
@@ -349,7 +349,7 @@ def setup_local_fact(workspace: Path, mnemon_dir: Path, env: dict[str, str]) -> 
 
 
 def memory_path(mnemon_dir: Path) -> Path:
-    return mnemon_dir / "harness" / "memory-loop" / "MEMORY.md"
+    return mnemon_dir / "harness" / "memory" / "MEMORY.md"
 
 
 def append_memory(mnemon_dir: Path, text: str) -> None:
@@ -535,7 +535,7 @@ def assert_skill_observe(report: dict[str, Any], workspace: Path, mnemon_dir: Pa
 
 
 def skill_loop_path(mnemon_dir: Path) -> Path:
-    return mnemon_dir / "harness" / "skill-loop"
+    return mnemon_dir / "harness" / "skill"
 
 
 def skill_usage_path(mnemon_dir: Path) -> Path:
@@ -726,7 +726,7 @@ def assert_skill_author_draft(report: dict[str, Any], workspace: Path, mnemon_di
 SCENARIOS: dict[str, Scenario] = {
     "memory-skip-local": Scenario(
         name="memory-skip-local",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_local_fact,
         prompt=(
@@ -737,7 +737,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "memory-focused-recall": Scenario(
         name="memory-focused-recall",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_memory_seed,
         prompt=(
@@ -749,20 +749,20 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "memory-write-decision": Scenario(
         name="memory-write-decision",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_none,
         prompt=(
             "Use the Mnemon memory loop to record this durable project decision: "
             "future loop optimization should be driven by app-server eval scenarios before broad host expansion. "
-            "Edit only the Mnemon memory-loop MEMORY.md in this eval workspace. "
+            "Edit only the Mnemon memory MEMORY.md in this eval workspace. "
             "Use the phrase 'app-server eval scenarios' in the saved memory. Then reply done."
         ),
         assert_result=assert_memory_write,
     ),
     "memory-no-pollution": Scenario(
         name="memory-no-pollution",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_none,
         prompt=(
@@ -773,20 +773,20 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "memory-merge-supersede": Scenario(
         name="memory-merge-supersede",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_memory_merge,
         prompt=(
             "Use the Mnemon memory loop to update existing working memory. "
             "The current durable decision supersedes the older host-first note: "
-            "memory-loop optimization should be driven by app-server eval scenarios before broad host expansion. "
+            "memory optimization should be driven by app-server eval scenarios before broad host expansion. "
             "Merge or replace the existing entry instead of appending a duplicate. Reply done."
         ),
         assert_result=assert_memory_merge,
     ),
     "memory-uncertain-preference": Scenario(
         name="memory-uncertain-preference",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_memory_uncertain_preference,
         prompt=(
@@ -798,7 +798,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "memory-secret-rejection": Scenario(
         name="memory-secret-rejection",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_none,
         prompt=(
@@ -809,7 +809,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "memory-recall-noise-filter": Scenario(
         name="memory-recall-noise-filter",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_memory_noise,
         prompt=(
@@ -820,7 +820,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "memory-multiturn-continuity": Scenario(
         name="memory-multiturn-continuity",
-        modules=["memory-loop"],
+        loops=["memory"],
         expected_skills=["memory_get", "memory_set"],
         setup=setup_none,
         prompt=[
@@ -834,7 +834,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-observe-evidence": Scenario(
         name="skill-observe-evidence",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_none,
         prompt=(
@@ -846,7 +846,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-skip-transient": Scenario(
         name="skill-skip-transient",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_none,
         prompt=(
@@ -858,7 +858,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-observe-missing": Scenario(
         name="skill-observe-missing",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_none,
         prompt=(
@@ -871,7 +871,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-manage-approved-create": Scenario(
         name="skill-manage-approved-create",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_none,
         prompt=(
@@ -885,7 +885,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-curate-proposal": Scenario(
         name="skill-curate-proposal",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_curate_evidence,
         prompt=(
@@ -898,7 +898,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-manage-unapproved-noop": Scenario(
         name="skill-manage-unapproved-noop",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_active_release,
         prompt=(
@@ -910,7 +910,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-manage-approved-stale": Scenario(
         name="skill-manage-approved-stale",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_active_legacy,
         prompt=(
@@ -922,7 +922,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-manage-approved-restore": Scenario(
         name="skill-manage-approved-restore",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_stale_release,
         prompt=(
@@ -934,7 +934,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "skill-author-draft": Scenario(
         name="skill-author-draft",
-        modules=["skill-loop"],
+        loops=["skill"],
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_none,
         prompt=(
@@ -986,7 +986,7 @@ SKILL_DEEP_SUITE = [
 
 def scenario_args(base: argparse.Namespace, scenario: Scenario) -> argparse.Namespace:
     args = argparse.Namespace(**vars(base))
-    args.modules = scenario.modules
+    args.loops = scenario.loops
     args.expected_skills = scenario.expected_skills
     args.prompt = scenario.prompt
     args.prompts = scenario.prompts
@@ -1008,7 +1008,7 @@ def run_eval(args: argparse.Namespace) -> dict[str, Any]:
         "run_dir": str(run_dir),
         "workspace": str(workspace),
         "mnemon_dir": str(mnemon_dir),
-        "modules": args.modules,
+        "loops": args.loops,
         "scenario": args.scenario,
         "agent_turn": args.agent_turn,
         "started_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -1135,19 +1135,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Scenario suite to run with --suite.",
     )
     parser.add_argument(
-        "--module",
-        dest="modules",
+        "--loop",
+        dest="loops",
         action="append",
-        choices=["memory-loop", "skill-loop", "eval-loop"],
+        choices=["memory", "skill", "eval"],
         default=[],
-        help="Harness module to install. May be repeated. Defaults to memory-loop.",
+        help="Harness loop to install. May be repeated. Defaults to memory.",
     )
     parser.add_argument(
         "--expected-skill",
         dest="expected_skills",
         action="append",
         default=[],
-        help="Projected Codex skill name that must appear in skills/list. Defaults are derived from selected modules.",
+        help="Projected Codex skill name that must appear in skills/list. Defaults are derived from selected loops.",
     )
     parser.add_argument("--agent-turn", action="store_true", help="Start a real Codex turn after app-server smoke checks.")
     parser.add_argument(
@@ -1165,15 +1165,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Set CODEX_HOME inside the eval run directory. This is suitable for smoke checks and may not have auth for real turns.",
     )
     args = parser.parse_args(argv)
-    if not args.modules:
-        args.modules = ["memory-loop"]
+    if not args.loops:
+        args.loops = ["memory"]
     if not args.expected_skills:
         expected: list[str] = []
-        if "memory-loop" in args.modules:
+        if "memory" in args.loops:
             expected.extend(["memory_get", "memory_set"])
-        if "skill-loop" in args.modules:
+        if "skill" in args.loops:
             expected.extend(SKILL_LOOP_EXPECTED_SKILLS)
-        if "eval-loop" in args.modules:
+        if "eval" in args.loops:
             expected.extend(EVAL_LOOP_EXPECTED_SKILLS)
         args.expected_skills = expected
     return args

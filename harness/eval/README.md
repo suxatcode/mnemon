@@ -2,21 +2,21 @@
 
 This directory documents eval modes for host-wrapped loop testing.
 
-The canonical eval loop module lives under:
+The canonical eval loop template lives under:
 
 ```text
-harness/modules/eval-loop/
+harness/loops/eval/
 ```
 
 Use `harness/eval/` for project-local runner notes and app-server operation
-details. Use `harness/modules/eval-loop/` for reusable eval-loop policy,
+details. Use `harness/loops/eval/` for reusable eval policy,
 scenarios, suites, rubrics, protocol skills, and lifecycle guidance.
 
 ## Codex App-Server Eval
 
 The Codex app-server eval uses the real Codex app-server protocol instead of a
 mock server. It creates an isolated run directory under `.testdata`, installs
-Mnemon loop modules into a generated workspace, starts:
+Mnemon loop templates into a generated workspace, starts:
 
 ```bash
 codex app-server --listen stdio://
@@ -42,16 +42,16 @@ Run the longer memory regression suite with:
 make codex-memory-deep-eval
 ```
 
-Run the longer skill-loop regression suite with:
+Run the longer skill regression suite with:
 
 ```bash
 make codex-skill-deep-eval
 ```
 
-Run the eval-loop projection smoke check with:
+Run the eval projection smoke check with:
 
 ```bash
-make codex-eval-loop-smoke
+make codex-eval-smoke
 ```
 
 To run an actual Codex turn, use:
@@ -95,7 +95,7 @@ The `memory-deep` suite extends memory coverage with:
 - rejecting secret-like values and generic restatements of existing safety policy
 - multi-turn continuity through persisted `MEMORY.md`
 
-The `skill-deep` suite extends skill-loop coverage with:
+The `skill-deep` suite extends skill coverage with:
 
 - skipping transient one-off workflow evidence
 - recording missing-skill evidence as JSONL
