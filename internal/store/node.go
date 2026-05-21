@@ -135,7 +135,11 @@ func (db *DB) UpdateEntities(id string, entities []string) error {
 }
 
 // IncrementAccessCount bumps the access count and refreshes last_accessed_at.
+// No-op when the database is read-only.
 func (db *DB) IncrementAccessCount(id string) error {
+	if db.readOnly {
+		return nil
+	}
 	_, err := db.execer().Exec(
 		`UPDATE insights SET access_count = access_count + 1, last_accessed_at = ? WHERE id = ?`,
 		time.Now().UTC().Format(time.RFC3339), id)

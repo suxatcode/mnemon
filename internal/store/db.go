@@ -26,10 +26,14 @@ type dbExecer interface {
 
 // DB wraps the SQLite database connection.
 type DB struct {
-	conn *sql.DB
-	tx   *sql.Tx // current active transaction (nil = no transaction)
-	path string
+	conn     *sql.DB
+	tx       *sql.Tx // current active transaction (nil = no transaction)
+	path     string
+	readOnly bool
 }
+
+// IsReadOnly returns true if the database was opened in read-only mode.
+func (db *DB) IsReadOnly() bool { return db.readOnly }
 
 // execer returns the active transaction if set, otherwise the raw connection.
 func (db *DB) execer() dbExecer {
@@ -205,7 +209,7 @@ func OpenReadOnly(dataDir string) (*DB, error) {
 		return nil, fmt.Errorf("open readonly database: %w", err)
 	}
 	conn.SetMaxOpenConns(1)
-	return &DB{conn: conn, path: dbPath}, nil
+	return &DB{conn: conn, path: dbPath, readOnly: true}, nil
 }
 
 // Open opens (or creates) the SQLite database at the given directory.

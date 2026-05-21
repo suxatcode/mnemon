@@ -11,7 +11,11 @@ const MaxOplogEntries = 5000
 
 // LogOp records an operation to the oplog and trims old entries beyond MaxOplogEntries.
 // Best-effort: failures are logged to stderr but do not propagate.
+// No-op when the database is read-only.
 func (db *DB) LogOp(operation, insightID, detail string) {
+	if db.readOnly {
+		return
+	}
 	if _, err := db.execer().Exec(
 		`INSERT INTO oplog (operation, insight_id, detail, created_at) VALUES (?, ?, ?, ?)`,
 		operation, insightID, detail, time.Now().UTC().Format(time.RFC3339)); err != nil {
