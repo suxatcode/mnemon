@@ -66,6 +66,42 @@ harness/ops/
 如果某个 loop 的契约需要额外 runtime 文件，可以加入该目录，例如 Memory Loop
 的 `MEMORY.md`。
 
+## 扩展原则
+
+新增 lifecycle loop 默认应该是声明式的。Loop author 通常应该新增一个
+Markdown-native loop package 加 machine-readable manifest，而不是新增 framework
+代码。
+
+```text
+Markdown / config owns semantics.
+Framework code owns mechanics.
+Host adapter code owns integration.
+Deterministic reactor code owns algorithms.
+```
+
+常规扩展面是：
+
+```text
+loop.json              # machine-readable lifecycle contract
+GUIDE.md               # HostAgent 使用的 policy 和 judgment rules
+hooks/*.md             # lifecycle boundary reminders
+skills/*.md            # reusable online protocols
+subagents/*.md         # LLM-supervised lifecycle job specs
+schemas/*.json         # structured job、proposal 或 report outputs
+examples/*.jsonl       # 可选 event fixtures，用于 validation
+```
+
+只有三类情况应该改代码：
+
+- 新宿主接入需要 projector、lifecycle mapping 或 HostAgent runner adapter。
+- 某个 loop 需要新的确定性算法，例如 ranking、graph traversal、diffing、
+  conflict detection、secret scanning 或 score aggregation。
+- Framework 本身需要新的 runtime primitive，例如 fork/diff、leases、approval
+  workflow、artifact storage 或 cross-loop dependency tracking。
+
+目标形态接近声明式控制平面：常见 loops 通过 templates 和 manifests 注册；新的
+接入能力或确定性 controller 才通过代码实现。
+
 ## 概念
 
 | 概念 | 是否必需 | 作用 |

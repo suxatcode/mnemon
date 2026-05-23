@@ -9,6 +9,11 @@ Mnemon does not need a heavy distributed control system. It needs a consistent
 model for making agent lifecycle capabilities durable, observable, portable, and
 governable.
 
+The control plane sits around host agents instead of replacing them. Mnemon does
+not orchestrate task execution; it orchestrates lifecycle capabilities such as
+memory consolidation, skill promotion, eval evidence, policy proposals,
+projection repair, and audit.
+
 ## Minimal Definition
 
 Mnemon keeps `State`, declares `Intent`, observes `Reality`, and uses
@@ -33,6 +38,11 @@ and proposals enter the kernel through profiles.
 
 Execution surfaces are not part of the core model. They belong to the execution
 layer: they are how Mnemon reaches host reality.
+
+In the event-sourced runtime, State is materialized from lifecycle events and
+host surfaces remain projections. `.mnemon` owns the canonical lifecycle state;
+`.codex`, `.claude`, hooks, skills, and subagents are generated or repairable
+views.
 
 ## Entity Profiles
 
@@ -133,6 +143,11 @@ Mnemon does not clone an experiment platform. Mnemon borrows the discipline of
 self-improving loops and makes them lifecycle-native, host-portable, and
 governable.
 
+The same boundary applies to event-sourced agent runtimes. Those systems can
+make the log, graph, and behaviors the agent runtime itself. Mnemon borrows the
+event-sourced discipline but applies it to the lifecycle control plane around
+agents users already run.
+
 In Mnemon, the decision space expands beyond keep or discard:
 
 - repair
@@ -141,6 +156,40 @@ In Mnemon, the decision space expands beyond keep or discard:
 - review
 - audit
 - no-op
+
+## Declarative Control Plane Analogy
+
+The closest infrastructure analogy is Kubernetes, but Mnemon should borrow the
+control-plane pattern rather than copy the domain. Kubernetes users declare
+desired infrastructure state in manifests, controllers observe actual state, and
+reconcile moves reality toward the desired state. New resources use CRDs; new
+behavior requires controllers or drivers.
+
+Mnemon applies the same shape to AI lifecycle capabilities:
+
+| Kubernetes | Mnemon |
+| --- | --- |
+| YAML manifest | `loop.json` plus Markdown templates |
+| CRD | loop schema and entity profile |
+| Controller | daemon reactor |
+| Reconcile loop | lifecycle reconcile |
+| Status subresource | `.mnemon/harness/*/status.json` |
+| Events | lifecycle events |
+| Admission / policy | governance and proposal gates |
+| Runtime / kubelet | HostAgent, host adapter, and HostAgent runner |
+
+The important difference is that Mnemon has two readers for every loop package.
+The framework reads `loop.json`, schemas, and event vocabulary. The HostAgent
+reads `GUIDE.md`, hooks, protocol skills, and subagent/job specs. That is why
+Markdown templates are first-class: they are the semantic surface for
+LLM-supervised lifecycle work.
+
+The extension rule follows from this:
+
+```text
+Template and manifest for new lifecycle semantics.
+Code only for new host integration, deterministic algorithms, or framework primitives.
+```
 
 ## Evolution Levels
 

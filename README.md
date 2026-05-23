@@ -19,6 +19,11 @@ LLM agents forget everything between sessions. Context compaction drops critical
 
 Mnemon gives your agent persistent, cross-session memory — a four-graph knowledge store with intent-aware recall, importance decay, and automatic deduplication. Single binary, zero API keys, one setup command.
 
+For the broader harness direction, Mnemon is an event-sourced lifecycle layer
+for agents you already use. It does not replace Codex, Claude Code, OpenClaw,
+or future hosts; it adds governed memory, skill, eval, proposal, and audit
+lifecycles around them.
+
 > **Claude Max / Pro subscriber?** Mnemon works entirely through your existing subscription — no separate API key required. Your LLM subscription *is* the intelligence layer. Two commands and you're done.
 
 ### Why Mnemon?

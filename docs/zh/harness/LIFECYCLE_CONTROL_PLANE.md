@@ -8,6 +8,10 @@ English version: [LIFECYCLE_CONTROL_PLANE.md](../../harness/LIFECYCLE_CONTROL_PL
 Mnemon 不需要一个重型分布式控制系统。Mnemon 需要的是一套一致的模型，用来让
 agent 生命周期能力变得持久、可观测、可迁移、可治理。
 
+这个控制平面围绕宿主 agent 展开，而不是替代宿主。Mnemon 不编排任务执行；
+Mnemon 编排 lifecycle capabilities，例如 memory consolidation、skill promotion、
+eval evidence、policy proposal、projection repair 和 audit。
+
 ## 最小定义
 
 Mnemon 保存 `State`，声明 `Intent`，观察 `Reality`，并通过 `Reconcile` 把
@@ -30,6 +34,10 @@ profile 进入这个内核。
 | Reconcile | 比较 Intent 与 Reality，并把结果写回 State 的对齐机制。 |
 
 Execution surfaces 不属于核心模型。它们属于执行层：它们说明 Mnemon 如何触达宿主现实。
+
+在 event-sourced runtime 中，State 由 lifecycle events materialize 出来，宿主
+surfaces 仍然只是 projections。`.mnemon` 拥有 canonical lifecycle state；
+`.codex`、`.claude`、hooks、skills 和 subagents 都是生成或可修复的 view。
 
 ## Entity Profiles
 
@@ -123,6 +131,10 @@ edit -> run -> evaluate -> keep/discard -> repeat
 Mnemon 不复制实验平台。Mnemon 借鉴的是 self-improving loop 的纪律，并让这类 loop
 变得生命周期原生、宿主可迁移、可治理。
 
+同样的边界也适用于 event-sourced agent runtimes。那类系统可以把 log、graph 和
+behaviors 做成 agent runtime 本体。Mnemon 借鉴 event-sourced discipline，但把它
+应用在已有宿主 agent 外围的 lifecycle control plane。
+
 在 Mnemon 中，决策空间不止 keep 或 discard：
 
 - repair
@@ -131,6 +143,38 @@ Mnemon 不复制实验平台。Mnemon 借鉴的是 self-improving loop 的纪律
 - review
 - audit
 - no-op
+
+## 声明式控制平面类比
+
+最接近的基础设施类比是 Kubernetes，但 Mnemon 借鉴的是 control-plane pattern，
+不是复制它的领域模型。Kubernetes 用户用 manifests 声明 desired infrastructure
+state，controllers 观察 actual state，并通过 reconcile 把 reality 拉向 desired
+state。新增资源用 CRD；新增行为需要 controller 或 driver。
+
+Mnemon 把同样形态应用到 AI lifecycle capabilities：
+
+| Kubernetes | Mnemon |
+| --- | --- |
+| YAML manifest | `loop.json` 加 Markdown templates |
+| CRD | loop schema 和 entity profile |
+| Controller | daemon reactor |
+| Reconcile loop | lifecycle reconcile |
+| Status subresource | `.mnemon/harness/*/status.json` |
+| Events | lifecycle events |
+| Admission / policy | governance 和 proposal gates |
+| Runtime / kubelet | HostAgent、host adapter 和 HostAgent runner |
+
+关键差异是，每个 Mnemon loop package 有两类读者。Framework 读取 `loop.json`、
+schemas 和 event vocabulary。HostAgent 读取 `GUIDE.md`、hooks、protocol skills
+和 subagent/job specs。所以 Markdown templates 是一等对象：它们是
+LLM-supervised lifecycle work 的语义 surface。
+
+扩展规则由此得到：
+
+```text
+Template and manifest for new lifecycle semantics.
+Code only for new host integration, deterministic algorithms, or framework primitives.
+```
 
 ## 演进层级
 

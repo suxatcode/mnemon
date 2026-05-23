@@ -8,6 +8,11 @@ Mnemon is a persistent memory system designed for LLM agents. It adopts the **LL
 
 This document describes the current Mnemon binary and engine architecture. The formal modular self-evolution harness docs live in [Mnemon Harness](harness/README.md), with installable runtime assets under the repository-level [harness](../harness/) directory.
 
+The harness direction extends this engine into an event-sourced lifecycle layer
+for agents users already run. Mnemon keeps host agents as the task execution
+runtime and governs memory, skill, eval, proposal, audit, and projection
+lifecycles around them.
+
 ---
 
 ## Table of Contents

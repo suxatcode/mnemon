@@ -67,6 +67,44 @@ harness/ops/
 Loop-specific runtime files may be added when they are part of the loop
 contract, such as `MEMORY.md` for the Memory Loop.
 
+## Extension Principle
+
+New lifecycle loops should be declarative by default. A loop author should
+usually add a Markdown-native loop package plus a machine-readable manifest, not
+new framework code.
+
+```text
+Markdown / config owns semantics.
+Framework code owns mechanics.
+Host adapter code owns integration.
+Deterministic reactor code owns algorithms.
+```
+
+The normal extension surface is:
+
+```text
+loop.json              # machine-readable lifecycle contract
+GUIDE.md               # policy and judgment rules for the HostAgent
+hooks/*.md             # lifecycle boundary reminders
+skills/*.md            # reusable online protocols
+subagents/*.md         # LLM-supervised lifecycle job specs
+schemas/*.json         # structured job, proposal, or report outputs
+examples/*.jsonl       # optional event fixtures for validation
+```
+
+Code changes should be reserved for three cases:
+
+- A new host integration requires a projector, lifecycle mapping, or HostAgent
+  runner adapter.
+- A loop needs a new deterministic algorithm such as ranking, graph traversal,
+  diffing, conflict detection, secret scanning, or score aggregation.
+- The framework itself needs a new runtime primitive such as fork/diff, leases,
+  approval workflow, artifact storage, or cross-loop dependency tracking.
+
+The target shape is similar to a declarative control plane: common loops are
+registered through templates and manifests, while new integration capabilities
+or deterministic controllers are implemented in code.
+
 ## Concepts
 
 | Concept | Required | Role |

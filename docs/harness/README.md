@@ -30,6 +30,8 @@ projection into host surfaces, and optional daemon scheduling.
 | Harness Roadmap | [EN](ROADMAP.md) / [中文](../zh/harness/ROADMAP.md) |
 | YC Evolving Design Philosophy | [EN](YC_EVOLVING_DESIGN_PHILOSOPHY.md) / [中文](../zh/harness/YC_EVOLVING_DESIGN_PHILOSOPHY.md) |
 | Lifecycle Control Plane | [EN](LIFECYCLE_CONTROL_PLANE.md) / [中文](../zh/harness/LIFECYCLE_CONTROL_PLANE.md) / [site](../site/lifecycle-control-plane/index.html) |
+| AI-Native Lifecycle Runtime | [EN](LIFECYCLE_RUNTIME.md) / [中文](../zh/harness/LIFECYCLE_RUNTIME.md) / [site](../site/lifecycle-runtime/index.html) |
+| System Flow | [EN](SYSTEM_FLOW.md) / [中文](../zh/harness/SYSTEM_FLOW.md) / [site](../site/system-flow/index.html) |
 | Memory Loop | [EN](memory/DESIGN.md) / [中文](../zh/harness/memory/DESIGN.md) / [site](../site/memory/index.html) |
 | Skill Loop | [EN](skill/DESIGN.md) / [中文](../zh/harness/skill/DESIGN.md) / [site](../site/skill/index.html) |
 | Eval Loop | [EN](eval/DESIGN.md) / [中文](../zh/harness/eval/DESIGN.md) |
@@ -66,6 +68,7 @@ projection into host surfaces, and optional daemon scheduling.
 | host manifest | Machine-readable record of projected loops, paths, lifecycle mappings, and host capabilities. |
 | daemon | Optional harness maintenance runner for scheduled loop work. |
 | substrate | Mnemon-owned runtime base for loop state, ops, projection, scheduling, and cross-loop protocols. |
+| system flow | End-to-end feedback path from a bare HostAgent through bootstrap, hooks, daemon reconcile, `.mnemon` state, and host projection. |
 
 ## Boundary
 

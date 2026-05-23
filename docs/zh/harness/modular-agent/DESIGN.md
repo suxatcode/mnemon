@@ -5,6 +5,9 @@
 Mnemon 的核心优势是 modular agent 模型：自进化能力应该作为外置
 harness 挂载到已有 agent 上，而不是重新实现一个 agent framework。
 
+一句话定位：Mnemon 是给已有 agent 使用的事件溯源生命周期层。它不是 agent
+runtime，也不拥有任务执行。
+
 Mnemon 不拥有 agent runtime，但它拥有 harness runtime substrate。这个
 substrate 是让独立 harness loops 能被安装、组合、调度、审计，并安全地与
 宿主 agent 协作的系统层。
@@ -32,7 +35,7 @@ Future Loops：evaluation、risk review、safety checks、benchmark feedback
 
 ```text
 Host Agent = execution runtime
-Mnemon     = harness runtime substrate
+Mnemon     = event-sourced lifecycle / harness substrate
 Modules    = memory / skill / eval / risk / review / audit / policy
 ```
 
@@ -76,6 +79,39 @@ Mnemon 需要自己的 substrate 来处理：
 
 这个 substrate 仍然不是 agent runtime。它不拥有 ReAct loop，不和用户对话，
 也不替代宿主的 tool routing。
+
+它的 canonical facts 是 lifecycle events 和 `.mnemon` state。Host directories、
+hook files、skill surfaces、subagents 和 generated docs 都是 projections，可以从
+lifecycle state 修复。
+
+## AI-Native 基础设施，而不是推理脚手架
+
+有些 agent 工程会随着模型增强而失效，是因为它们站在模型主推理路径上。固定的
+workflow planner、脆弱的 prompt chain、人为拆解 reasoning steps、僵硬的 router，
+以及过度规定的 RAG assembly，往往是在和模型自身不断增强的理解、规划、检索和
+执行能力竞争。
+
+Mnemon 应该避免这种失效模式。它不应该成为试图替宿主模型规划的 reasoning
+scaffold。它的长期价值在于模型无法可靠自持的外部能力：
+
+- persistent state
+- lifecycle management
+- audit 和 event history
+- projection into multiple hosts
+- background scheduling
+- snapshot、restore 和 recovery
+- proposal、review 和 governance gates
+- cross-session 和 cross-host continuity
+
+宿主模型仍然是 semantic judgment engine。Mnemon 提供外部 lifecycle substrate，
+让这些判断变得持久、可检查、可迁移、可恢复。
+
+这给出一个实践规则：
+
+```text
+Let the model own understanding, reasoning, planning, and task execution.
+Let Mnemon own state, lifecycle, projection, governance, and recovery.
+```
 
 ## Memory-Centered Harness Layer
 
@@ -143,7 +179,7 @@ agent framework。
 | Hooks | 在 Prime、Remind、Nudge、Compact 或等价宿主事件上安装生命周期提醒。 |
 | Skills | 暴露 `memory_get`、`memory_set`、`skill_observe`、`skill_manage` 等 protocol 操作。 |
 | Subagents | 在在线任务路径之外运行 dreaming、curator review 等较重的维护任务。 |
-| Daemon | 可选地调度已安装 loop 的后台维护任务。 |
+| Daemon | 运行常驻 lifecycle kernel：调度确定性工作，把语义 job 派发给 HostAgent runner，校验输出，并执行 governance。 |
 | Filesystem | 在可预测目录和 project/user scope 下保存 canonical loop state。 |
 | Environment | 让 protocol skill 通过环境变量解析路径，而不是写死某个宿主 agent。 |
 
@@ -152,8 +188,8 @@ agent framework。
 
 ## Harness Daemon
 
-`mnemon-daemon` 是 proposed harness daemon：用于已安装 Mnemon loops 的后台
-maintenance runner。
+`mnemon-daemon` 是 proposed always-on lifecycle runtime：用于已安装 Mnemon
+loops。
 
 它有价值，是因为部分模块工作不适合放在在线 ReAct loop 中执行：
 
@@ -164,16 +200,44 @@ maintenance runner。
 - audit 和 report 写入
 - leases、locks、queues 和 loop status
 
-daemon 不是宿主 agent，也不是第二个 runtime。它不应和用户对话，不应接管
-任务执行，不应替宿主进行 tool routing，也不应绕过 proposal 和 approval
-policy。
+daemon 不是宿主 agent，也不是第二个任务 runtime。它不应和用户对话，不应接管
+任务执行，不应替宿主进行 tool routing，不应自己做语义 lifecycle 判断，也不应
+绕过 proposal 和 approval policy。
+
+它的 AI-native 角色，是让 Mnemon 继续保持在 LLM-supervised pattern 中：
+
+```text
+daemon detects lifecycle need
+        |
+        v
+daemon schedules deterministic reactor
+        |
+        +-----------------------------+
+        |                             |
+        v                             v
+low-risk structural work          semantic judgment needed
+        |                             |
+        v                             v
+daemon applies directly           HostAgent runner executes job spec
+                                      |
+                                      v
+                                daemon validates result
+                                      |
+                                      v
+                                apply / propose / audit
+```
+
+在这个模型里，subagent specs 是 portable lifecycle job specs。Claude Code 可以
+把它们作为 native subagents 运行，Codex 可以通过 app-server tasks 运行，未来
+宿主可以提供自己的 HostAgent runner adapter。
 
 边界应保持为：
 
 ```text
 Host Agent      -> 在线任务执行和用户交互
-mnemon-daemon   -> 离线 harness maintenance 和定时 loop jobs
-Harness Loops -> memory、skills、eval、risk、review、audit、policy
+mnemon-daemon   -> lifecycle scheduling、validation、materialization、governance
+HostAgent runner -> LLM-supervised semantic lifecycle jobs
+Harness Loops   -> memory、skills、eval、risk、review、audit、policy
 ```
 
 在 MVP 阶段，loop 仍然可以通过人工触发或 host hooks 运行。当多个 loop

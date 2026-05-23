@@ -1,5 +1,9 @@
 # Codex App-Server Eval
 
+Codex app-server 是 Mnemon 当前 reference HostAgent runner，用于运行
+LLM-supervised lifecycle jobs。它让 Mnemon 可以通过宿主 agent 执行语义工作，而
+不需要把新的 LLM runtime 内嵌到 daemon 里。
+
 这个 eval 模式使用真实的 Codex app-server，而不是 mock server。它会在
 `.testdata` 下创建一次性的隔离运行目录，把 Mnemon loop template 投影到生成的
 workspace 中，然后启动：
@@ -7,6 +11,29 @@ workspace 中，然后启动：
 ```bash
 codex app-server --listen stdio://
 ```
+
+在 lifecycle architecture 中，同一机制可以从 eval 推广到通用语义 job：
+
+```text
+mnemon-daemon schedules job
+        |
+        v
+Codex app-server starts HostAgent task
+        |
+        v
+HostAgent reads job spec, GUIDE, state, recent events
+        |
+        v
+LLM produces structured result
+        |
+        v
+daemon validates result and records accepted events
+```
+
+`memory/subagents/dreaming.md`、`skill/subagents/curator.md` 和
+`eval/subagents/evaluator.md` 这类 subagent markdown files 应被理解为 portable
+lifecycle job specs。Claude Code 可以把它们作为 native subagents 运行；Codex
+通过 app-server tasks 运行同类工作。
 
 默认 smoke 流程会通过 JSON-RPC 调用 `initialize`、`skills/list` 和
 `thread/start`，验证真实 Codex app-server 能读取被 harness 注入的 `.codex`

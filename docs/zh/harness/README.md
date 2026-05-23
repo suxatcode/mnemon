@@ -25,6 +25,8 @@ host surface projection，以及可选的 daemon scheduling。
 | Harness Roadmap | [中文](ROADMAP.md) / [EN](../../harness/ROADMAP.md) |
 | YC Evolving 设计哲学 | [中文](YC_EVOLVING_DESIGN_PHILOSOPHY.md) / [EN](../../harness/YC_EVOLVING_DESIGN_PHILOSOPHY.md) |
 | Lifecycle Control Plane | [中文](LIFECYCLE_CONTROL_PLANE.md) / [EN](../../harness/LIFECYCLE_CONTROL_PLANE.md) / [site](../../site/lifecycle-control-plane/index.html) |
+| AI-Native Lifecycle Runtime | [中文](LIFECYCLE_RUNTIME.md) / [EN](../../harness/LIFECYCLE_RUNTIME.md) / [site](../../site/lifecycle-runtime/index.html) |
+| System Flow | [中文](SYSTEM_FLOW.md) / [EN](../../harness/SYSTEM_FLOW.md) / [site](../../site/system-flow/index.html) |
 | Memory Loop | [中文](memory/DESIGN.md) / [EN](../../harness/memory/DESIGN.md) / [site](../../site/memory/index.html) |
 | Skill Loop | [中文](skill/DESIGN.md) / [EN](../../harness/skill/DESIGN.md) / [site](../../site/skill/index.html) |
 | Eval Loop | [中文](eval/DESIGN.md) / [EN](../../harness/eval/DESIGN.md) |
@@ -61,6 +63,7 @@ host surface projection，以及可选的 daemon scheduling。
 | host manifest | 机器可读记录，描述已投影 loops、paths、lifecycle mappings 和 host capabilities。 |
 | daemon | 可选的 harness maintenance runner，用于调度 loop 后台工作。 |
 | substrate | Mnemon 拥有的运行时基座，用于 loop state、ops、projection、scheduling 和跨 loop 协议。 |
+| system flow | 从裸 HostAgent 到 bootstrap、hooks、daemon reconcile、`.mnemon` state 和 host projection 的端到端反馈路径。 |
 
 ## 边界
 

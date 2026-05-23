@@ -6,6 +6,9 @@ Mnemon's main advantage is the modular agent model: self-evolution should be an
 external harness that can attach to existing agents, not a new agent framework
 that replaces them.
 
+In short: Mnemon is an event-sourced lifecycle layer for agents you already use.
+It is not an agent runtime and it does not own task execution.
+
 Mnemon does not own the agent runtime, but it does own a harness runtime
 substrate. That substrate is the system layer that makes independent harness
 loops installable, composable, scheduled, auditable, and safe to combine with a
@@ -34,7 +37,7 @@ The distinction is:
 
 ```text
 Host Agent = execution runtime
-Mnemon     = harness runtime substrate
+Mnemon     = event-sourced lifecycle / harness substrate
 Modules    = memory / skill / eval / risk / review / audit / policy
 ```
 
@@ -79,6 +82,42 @@ multiple loops need to cooperate. Mnemon needs its own substrate for:
 
 This substrate is still not an agent runtime. It does not own the ReAct loop,
 talk to users, or replace host tool routing.
+
+Its canonical facts are lifecycle events and `.mnemon` state. Host directories,
+hook files, skill surfaces, subagents, and generated docs are projections that
+can be repaired from the lifecycle state.
+
+## AI-Native Infrastructure, Not Reasoning Scaffolding
+
+Some agent engineering becomes obsolete as models improve because it sits on the
+model's primary reasoning path. Fixed workflow planners, brittle prompt chains,
+manual reasoning-step decomposition, rigid routers, and over-prescriptive RAG
+assembly often compete with the model's own improving ability to understand,
+plan, retrieve, and act.
+
+Mnemon should avoid that failure mode. It should not be a reasoning scaffold
+that tries to out-plan the host model. Its durable value is in external
+capabilities that the model cannot reliably own by itself:
+
+- persistent state
+- lifecycle management
+- audit and event history
+- projection into multiple hosts
+- background scheduling
+- snapshot, restore, and recovery
+- proposal, review, and governance gates
+- cross-session and cross-host continuity
+
+The host model remains the semantic judgment engine. Mnemon provides the
+external lifecycle substrate that makes those judgments durable, inspectable,
+portable, and recoverable.
+
+This gives a practical rule:
+
+```text
+Let the model own understanding, reasoning, planning, and task execution.
+Let Mnemon own state, lifecycle, projection, governance, and recovery.
+```
 
 ## Memory-Centered Harness Layer
 
@@ -152,7 +191,7 @@ without mixing all of those concerns into one agent framework.
 | Hooks | Install lifecycle nudges at Prime, Remind, Nudge, Compact, or equivalent host events. |
 | Skills | Expose reusable protocol operations such as `memory_get`, `memory_set`, `skill_observe`, and `skill_manage`. |
 | Subagents | Run heavier maintenance jobs such as dreaming and curator review outside the online task path. |
-| Daemon | Optionally schedule background maintenance for installed loops. |
+| Daemon | Run the always-on lifecycle kernel: schedule deterministic work, dispatch semantic jobs to HostAgent runners, validate outputs, and enforce governance. |
 | Filesystem | Store canonical loop state in predictable directories and project/user scopes. |
 | Environment | Let protocol skills resolve paths without hard-coding a specific host agent. |
 
@@ -162,8 +201,8 @@ protocols directly.
 
 ## Harness Daemon
 
-`mnemon-daemon` is the proposed harness daemon: a background maintenance runner
-for installed Mnemon loops.
+`mnemon-daemon` is the proposed always-on lifecycle runtime for installed
+Mnemon loops.
 
 It is useful because some loop work should not run inside the online ReAct
 loop:
@@ -175,16 +214,44 @@ loop:
 - audit and report writing
 - leases, locks, queues, and loop status
 
-The daemon is not a host agent and not a second runtime. It must not converse
-with users, take over task execution, route tools for the host, or bypass
-proposal and approval policy.
+The daemon is not a host agent and not a second task runtime. It must not
+converse with users, take over task execution, route tools for the host, make
+semantic lifecycle judgments by itself, or bypass proposal and approval policy.
+
+Its AI-native role is to keep Mnemon inside the LLM-supervised pattern:
+
+```text
+daemon detects lifecycle need
+        |
+        v
+daemon schedules deterministic reactor
+        |
+        +-----------------------------+
+        |                             |
+        v                             v
+low-risk structural work          semantic judgment needed
+        |                             |
+        v                             v
+daemon applies directly           HostAgent runner executes job spec
+                                      |
+                                      v
+                                daemon validates result
+                                      |
+                                      v
+                                apply / propose / audit
+```
+
+In this model, subagent specs are portable lifecycle job specs. Claude Code can
+run them as native subagents, Codex can run them through app-server tasks, and
+future hosts can provide their own HostAgent runner adapters.
 
 The intended boundary is:
 
 ```text
 Host Agent      -> online task execution and user interaction
-mnemon-daemon   -> offline harness maintenance and scheduled loop jobs
-Harness Loops -> memory, skills, eval, risk, review, audit, policy
+mnemon-daemon   -> lifecycle scheduling, validation, materialization, governance
+HostAgent runner -> LLM-supervised semantic lifecycle jobs
+Harness Loops   -> memory, skills, eval, risk, review, audit, policy
 ```
 
 For the MVP, loops can still run manually or through host hooks. The daemon

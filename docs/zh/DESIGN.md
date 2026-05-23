@@ -8,6 +8,10 @@ Mnemon 是一个为 LLM agent 设计的持久化记忆系统。它采用 **LLM-S
 
 本文档描述当前 Mnemon binary 与 engine architecture。正式 modular self-evolution harness 文档见 [Mnemon Harness](harness/README.md)，可安装 runtime 资产位于仓库根目录的 [harness](../../harness/) 目录。
 
+Harness 方向把这个 engine 扩展为给已有 agent 使用的事件溯源生命周期层。Mnemon
+保留宿主 agent 作为任务执行 runtime，并在其外围治理 memory、skill、eval、
+proposal、audit 和 projection 生命周期。
+
 ---
 
 ## 目录

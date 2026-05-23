@@ -557,7 +557,7 @@
     <div class="shell">
       <div class="topbar">
         <div class="nav-left">
-          <a class="home-link" href="../index.html">Docs Home</a>
+          <a class="home-link" href="../">Docs Home</a>
           <div class="eyebrow">Mnemon Harness Design Note</div>
         </div>
         <div class="language-switch" aria-label="Language">
@@ -571,7 +571,7 @@
           <div>
             <h1>生命周期控制平面</h1>
             <p class="summary">
-              Mnemon 保存 State，声明 Intent，观察 Reality，并通过 Reconcile 对齐差距。实体不是模型本身；实体只是模型中的 profile。Execution Surfaces 负责把 Mnemon 的意图投影给宿主，并把宿主现实观察回来。
+              Mnemon 是宿主 Agent 外围的事件溯源生命周期层，不替代任务执行。它保存 State，声明 Intent，观察 Reality，并通过 Reconcile 治理 memory、skill、eval、policy、proposal 和 projection 的生命周期。
             </p>
             <div class="tag-row">
               <span class="tag state">state</span>
@@ -596,7 +596,7 @@
           <div>
             <h1>Lifecycle Control Plane</h1>
             <p class="summary">
-              Mnemon keeps State, declares Intent, observes Reality, and Reconciles the gap. Entities are not the model itself; they are profiles inside the model. Execution Surfaces project Mnemon intent into the host and observe host reality back into Mnemon.
+              Mnemon is an event-sourced lifecycle layer around host agents, not a replacement task runtime. It keeps State, declares Intent, observes Reality, and Reconciles memory, skill, eval, policy, proposal, and projection lifecycles.
             </p>
             <div class="tag-row">
               <span class="tag state">state</span>
@@ -623,7 +623,7 @@
       <section>
         <div class="section-title">
           <h2>最小定义</h2>
-          <p>不强行对齐外部系统概念，只保留 Mnemon 自己的一致结构。</p>
+          <p>不强行对齐外部系统概念，只保留 Mnemon 自己的一致结构：不编排任务执行，只编排生命周期能力。</p>
         </div>
         <div class="callout">
           <p class="quote-line">
@@ -877,6 +877,24 @@
           <h2>演进层级</h2>
           <p>保持轻量：先定义 profile，再扩展 surface，最后进入自演进治理。</p>
         </div>
+        <div class="compare">
+          <article class="compare-card">
+            <h3>声明式控制平面</h3>
+            <ul>
+              <li>Kubernetes 用 manifest 声明 desired state，由 controller reconcile actual state。</li>
+              <li>Mnemon 借鉴这个 pattern，但把对象换成 AI lifecycle capabilities。</li>
+              <li>常见 loop 应通过 <code>loop.json</code>、Markdown templates 和 schemas 注册。</li>
+            </ul>
+          </article>
+          <article class="compare-card">
+            <h3>扩展边界</h3>
+            <ul>
+              <li>Markdown / config 负责语义。</li>
+              <li>Framework code 负责通用机制。</li>
+              <li>只有新增宿主接入、确定性算法或 runtime primitive 时才改代码。</li>
+            </ul>
+          </article>
+        </div>
         <div class="levels">
           <div class="card loop">
             <b>Level 1: Profiles</b>
@@ -902,7 +920,7 @@
       <section>
         <div class="section-title">
           <h2>Minimal Definition</h2>
-          <p>Do not force-fit external concepts. Keep Mnemon's own structure consistent.</p>
+          <p>Do not force-fit external concepts. Keep Mnemon's own structure consistent: orchestrate lifecycle capabilities, not task execution.</p>
         </div>
         <div class="callout">
           <p class="quote-line">
@@ -1155,6 +1173,24 @@
         <div class="section-title">
           <h2>Evolution Levels</h2>
           <p>Stay lightweight: define profiles, expand surfaces, then move toward self-evolution governance.</p>
+        </div>
+        <div class="compare">
+          <article class="compare-card">
+            <h3>Declarative Control Plane</h3>
+            <ul>
+              <li>Kubernetes declares desired state in manifests and lets controllers reconcile actual state.</li>
+              <li>Mnemon borrows that pattern but applies it to AI lifecycle capabilities.</li>
+              <li>Common loops should register through <code>loop.json</code>, Markdown templates, and schemas.</li>
+            </ul>
+          </article>
+          <article class="compare-card">
+            <h3>Extension Boundary</h3>
+            <ul>
+              <li>Markdown / config owns semantics.</li>
+              <li>Framework code owns common mechanics.</li>
+              <li>Only new host integrations, deterministic algorithms, or runtime primitives need code.</li>
+            </ul>
+          </article>
         </div>
         <div class="levels">
           <div class="card loop">
