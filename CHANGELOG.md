@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-05-23
+
+### Added
+- Privacy-safe memory receipts via `mnemon receipt`, allowing users to show
+  memory activity with identifiers, timestamps, summaries, and relation metadata
+  without exposing stored memory content.
+
+### Fixed
+- Read-only store operations now skip access-count and oplog writes, preventing
+  recall/search/status-style paths from attempting mutations when the store is
+  opened in read-only mode.
+
+### Changed
+- Project licensing switched to Apache-2.0.
+
 ## [0.1.6] - 2026-05-18
 
 ### Added
@@ -96,7 +111,8 @@ Initial public release.
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - Comprehensive documentation with Chinese translations
 
-[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/mnemon-dev/mnemon/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/mnemon-dev/mnemon/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/mnemon-dev/mnemon/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/mnemon-dev/mnemon/compare/v0.1.3...v0.1.4
