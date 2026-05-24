@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-05-24
+
 ### Added
 - `--embed-model` global flag exposes the existing `MNEMON_EMBED_MODEL` env
   var on the CLI, applied consistently across `embed`, `recall`, and
@@ -119,7 +121,8 @@ Initial public release.
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - Comprehensive documentation with Chinese translations
 
-[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/mnemon-dev/mnemon/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/mnemon-dev/mnemon/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/mnemon-dev/mnemon/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/mnemon-dev/mnemon/compare/v0.1.4...v0.1.5
