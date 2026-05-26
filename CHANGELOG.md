@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: `recall` default output is now compact (LLM-friendly).
+  Use `--verbose` to restore the previous full payload. The compact
+  format keeps id / content / category / importance / intent /
+  matched_via / confidence / score; signals, timestamps, traversal
+  metadata, and extra fields are dropped from the default and remain
+  available via `--verbose`. (#3)
+
+### Added
+
+- `--verbose` flag on `recall` to output the full RecallResponse.
+
 ## [0.1.8] - 2026-05-24
 
 ### Added
