@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-05-27
+
+### Added
+
+- English/Chinese import guide coverage and setup skill guidance for using
+  `mnemon import` on historical chat exports.
+
 ## [0.1.10] - 2026-05-27
 
 ### Added
@@ -189,7 +196,8 @@ Initial public release.
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - Comprehensive documentation with Chinese translations
 
-[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/mnemon-dev/mnemon/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/mnemon-dev/mnemon/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/mnemon-dev/mnemon/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/mnemon-dev/mnemon/compare/v0.1.7...v0.1.8

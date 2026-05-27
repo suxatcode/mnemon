@@ -238,6 +238,7 @@ make help           # 显示所有目标
 - [Skill Loop Harness](../../harness/loops/skill/README.md) — 可安装 skill loop 资产
 - [设计与架构](DESIGN.md) — 当前 engine architecture、核心概念、算法、集成设计
 - [用法与参考](USAGE.md) — CLI 命令、嵌入向量支持、架构概览
+- [记忆导入指南](IMPORT.md) — 导入历史聊天的 schema 与 LLM 提取提示词
 - [架构图](../diagrams/) — 系统架构、记忆/召回流程、四图模型、生命周期管理
 
 ## 参考文献
