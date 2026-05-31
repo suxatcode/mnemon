@@ -8,7 +8,9 @@ memory. The harness adds a governed agent-state substrate around host agents:
 events, projected context, readback verification, proposals, apply, audit, and
 coordination topology.
 
-The current beta is source-build only and may change before a stable release.
+The current beta is source-build only, not production-ready, and has no
+compatibility guarantee. Commands, file layouts, schemas, projected surfaces,
+and behavior may change in breaking ways before a stable release.
 
 ## Mental Model
 

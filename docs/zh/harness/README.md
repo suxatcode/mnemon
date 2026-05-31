@@ -2,6 +2,8 @@
 
 `mnemon-harness` 是一个实验性 beta 层，用来把 host agent 接入项目本地的受治理状态。它目前只支持源码构建，并且有意和稳定的 `mnemon` CLI 保持分离。
 
+它还不是生产可用版本，也不提供兼容性保证。命令、文件布局、schema、projection surface 和行为都可能在稳定版前发生 breaking change。
+
 稳定版 Mnemon 仍然专注于记忆与召回。Harness 在 Codex、Claude Code 等 host agent 周围加入 lifecycle exchange、evidence、proposal、audit、coordination topology 和审阅 TUI。
 
 ## 1. What It Is

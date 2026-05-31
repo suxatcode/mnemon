@@ -4,6 +4,10 @@
 project-local governed state. It is source-build only and intentionally separate
 from the stable `mnemon` CLI.
 
+It is not production-ready and has no compatibility guarantee. Commands, file
+layouts, schemas, projected surfaces, and behavior may change in breaking ways
+before a stable release.
+
 Stable Mnemon remains a memory and recall tool. The harness adds lifecycle
 exchange, evidence, proposals, audit, coordination topology, and a review TUI
 around host agents such as Codex and Claude Code.

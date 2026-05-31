@@ -19,10 +19,10 @@ LLM agents forget everything between sessions. Context compaction drops critical
 
 Mnemon gives your agent persistent, cross-session memory — a four-graph knowledge store with intent-aware recall, importance decay, and automatic deduplication. Single binary, zero API keys, one setup command.
 
-For the broader harness direction, Mnemon is an event-sourced lifecycle layer
-for agents you already use. It does not replace Codex, Claude Code, OpenClaw,
-or future hosts; it adds governed memory, skill, eval, proposal, and audit
-lifecycles around them.
+> **Experimental beta:** this repository also includes `mnemon-harness`, a
+> source-built beta for project-local host-agent lifecycle state. It is separate
+> from the stable `mnemon` CLI, not production-ready, and may make breaking
+> changes at any time. See [harness/README.md](harness/README.md).
 
 > **Claude Max / Pro subscriber?** Mnemon works entirely through your existing subscription — no separate API key required. Your LLM subscription *is* the intelligence layer. Two commands and you're done.
 
@@ -275,7 +275,7 @@ See [Development and Deployment](docs/DEPLOYMENT.md) for Docker, Compose, Ollama
 
 ## Documentation
 
-- [Modular Self-Evolution Harness](docs/harness/README.md) — formal harness docs for modular agent, memory loop, and skill loop design
+- [Mnemon Harness Beta](harness/README.md) — experimental host-agent lifecycle state
 - [Memory Loop Harness](harness/loops/memory/README.md) — installable memory loop assets
 - [Skill Loop Harness](harness/loops/skill/README.md) — installable skill loop assets
 - [Design & Architecture](docs/DESIGN.md) — current engine architecture, algorithms, integration design
