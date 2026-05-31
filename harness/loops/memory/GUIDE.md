@@ -2,7 +2,7 @@
 
 This guide defines when memory behavior is useful. It does not decide whether a
 specific operation should target `MEMORY.md` or Mnemon. Storage choices belong
-to `memory_get.md`, `memory_set.md`, and the dreaming subagent.
+to `memory-get`, `memory-set`, and the dreaming subagent.
 
 ## Stance
 
@@ -29,6 +29,25 @@ covered by visible context, or unlikely to benefit from prior experience.
 
 Cheap skip examples: tiny one-off questions, pure file listing or status checks,
 direct follow-ups already fully in context, and explicit no-memory requests.
+
+## Profile (governed pull)
+
+If `PROFILE.json` (and, for coordination, `COORDINATION.json`) is present in this
+loop's runtime surface (beside this guide), read it at the start of a task: it
+holds the durable profile entries / coordination state the harness has reviewed,
+approved, and scoped to this host and loop. Treat them as established preferences
+and decisions — governed context pulled from the canonical state, not working
+notes, and possibly absent when nothing is scoped here.
+
+`PROJECTION.json` (beside this guide) is the projection envelope: it carries the
+live `context_digest` for what was projected to your host+loop. When you act on
+the pulled context and write events back, read `context_digest` from
+`PROJECTION.json` and echo it as `observed_projection_ref` (or
+`observed_context_digest`) in your event payload. Echo from the envelope on your
+surface — you do not need to read Mnemon's internal state. This lets the harness
+verify you acted on the *current* projection — and flag when you are acting on a
+stale one. Echoing is best-effort: it makes you "observed" rather than
+"acted-but-unattributed", and never blocks your work.
 
 ## Write Memory
 

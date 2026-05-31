@@ -19,7 +19,7 @@ else
 fi
 
 if [[ "${EVENT_COUNT}" -ge "${REVIEW_MIN_EVENTS}" ]]; then
-  echo "[mnemon-skill] ${EVENT_COUNT} skill evidence event(s) recorded; consider skill_curate or mnemon-skill-curator before/after compaction."
+  echo "[mnemon-skill] ${EVENT_COUNT} skill evidence event(s) recorded; consider skill-curate or mnemon-skill-curator before/after compaction."
 else
-  echo "[mnemon-skill] Compact boundary: consider skill_curate only if this session produced meaningful skill lifecycle evidence."
+  echo "[mnemon-skill] Compact boundary: consider skill-curate only if this session produced meaningful skill lifecycle evidence."
 fi

@@ -16,8 +16,16 @@ harness/loops/eval/
 ├── loop.json
 ├── env.sh
 ├── GUIDE.md
-├── hooks/
+├── hook-prompts/
 ├── skills/
+│   ├── eval-plan/
+│   │   └── SKILL.md
+│   ├── eval-run/
+│   │   └── SKILL.md
+│   ├── eval-analyze/
+│   │   └── SKILL.md
+│   └── eval-improve/
+│       └── SKILL.md
 ├── subagents/
 ├── scenarios/
 ├── suites/
@@ -99,3 +107,15 @@ bash harness/ops/uninstall.sh --host codex --loop eval
 Existing project-local Codex app-server eval commands remain available through
 `make codex-app-eval-suite`, `make codex-memory-deep-eval`, and
 `make codex-skill-deep-eval`.
+
+Codex app-server suite membership lives in `suites/*.json` as `scenario_ids`.
+Scenario runtime metadata for the compatibility runner lives in
+`scenarios/codex-app.json`: prompts, loop requirements, expected skills, and
+the Python setup/assertion handler names that still provide compatibility
+checks. The Go harness CLI can plan and start a gated runner workspace from the
+same declarations:
+
+```bash
+mnemon-harness eval run --suite default --scenario memory-focused-recall
+mnemon-harness eval report --run-id <run-id>
+```

@@ -12,16 +12,20 @@ harness/loops/skill/
 ├── loop.json
 ├── env.sh
 ├── GUIDE.md
-├── hooks/
+├── hook-prompts/
 │   ├── prime.md
 │   ├── remind.md
 │   ├── nudge.md
 │   └── compact.md
 ├── skills/
-│   ├── skill_observe.md
-│   ├── skill_curate.md
-│   ├── skill_author.md
-│   └── skill_manage.md
+│   ├── skill-observe/
+│   │   └── SKILL.md
+│   ├── skill-curate/
+│   │   └── SKILL.md
+│   ├── skill-author/
+│   │   └── SKILL.md
+│   └── skill-manage/
+│       └── SKILL.md
 ├── subagents/
 │   └── curator.md
 ```
@@ -41,11 +45,11 @@ harness/loops/skill/
 | `loop.json` | Machine-readable loop manifest for standard lifecycle events, assets, state, and host adapters. |
 | `env.sh` | Runtime config: canonical skill library, host skill surface, usage log, and proposal paths. |
 | `GUIDE.md` | Policy for evidence, review triggers, lifecycle movement, and proposal-first changes. |
-| `hooks/*.md` | Four lifecycle reminders. Prime syncs active skills; Nudge records evidence; Compact may trigger review; Remind is no-op by default. |
-| `skills/skill_observe.md` | Online evidence capture protocol. |
-| `skills/skill_curate.md` | Protocol for starting a curator review. |
-| `skills/skill_author.md` | Protocol for drafting reviewable `SKILL.md` content. |
-| `skills/skill_manage.md` | Approved lifecycle mutation protocol. |
+| `hook-prompts/*.md` | Four lifecycle reminders. Prime syncs active skills; Nudge records evidence; Compact may trigger review; Remind is no-op by default. |
+| `skills/skill-observe/SKILL.md` | Online evidence capture protocol. |
+| `skills/skill-curate/SKILL.md` | Protocol for starting a curator review. |
+| `skills/skill-author/SKILL.md` | Protocol for drafting reviewable `SKILL.md` content. |
+| `skills/skill-manage/SKILL.md` | Approved lifecycle mutation protocol. |
 | `subagents/curator.md` | Background reviewer that proposes create, patch, consolidate, stale, archive, or restore actions. |
 | Host adapter | Host-specific projection lives outside the loop under `harness/hosts/<host>/`. |
 
@@ -90,10 +94,10 @@ The key split is:
 
 ```text
 GUIDE.md decides when skill evolution behavior is useful.
-skill_observe.md records evidence only.
+skill-observe records evidence only.
 curator.md reviews evidence and proposes changes.
-skill_author.md drafts skill content for review.
-skill_manage.md applies approved changes to canonical state.
+skill-author drafts skill content for review.
+skill-manage applies approved changes to canonical state.
 prime.sh projects active canonical skills into the host skill surface.
 ```
 

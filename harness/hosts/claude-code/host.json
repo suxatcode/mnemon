@@ -9,12 +9,14 @@
       ".claude/agents",
       ".claude/settings.json",
       ".claude/mnemon-memory",
-      ".claude/mnemon-skill"
+      ".claude/mnemon-skill",
+      ".claude/mnemon-goal"
     ],
     "observation": [
       ".mnemon/hosts/claude-code/manifest.json",
       ".mnemon/harness/*/status.json",
       "hook output",
+      "goal evidence records",
       "skill usage evidence"
     ]
   },

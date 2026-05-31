@@ -35,7 +35,7 @@ fi
 if [[ "${NON_EMPTY_LINES}" -gt "${MAX_NON_EMPTY_LINES}" ]]; then
   REASON="[mnemon-memory] Compact: MEMORY.md has ${NON_EMPTY_LINES} non-empty lines. Before compaction, spawn mnemon-dreaming to write durable content to Mnemon and compact MEMORY.md, then retry compaction."
 else
-  REASON="[mnemon-memory] Compact: MNEMON_MEMORY_LOOP_DIR=${MEMORY_DIR:-unset}. Before compaction, preserve critical continuity with memory_set when needed. If this boundary should consolidate working memory, spawn mnemon-dreaming, then retry compaction."
+  REASON="[mnemon-memory] Compact: MNEMON_MEMORY_LOOP_DIR=${MEMORY_DIR:-unset}. Before compaction, preserve critical continuity with memory-set when needed. If this boundary should consolidate working memory, spawn mnemon-dreaming, then retry compaction."
 fi
 
 cat <<JSON

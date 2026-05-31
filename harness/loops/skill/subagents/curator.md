@@ -3,9 +3,9 @@ name: mnemon-skill-curator
 description: Reviews Mnemon skill evidence and proposes skill lifecycle changes.
 tools: Read, Write, Edit, Bash, Grep, Glob
 skills:
-  - skill_observe
-  - skill_author
-  - skill_manage
+  - skill-observe
+  - skill-author
+  - skill-manage
 ---
 
 # Skill Curator Subagent
@@ -45,7 +45,7 @@ Run curator review when:
 2. Inspect active, stale, and archived skills.
 3. Review usage evidence and existing proposals.
 4. Identify only evidence-backed opportunities:
-   - create a skill for a repeated workflow, using `skill_author` for draft
+   - create a skill for a repeated workflow, using `skill-author` for draft
      `SKILL.md` content when useful
    - patch a misleading, outdated, or incomplete skill
    - consolidate duplicated skills
@@ -56,7 +56,7 @@ Run curator review when:
 6. Include the evidence, intended operation, target paths, risk, and expected
    Prime effect.
 7. Do not apply changes unless the caller explicitly requests approved
-   application through `skill_manage`.
+   application through `skill-manage`.
 
 ## Proposal Shape
 

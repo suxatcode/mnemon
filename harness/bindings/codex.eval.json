@@ -6,12 +6,18 @@
   "projection_path": ".codex",
   "runtime_surface": ".codex/mnemon-eval",
   "lifecycle_mapping": {
-    "prime": "thread/start developer instructions",
-    "remind": "user prompt guidance",
-    "nudge": "turn completion guidance",
-    "compact": "thread compact guidance",
+    "prime": "SessionStart",
+    "remind": "UserPromptSubmit",
+    "nudge": "Stop",
+    "compact": "PreCompact",
     "maintenance": "app-server eval"
+  },
+  "runner_bindings": {
+    "eval.evaluator": {
+      "mode": "app_server",
+      "runner": "codex-app-server",
+      "prompt_from": "subagents/evaluator.md"
+    }
   },
   "reconcile": ["plan", "run", "analyze", "improve", "retire", "no-op"]
 }
-

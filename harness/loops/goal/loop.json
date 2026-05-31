@@ -1,0 +1,147 @@
+{
+  "schema_version": 2,
+  "name": "goal",
+  "version": "0.1.0",
+  "description": "Manages project-scoped Mnemon goals, evidence, verification, completion gates, and host goal links.",
+  "control_model": {
+    "state": [
+      "goal records",
+      "goal plans",
+      "goal evidence",
+      "verification reports",
+      "host links",
+      "goal status"
+    ],
+    "intent": "Keep long-running project work durable, evidence-backed, and explicitly verified before completion.",
+    "reality": [
+      "host thread state",
+      "current repository state",
+      "recorded evidence",
+      "verification output",
+      "blockers",
+      "completion readiness"
+    ],
+    "reconcile": [
+      "init",
+      "plan",
+      "record_evidence",
+      "verify",
+      "complete",
+      "block",
+      "pause",
+      "resume",
+      "link_host",
+      "no-op"
+    ]
+  },
+  "entity_profiles": {
+    "template": "goal",
+    "controlled": [
+      "goal"
+    ],
+    "surface": [
+      "mnemon-goal protocol skill",
+      "cross-goal consolidator",
+      "GOAL.md",
+      "PLAN.md",
+      "EVIDENCE.jsonl",
+      "REPORT.md",
+      "host goal links"
+    ],
+    "evidence": [
+      "accepted evidence records",
+      "verification reports",
+      "artifact refs",
+      "host thread refs",
+      "blocker records",
+      "learning candidates"
+    ],
+    "governance": [
+      "completion gate",
+      "blocked state",
+      "pause/resume state",
+      "host link audit",
+      "cross-loop proposal candidates"
+    ]
+  },
+  "surfaces": {
+    "projection": [
+      "GUIDE.md",
+      "mnemon-goal",
+      "cross-goal-consolidator",
+      "runtime env"
+    ],
+    "observation": [
+      "goal status",
+      "GOAL.md",
+      "PLAN.md",
+      "EVIDENCE.jsonl",
+      "REPORT.md",
+      "host link records"
+    ]
+  },
+  "lifecycle_events": [
+    "goal.created",
+    "goal.planned",
+    "goal.evidence_recorded",
+    "goal.verified",
+    "goal.completed",
+    "goal.blocked",
+    "goal.paused",
+    "goal.resumed",
+    "goal.host_linked"
+  ],
+  "assets": {
+    "guide": "GUIDE.md",
+    "env": "env.sh",
+    "hook_prompts": {
+      "prime": "hook-prompts/prime.md",
+      "remind": "hook-prompts/remind.md",
+      "nudge": "hook-prompts/nudge.md",
+      "compact": "hook-prompts/compact.md"
+    },
+    "skills": [
+      "skills/mnemon-goal/SKILL.md"
+    ],
+    "subagents": [
+      "subagents/cross-goal-consolidator.md"
+    ]
+  },
+  "state": {
+    "canonical": [
+      ".mnemon/events.jsonl",
+      ".mnemon/harness/goals",
+      ".mnemon/harness/status/goals"
+    ],
+    "loop_runtime": [
+      "GUIDE.md",
+      "loop.json",
+      "env.sh"
+    ]
+  },
+  "controllers": [
+    {
+      "name": "goal.cross_goal_consolidation.on_completed",
+      "watches": [
+        "goal.completed"
+      ],
+      "enqueue": "goal.cross_goal_consolidation",
+      "reason": "A completed goal may contain reusable learnings for memory, skill, or GUIDE evolution."
+    }
+  ],
+  "jobs": {
+    "goal.cross_goal_consolidation": {
+      "type": "semantic",
+      "spec": "subagents/cross-goal-consolidator.md",
+      "preferred_runner": "host-subagent",
+      "fallback_runner": "codex-app-server",
+      "governance": "report-or-proposal",
+      "prompt": "Review the completed goal evidence with subagents/cross-goal-consolidator.md and return learning candidates without applying memory, skill, or GUIDE mutations.",
+      "max_turns": 2
+    }
+  },
+  "host_adapters": {
+    "claude-code": "../../hosts/claude-code",
+    "codex": "../../hosts/codex"
+  }
+}

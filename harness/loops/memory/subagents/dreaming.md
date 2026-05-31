@@ -3,8 +3,8 @@ name: mnemon-dreaming
 description: Consolidates Mnemon working memory. Use when MEMORY.md needs cleanup, exceeds quota, or should be written into long-term Mnemon memory.
 tools: Read, Write, Edit, Bash, Grep, Glob
 skills:
-  - memory_get
-  - memory_set
+  - memory-get
+  - memory-set
 ---
 
 # Dreaming Subagent

@@ -27,5 +27,5 @@ fi
 if [[ "${NON_EMPTY_LINES}" -gt "${MAX_NON_EMPTY_LINES}" ]]; then
   echo "[mnemon-memory] MEMORY.md is long (${NON_EMPTY_LINES} lines); consider mnemon-dreaming."
 else
-  echo "[mnemon-memory] Consider: does this exchange warrant memory_set?"
+  echo "[mnemon-memory] Consider: does this exchange warrant memory-set?"
 fi
