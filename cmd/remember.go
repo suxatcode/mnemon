@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mnemon-dev/mnemon/internal/daemonemit"
 	"github.com/mnemon-dev/mnemon/internal/embed"
 	"github.com/mnemon-dev/mnemon/internal/graph"
 	"github.com/mnemon-dev/mnemon/internal/model"
@@ -231,7 +232,9 @@ var rememberCmd = &cobra.Command{
 
 			// Update entities extracted by the engine
 			if len(insight.Entities) > 0 {
-				_ = db.UpdateEntities(insight.ID, insight.Entities)
+				if err := db.UpdateEntities(insight.ID, insight.Entities); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: update entities: %v\n", err)
+				}
 			}
 
 			// Compute and store effective_importance (after edges are created)
@@ -292,6 +295,7 @@ var rememberCmd = &cobra.Command{
 		if replacedID != "" {
 			output["replaced_id"] = replacedID
 		}
+		emitRememberEvent(insight, diffAction)
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(output)
@@ -307,4 +311,26 @@ func init() {
 	rememberCmd.Flags().StringVar(&remEntityMode, "entity-mode", string(graph.EntityModeMerge), "entity handling mode (merge|provided|auto)")
 	rememberCmd.Flags().BoolVar(&remNoDiff, "no-diff", false, "skip duplicate/conflict detection")
 	rootCmd.AddCommand(rememberCmd)
+}
+
+func emitRememberEvent(insight *model.Insight, action string) {
+	if os.Getenv("MNEMON_HARNESS_EVENT_EMIT") != "1" {
+		return
+	}
+	_, _, _ = daemonemit.Emit(daemonemit.Options{
+		Root:          ".",
+		Topic:         "memory.hot_write_observed",
+		CorrelationID: "memory:" + insight.ID,
+		Loop:          "memory",
+		Host:          "mnemon",
+		Actor:         "mnemon-manual",
+		Source:        "mnemon.remember",
+		Store:         resolveStoreName(),
+		Payload: map[string]any{
+			"insight_id": insight.ID,
+			"category":   string(insight.Category),
+			"importance": insight.Importance,
+			"action":     action,
+		},
+	})
 }

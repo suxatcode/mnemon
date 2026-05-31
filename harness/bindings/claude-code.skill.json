@@ -11,6 +11,12 @@
     "nudge": "Stop",
     "compact": "PreCompact"
   },
+  "runner_bindings": {
+    "skill.curator": {
+      "mode": "native_subagent",
+      "agent": "mnemon-skill-curator",
+      "fallback_runner": "codex-app-server"
+    }
+  },
   "reconcile": ["observe", "curate", "propose", "manage", "no-op"]
 }
-

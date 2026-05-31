@@ -60,10 +60,10 @@
   },
   "surfaces": {
     "projection": [
-      "eval_plan",
-      "eval_run",
-      "eval_analyze",
-      "eval_improve",
+      "eval-plan",
+      "eval-run",
+      "eval-analyze",
+      "eval-improve",
       "scenarios",
       "suites",
       "rubrics",
@@ -88,26 +88,32 @@
     "runtime_files": [
       "suites/smoke.json",
       "suites/regression.json",
+      "suites/codex-app-default.json",
+      "suites/memory-deep.json",
+      "suites/skill-deep.json",
       "rubrics/eval-asset-quality.md",
       "rubrics/interface-loop-behavior.md",
+      "scenarios/codex-app.json",
       "scenarios/memory/project-preference-recall.md",
       "scenarios/skill/skill-creation-reuse.md",
       "scenarios/docs/bilingual-doc-sync.md",
       "scenarios/ops/host-projection-smoke.md"
     ],
-    "hooks": {
-      "prime": "hooks/prime.md",
-      "remind": "hooks/remind.md",
-      "nudge": "hooks/nudge.md",
-      "compact": "hooks/compact.md"
+    "hook_prompts": {
+      "prime": "hook-prompts/prime.md",
+      "remind": "hook-prompts/remind.md",
+      "nudge": "hook-prompts/nudge.md",
+      "compact": "hook-prompts/compact.md"
     },
     "skills": [
-      "skills/eval_plan.md",
-      "skills/eval_run.md",
-      "skills/eval_analyze.md",
-      "skills/eval_improve.md"
+      "skills/eval-plan/SKILL.md",
+      "skills/eval-run/SKILL.md",
+      "skills/eval-analyze/SKILL.md",
+      "skills/eval-improve/SKILL.md"
     ],
     "subagents": [
+      "subagents/ab-judge.md",
+      "subagents/evolution-judge.md",
       "subagents/evaluator.md"
     ]
   },
@@ -133,6 +139,42 @@
     "canonical",
     "retired"
   ],
+  "controllers": [
+    {
+      "name": "eval.evaluator.on_run_requested",
+      "watches": [
+        "eval.run_requested"
+      ],
+      "enqueue": "eval.evaluator",
+      "reason": "An eval run was requested and should be dispatched through a governed runner."
+    }
+  ],
+  "jobs": {
+    "eval.evaluator": {
+      "type": "semantic",
+      "spec": "subagents/evaluator.md",
+      "preferred_runner": "codex-app-server",
+      "governance": "report",
+      "prompt": "Run the eval evaluator job from subagents/evaluator.md and return structured eval evidence.",
+      "max_turns": 3
+    },
+    "eval.ab_judge": {
+      "type": "semantic",
+      "spec": "subagents/ab-judge.md",
+      "preferred_runner": "codex-app-server",
+      "governance": "report",
+      "prompt": "Review the ABTestResult with subagents/ab-judge.md and return one ABTestVerdict JSON object.",
+      "max_turns": 2
+    },
+    "eval.evolution_judge": {
+      "type": "semantic",
+      "spec": "subagents/evolution-judge.md",
+      "preferred_runner": "codex-app-server",
+      "governance": "report",
+      "prompt": "Review the harness evolution candidate with subagents/evolution-judge.md and return one EvolutionJudgeVerdict JSON object.",
+      "max_turns": 2
+    }
+  },
   "host_adapters": {
     "codex": "../../hosts/codex"
   }

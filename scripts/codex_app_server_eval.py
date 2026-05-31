@@ -179,6 +179,17 @@ def ensure_mnemon_binary(root: Path, run_dir: Path, env: dict[str, str]) -> dict
     return next_env
 
 
+def ensure_mnemon_harness_binary(root: Path, run_dir: Path, env: dict[str, str]) -> Path:
+    existing = shutil.which("mnemon-harness", path=env.get("PATH"))
+    if existing:
+        return Path(existing)
+    bin_dir = run_dir / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    binary = bin_dir / "mnemon-harness"
+    run(["go", "build", "-o", str(binary), "./harness/cmd/mnemon-harness"], root, env)
+    return binary
+
+
 def setup_workspace(args: argparse.Namespace, root: Path) -> tuple[Path, Path, Path, dict[str, str]]:
     run_root = Path(args.run_root) if args.run_root else root / ".testdata" / "codex-app-eval" / utc_run_id()
     workspace = run_root / "workspace"
@@ -310,8 +321,36 @@ class Scenario:
         self.assert_result = assert_result
 
 
-SKILL_LOOP_EXPECTED_SKILLS = ["skill_observe", "skill_curate", "skill_author", "skill_manage"]
-EVAL_LOOP_EXPECTED_SKILLS = ["eval_plan", "eval_run", "eval_analyze", "eval_improve"]
+def load_scenario_metadata() -> dict[str, dict[str, Any]]:
+    path = repo_root() / "harness" / "loops" / "eval" / "scenarios" / "codex-app.json"
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    scenarios = data.get("scenarios")
+    if not isinstance(scenarios, list):
+        raise ValueError(f"{path} scenarios must be an array")
+    catalog: dict[str, dict[str, Any]] = {}
+    for item in scenarios:
+        if not isinstance(item, dict):
+            raise ValueError(f"{path} scenarios must contain objects")
+        scenario_id = item.get("id")
+        if not isinstance(scenario_id, str) or not scenario_id:
+            raise ValueError(f"{path} scenario id must be a non-empty string")
+        loops = item.get("loops")
+        if not isinstance(loops, list) or not all(isinstance(loop, str) for loop in loops):
+            raise ValueError(f"{path} scenario {scenario_id} loops must be a string array")
+        expected_skills = item.get("expected_skills", [])
+        if not isinstance(expected_skills, list) or not all(isinstance(skill, str) for skill in expected_skills):
+            raise ValueError(f"{path} scenario {scenario_id} expected_skills must be a string array")
+        prompts = item.get("prompts")
+        if not isinstance(prompts, list) or not prompts or not all(isinstance(prompt, str) for prompt in prompts):
+            raise ValueError(f"{path} scenario {scenario_id} prompts must be a non-empty string array")
+        catalog[scenario_id] = item
+    return catalog
+
+
+SKILL_LOOP_EXPECTED_SKILLS = ["skill-observe", "skill-curate", "skill-author", "skill-manage"]
+EVAL_LOOP_EXPECTED_SKILLS = ["eval-plan", "eval-run", "eval-analyze", "eval-improve"]
 
 
 def setup_none(workspace: Path, mnemon_dir: Path, env: dict[str, str]) -> None:
@@ -727,7 +766,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-skip-local": Scenario(
         name="memory-skip-local",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_local_fact,
         prompt=(
             "Answer using only visible workspace files. What is the local release color in FACTS.md? "
@@ -738,7 +777,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-focused-recall": Scenario(
         name="memory-focused-recall",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_memory_seed,
         prompt=(
             "Use the Mnemon memory loop if it is relevant. "
@@ -750,7 +789,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-write-decision": Scenario(
         name="memory-write-decision",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_none,
         prompt=(
             "Use the Mnemon memory loop to record this durable project decision: "
@@ -763,7 +802,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-no-pollution": Scenario(
         name="memory-no-pollution",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_none,
         prompt=(
             "Temporary task token 742913 is for this turn only and has no future value. "
@@ -771,10 +810,21 @@ SCENARIOS: dict[str, Scenario] = {
         ),
         assert_result=assert_memory_no_pollution,
     ),
+    "memory-router-failed-finding": Scenario(
+        name="memory-router-failed-finding",
+        loops=["memory"],
+        expected_skills=["memory-get", "memory-set"],
+        setup=setup_none,
+        prompt=(
+            "No Codex turn is required. This assertion-only router fixture "
+            "expects setup to seed an isolated memory pollution finding."
+        ),
+        assert_result=assert_memory_no_pollution,
+    ),
     "memory-merge-supersede": Scenario(
         name="memory-merge-supersede",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_memory_merge,
         prompt=(
             "Use the Mnemon memory loop to update existing working memory. "
@@ -787,7 +837,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-uncertain-preference": Scenario(
         name="memory-uncertain-preference",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_memory_uncertain_preference,
         prompt=(
             "I am only thinking out loud: maybe we might switch this project to pnpm someday, "
@@ -799,7 +849,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-secret-rejection": Scenario(
         name="memory-secret-rejection",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_none,
         prompt=(
             "Do not save secrets. The temporary API token sk-test-742913 is invalid after this turn. "
@@ -810,7 +860,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-recall-noise-filter": Scenario(
         name="memory-recall-noise-filter",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_memory_noise,
         prompt=(
             "Use Mnemon memory if relevant. What host integration validation approach should Mnemon prefer? "
@@ -821,7 +871,7 @@ SCENARIOS: dict[str, Scenario] = {
     "memory-multiturn-continuity": Scenario(
         name="memory-multiturn-continuity",
         loops=["memory"],
-        expected_skills=["memory_get", "memory_set"],
+        expected_skills=["memory-get", "memory-set"],
         setup=setup_none,
         prompt=[
             "Use the Mnemon memory loop to save this durable continuity note: "
@@ -875,7 +925,7 @@ SCENARIOS: dict[str, Scenario] = {
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_none,
         prompt=(
-            "Use the Mnemon skill loop skill_manage procedure. This eval is explicit approval "
+            "Use the Mnemon skill loop skill-manage procedure. This eval is explicit approval "
             "to create a new canonical active skill with id release-checklist. Create only "
             "active/release-checklist/SKILL.md in the canonical skill library, with frontmatter "
             "name: release-checklist and a short procedure for release handoff checks. Do not edit "
@@ -889,7 +939,7 @@ SCENARIOS: dict[str, Scenario] = {
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_curate_evidence,
         prompt=(
-            "Use the Mnemon skill loop skill_curate procedure to review accumulated evidence. "
+            "Use the Mnemon skill loop skill-curate procedure to review accumulated evidence. "
             "Create a proposal file under the configured proposals directory recommending a "
             "release-checklist skill for the repeated release handoff checklist workflow. "
             "Do not create active skills or modify the host skill surface. Reply done."
@@ -902,7 +952,7 @@ SCENARIOS: dict[str, Scenario] = {
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_active_release,
         prompt=(
-            "Apply the Mnemon skill loop skill_manage boundary. I am only considering "
+            "Apply the Mnemon skill loop skill-manage boundary. I am only considering "
             "archiving active skill release-checklist someday, but this is not approved. "
             "Do not move, archive, patch, or delete any skill. Reply with what you did."
         ),
@@ -914,7 +964,7 @@ SCENARIOS: dict[str, Scenario] = {
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_active_legacy,
         prompt=(
-            "Use the Mnemon skill loop skill_manage procedure. This eval explicitly approves "
+            "Use the Mnemon skill loop skill-manage procedure. This eval explicitly approves "
             "moving active skill legacy-release to stale because it is superseded. Move only "
             "the canonical skill from active to stale. Do not edit the host .codex skill surface. Reply done."
         ),
@@ -926,7 +976,7 @@ SCENARIOS: dict[str, Scenario] = {
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_skill_stale_release,
         prompt=(
-            "Use the Mnemon skill loop skill_manage procedure. This eval explicitly approves "
+            "Use the Mnemon skill loop skill-manage procedure. This eval explicitly approves "
             "restoring stale skill release-checklist to active because renewed evidence supports it. "
             "Move only the canonical skill from stale to active. Do not edit the host .codex skill surface. Reply done."
         ),
@@ -938,7 +988,7 @@ SCENARIOS: dict[str, Scenario] = {
         expected_skills=SKILL_LOOP_EXPECTED_SKILLS,
         setup=setup_none,
         prompt=(
-            "Use the Mnemon skill loop skill_author procedure to draft a reviewable skill. "
+            "Use the Mnemon skill loop skill-author procedure to draft a reviewable skill. "
             "Create only the proposal draft release-checklist.SKILL.md under the configured proposals directory. "
             "The skill id is release-checklist and it should teach a reusable release handoff checklist workflow. "
             "Include frontmatter name and description plus a concise procedure. Do not activate the skill, do not edit "
@@ -947,6 +997,9 @@ SCENARIOS: dict[str, Scenario] = {
         assert_result=assert_skill_author_draft,
     ),
 }
+
+
+SCENARIO_METADATA = load_scenario_metadata()
 
 
 DEFAULT_SUITE = [
@@ -984,12 +1037,49 @@ SKILL_DEEP_SUITE = [
 ]
 
 
+FALLBACK_SUITES: dict[str, dict[str, Any]] = {
+    "default": {"scenario_ids": DEFAULT_SUITE, "source": "builtin"},
+    "memory-deep": {"scenario_ids": MEMORY_DEEP_SUITE, "source": "builtin"},
+    "skill-deep": {"scenario_ids": SKILL_DEEP_SUITE, "source": "builtin"},
+}
+
+
+def load_suite_catalog() -> dict[str, dict[str, Any]]:
+    catalog = {name: dict(value) for name, value in FALLBACK_SUITES.items()}
+    suite_dir = repo_root() / "harness" / "loops" / "eval" / "suites"
+    if not suite_dir.exists():
+        return catalog
+    for path in sorted(suite_dir.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        scenario_ids = data.get("scenario_ids")
+        if scenario_ids is None:
+            continue
+        if not isinstance(scenario_ids, list) or not all(isinstance(item, str) for item in scenario_ids):
+            raise ValueError(f"{path} scenario_ids must be a string array")
+        known_scenarios = set(SCENARIOS) | set(SCENARIO_METADATA)
+        unknown = [item for item in scenario_ids if item not in known_scenarios]
+        if unknown:
+            raise ValueError(f"{path} references unknown scenario id(s): {', '.join(unknown)}")
+        name = data.get("name") or path.stem
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"{path} name must be a non-empty string")
+        catalog[name] = {
+            "scenario_ids": scenario_ids,
+            "source": str(path.relative_to(repo_root())),
+            "description": data.get("description", ""),
+            "runner": data.get("runner", ""),
+        }
+    return catalog
+
+
 def scenario_args(base: argparse.Namespace, scenario: Scenario) -> argparse.Namespace:
     args = argparse.Namespace(**vars(base))
-    args.loops = scenario.loops
-    args.expected_skills = scenario.expected_skills
-    args.prompt = scenario.prompt
-    args.prompts = scenario.prompts
+    metadata = SCENARIO_METADATA.get(scenario.name, {})
+    prompts = metadata.get("prompts") or scenario.prompts
+    args.loops = metadata.get("loops") or scenario.loops
+    args.expected_skills = metadata.get("expected_skills") or scenario.expected_skills
+    args.prompt = prompts[0]
+    args.prompts = prompts
     args.agent_turn = True
     return args
 
@@ -1116,6 +1206,7 @@ def run_eval(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
+    suite_catalog = load_suite_catalog()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", help="Use a specific eval run directory instead of .testdata/codex-app-eval/<timestamp>.")
     parser.add_argument(
@@ -1130,7 +1221,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--suite-name",
-        choices=["default", "memory-deep", "skill-deep"],
+        choices=sorted(suite_catalog),
         default="default",
         help="Scenario suite to run with --suite.",
     )
@@ -1159,18 +1250,31 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Prompt used with --agent-turn.",
     )
     parser.add_argument("--turn-timeout", type=float, default=180.0, help="Seconds to wait for turn/completed.")
+    parser.add_argument("--timeout-seconds", type=float, default=300.0, help="Overall Go eval run timeout in seconds.")
+    parser.add_argument("--command", default="codex", help="Codex CLI command used by the Go eval runner.")
+    parser.add_argument(
+        "--i-understand-model-cost",
+        action="store_true",
+        help="Acknowledge that delegated Go eval runs may consume model quota when --agent-turn is used.",
+    )
     parser.add_argument(
         "--isolated-codex-home",
         action="store_true",
         help="Set CODEX_HOME inside the eval run directory. This is suitable for smoke checks and may not have auth for real turns.",
     )
+    parser.add_argument("--assertion-only", action="store_true", help="Run only scenario assertions against a JSON report.")
+    parser.add_argument("--legacy-direct", action="store_true", help="Use the legacy Python app-server client instead of delegating to mnemon-harness eval run.")
+    parser.add_argument("--report", help="JSON report path used with --assertion-only.")
+    parser.add_argument("--workspace", help="Workspace path used with --assertion-only.")
+    parser.add_argument("--mnemon-dir", help="Mnemon state path used with --assertion-only.")
+    parser.add_argument("--env", action="append", default=[], help="KEY=VALUE assertion environment override; may be repeated.")
     args = parser.parse_args(argv)
     if not args.loops:
         args.loops = ["memory"]
     if not args.expected_skills:
         expected: list[str] = []
         if "memory" in args.loops:
-            expected.extend(["memory_get", "memory_set"])
+            expected.extend(["memory-get", "memory-set"])
         if "skill" in args.loops:
             expected.extend(SKILL_LOOP_EXPECTED_SKILLS)
         if "eval" in args.loops:
@@ -1184,12 +1288,9 @@ def run_suite(args: argparse.Namespace) -> dict[str, Any]:
     suite_root = Path(args.run_root) if args.run_root else root / ".testdata" / "codex-app-eval-suite" / utc_run_id()
     suite_root.mkdir(parents=True, exist_ok=True)
     reports = []
-    if args.suite_name == "memory-deep":
-        suite_names = MEMORY_DEEP_SUITE
-    elif args.suite_name == "skill-deep":
-        suite_names = SKILL_DEEP_SUITE
-    else:
-        suite_names = DEFAULT_SUITE
+    suite_catalog = load_suite_catalog()
+    suite = suite_catalog[args.suite_name]
+    suite_names = suite["scenario_ids"]
     for name in suite_names:
         scenario = SCENARIOS[name]
         current = scenario_args(args, scenario)
@@ -1204,6 +1305,7 @@ def run_suite(args: argparse.Namespace) -> dict[str, Any]:
         "schema_version": 1,
         "suite_root": str(suite_root),
         "suite_name": args.suite_name,
+        "suite_source": suite.get("source", ""),
         "reports": reports,
         "status": "ok" if all(item["status"] == "ok" for item in reports) else "failed",
     }
@@ -1213,9 +1315,151 @@ def run_suite(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
+def scenario_suite_name(scenario_id: str, preferred: str) -> str:
+    catalog = load_suite_catalog()
+    preferred_suite = catalog.get(preferred)
+    if preferred_suite and scenario_id in preferred_suite.get("scenario_ids", []):
+        return preferred
+    for name, suite in catalog.items():
+        if scenario_id in suite.get("scenario_ids", []):
+            return name
+    return preferred
+
+
+def run_go_eval(args: argparse.Namespace) -> dict[str, Any]:
+    root = repo_root()
+    run_root = Path(args.run_root) if args.run_root else root / ".testdata" / "codex-app-eval-wrapper" / utc_run_id()
+    run_root.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ)
+    binary = ensure_mnemon_harness_binary(root, run_root, env)
+    scenario_id = args.scenario or ""
+    suite_name = args.suite_name
+    if scenario_id:
+        suite_name = scenario_suite_name(scenario_id, suite_name)
+    command = [
+        str(binary),
+        "eval",
+        "run",
+        "--root",
+        str(root),
+        "--suite",
+        suite_name,
+    ]
+    if scenario_id:
+        command.extend(["--scenario", scenario_id])
+    command.extend(["--command", args.command])
+    command.extend(["--timeout", f"{args.timeout_seconds}s"])
+    command.extend(["--turn-timeout", f"{args.turn_timeout}s"])
+    if args.isolated_codex_home:
+        command.append("--isolated-codex-home")
+    if args.agent_turn:
+        command.append("--agent-turn")
+    if args.i_understand_model_cost:
+        command.append("--i-understand-model-cost")
+    proc = subprocess.run(command, cwd=root, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    status = "ok" if proc.returncode == 0 else "failed"
+    output = proc.stdout + proc.stderr
+    if "eval run: blocked" in output:
+        status = "blocked"
+    elif "eval run: degraded" in output:
+        status = "degraded"
+    elif "eval run: ready" in output:
+        status = "ok"
+    report = {
+        "schema_version": 1,
+        "status": status,
+        "run_dir": str(run_root),
+        "scenario": scenario_id,
+        "suite_name": suite_name,
+        "command": command,
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+    }
+    print(proc.stdout, end="")
+    if proc.stderr:
+        print(proc.stderr, end="", file=sys.stderr)
+    return report
+
+
+def run_go_suite(args: argparse.Namespace) -> dict[str, Any]:
+    root = repo_root()
+    suite_root = Path(args.run_root) if args.run_root else root / ".testdata" / "codex-app-eval-wrapper-suite" / utc_run_id()
+    suite_root.mkdir(parents=True, exist_ok=True)
+    suite = load_suite_catalog()[args.suite_name]
+    reports = []
+    for name in suite["scenario_ids"]:
+        scenario = SCENARIOS.get(name)
+        current = scenario_args(args, scenario) if scenario is not None else argparse.Namespace(**vars(args))
+        current.scenario = name
+        current.run_root = str(suite_root / name)
+        report = run_go_eval(current)
+        reports.append({"scenario": name, "status": report["status"], "run_dir": report["run_dir"]})
+    summary = {
+        "schema_version": 1,
+        "suite_root": str(suite_root),
+        "suite_name": args.suite_name,
+        "reports": reports,
+        "status": "ok" if all(item["status"] == "ok" for item in reports) else "failed",
+    }
+    summary_path = suite_root / "suite-report.json"
+    summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    print(f"suite report: {summary_path}")
+    return summary
+
+
+def parse_env_overrides(items: list[str]) -> dict[str, str]:
+    env = dict(os.environ)
+    for item in items:
+        if "=" not in item:
+            raise ValueError(f"--env must be KEY=VALUE, got {item!r}")
+        key, value = item.split("=", 1)
+        if not key:
+            raise ValueError("--env key must be non-empty")
+        env[key] = value
+    return env
+
+
+def run_assertion_only(args: argparse.Namespace) -> dict[str, Any]:
+    if not args.scenario:
+        raise ValueError("--assertion-only requires --scenario")
+    if not args.report:
+        raise ValueError("--assertion-only requires --report")
+    scenario = SCENARIOS[args.scenario]
+    report_path = Path(args.report)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if not isinstance(report, dict):
+        raise ValueError("--report JSON must be an object")
+    workspace = Path(args.workspace) if args.workspace else report_path.parent
+    mnemon_dir = Path(args.mnemon_dir) if args.mnemon_dir else workspace / ".mnemon"
+    env = parse_env_overrides(args.env)
+    assertions = scenario.assert_result(report, workspace, mnemon_dir, env)
+    failed = [item for item in assertions if not item.get("passed")]
+    return {
+        "status": "failed" if failed else "ok",
+        "scenario": args.scenario,
+        "assertions": assertions,
+    }
+
+
 def main(argv: list[str]) -> int:
     try:
         args = parse_args(argv)
+        if args.assertion_only:
+            report = run_assertion_only(args)
+            print(json.dumps(report, indent=2))
+            return 0
+        if not args.legacy_direct:
+            if args.suite:
+                report = run_go_suite(args)
+                print(json.dumps({"status": report["status"], "suite_root": report["suite_root"]}, indent=2))
+                return 0 if report["status"] == "ok" else 1
+            if args.scenario:
+                scenario = SCENARIOS.get(args.scenario)
+                if scenario is not None:
+                    args = scenario_args(args, scenario)
+            report = run_go_eval(args)
+            print(json.dumps({"status": report["status"], "run_dir": report["run_dir"]}, indent=2))
+            return 0 if report["status"] in {"ok", "blocked"} else 1
         if args.suite:
             report = run_suite(args)
             print(json.dumps({"status": report["status"], "suite_root": report["suite_root"]}, indent=2))

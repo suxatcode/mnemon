@@ -6,11 +6,17 @@
   "projection_path": ".codex",
   "runtime_surface": ".codex/mnemon-memory",
   "lifecycle_mapping": {
-    "prime": "thread/start developer instructions",
-    "remind": "user prompt guidance",
-    "nudge": "turn completion guidance",
-    "compact": "thread compact guidance"
+    "prime": "SessionStart",
+    "remind": "UserPromptSubmit",
+    "nudge": "Stop",
+    "compact": "PreCompact"
+  },
+  "runner_bindings": {
+    "memory.dreaming": {
+      "mode": "app_server",
+      "runner": "codex-app-server",
+      "prompt_from": "subagents/dreaming.md"
+    }
   },
   "reconcile": ["read", "write", "compact", "consolidate", "no-op"]
 }
-

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mnemon daemon job or global budget",
+  "oneOf": [
+    {"$ref": "#/$defs/job"},
+    {"$ref": "#/$defs/global_config"}
+  ],
+  "$defs": {
+    "job": {
+      "type": "object",
+      "required": ["id", "when", "do"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-zA-Z0-9_.-]+$"},
+        "description": {"type": "string"},
+        "when": {"$ref": "#/$defs/trigger"},
+        "do": {"$ref": "#/$defs/action"},
+        "budget": {"$ref": "#/$defs/budget"},
+        "enabled": {"type": "boolean"},
+        "metadata": {"type": "object"}
+      }
+    },
+    "global_config": {
+      "type": "object",
+      "required": ["global_budget"],
+      "additionalProperties": false,
+      "properties": {
+        "global_budget": {"$ref": "#/$defs/global_budget"}
+      }
+    },
+    "global_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "daily_cost_usd": {"type": "number"},
+        "daily_real_turns": {"type": "integer"},
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "properties": {
+        "event": {"type": "string"},
+        "payload_match": {"type": "object"},
+        "cron": {"type": "string"},
+        "timezone": {"type": "string"},
+        "interval": {"type": "string"},
+        "threshold": {"$ref": "#/$defs/threshold"},
+        "any": {"type": "array", "items": {"$ref": "#/$defs/trigger"}},
+        "all": {"type": "array", "items": {"$ref": "#/$defs/trigger"}}
+      }
+    },
+    "threshold": {
+      "type": "object",
+      "required": ["metric", "op", "value"],
+      "properties": {
+        "metric": {"type": "string"},
+        "op": {"enum": [">", ">=", "<", "<=", "==", "!="]},
+        "value": {"type": "number"},
+        "window": {"type": "string"}
+      }
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "subagent": {"type": "string"},
+        "prompt_override": {"type": "string"},
+        "cli": {"type": "string"},
+        "cwd": {"type": "string"},
+        "env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "spawn_runner": {"type": "string"},
+        "prompt": {"type": "string"},
+        "isolated_home": {"type": "boolean"},
+        "max_turns": {"type": "integer"},
+        "prompt_file": {"type": "string"}
+      }
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "cost_usd": {"type": "number"},
+        "max_sec": {"type": "integer"},
+        "max_turns": {"type": "integer"},
+        "max_attempts": {"type": "integer"},
+        "concurrency": {"type": "integer"}
+      }
+    }
+  }
+}

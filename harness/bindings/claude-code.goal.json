@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "claude-code.goal",
+  "host": "claude-code",
+  "loop": "goal",
+  "projection_path": ".claude",
+  "runtime_surface": ".claude/mnemon-goal",
+  "lifecycle_mapping": {
+    "prime": "SessionStart",
+    "remind": "UserPromptSubmit",
+    "nudge": "Stop",
+    "compact": "PreCompact",
+    "maintenance": "manual goal command or host continuation"
+  },
+  "reconcile": ["init", "plan", "record_evidence", "verify", "complete", "block", "pause", "resume", "link_host", "no-op"]
+}

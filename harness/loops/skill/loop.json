@@ -56,10 +56,10 @@
   "surfaces": {
     "projection": [
       "active skills",
-      "skill_observe",
-      "skill_curate",
-      "skill_author",
-      "skill_manage",
+      "skill-observe",
+      "skill-curate",
+      "skill-author",
+      "skill-manage",
       "curator",
       "runtime env"
     ],
@@ -80,17 +80,17 @@
   "assets": {
     "guide": "GUIDE.md",
     "env": "env.sh",
-    "hooks": {
-      "prime": "hooks/prime.md",
-      "remind": "hooks/remind.md",
-      "nudge": "hooks/nudge.md",
-      "compact": "hooks/compact.md"
+    "hook_prompts": {
+      "prime": "hook-prompts/prime.md",
+      "remind": "hook-prompts/remind.md",
+      "nudge": "hook-prompts/nudge.md",
+      "compact": "hook-prompts/compact.md"
     },
     "skills": [
-      "skills/skill_observe.md",
-      "skills/skill_curate.md",
-      "skills/skill_author.md",
-      "skills/skill_manage.md"
+      "skills/skill-observe/SKILL.md",
+      "skills/skill-curate/SKILL.md",
+      "skills/skill-author/SKILL.md",
+      "skills/skill-manage/SKILL.md"
     ],
     "subagents": [
       "subagents/curator.md"
@@ -110,6 +110,27 @@
       "skills/.usage.jsonl",
       "proposals"
     ]
+  },
+  "controllers": [
+    {
+      "name": "skill.curator.on_usage",
+      "watches": [
+        "skill.usage_observed"
+      ],
+      "enqueue": "skill.curator",
+      "reason": "Skill usage evidence may need curator review."
+    }
+  ],
+  "jobs": {
+    "skill.curator": {
+      "type": "semantic",
+      "spec": "subagents/curator.md",
+      "preferred_runner": "host-subagent",
+      "fallback_runner": "codex-app-server",
+      "governance": "report-or-proposal",
+      "prompt": "Run the skill curator job from subagents/curator.md and return structured evidence for any proposed skill lifecycle changes.",
+      "max_turns": 3
+    }
   },
   "host_adapters": {
     "claude-code": "../../hosts/claude-code",

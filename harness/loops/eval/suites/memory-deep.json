@@ -1,0 +1,22 @@
+{
+  "name": "memory-deep",
+  "description": "Longer real Codex app-server regression suite for memory loop behavior.",
+  "host": "codex",
+  "lifecycle": "promoted",
+  "runner": "codex-app-server",
+  "scenario_ids": [
+    "memory-skip-local",
+    "memory-focused-recall",
+    "memory-recall-noise-filter",
+    "memory-write-decision",
+    "memory-merge-supersede",
+    "memory-uncertain-preference",
+    "memory-secret-rejection",
+    "memory-no-pollution",
+    "memory-multiturn-continuity"
+  ],
+  "rubrics": [
+    "eval-asset-quality",
+    "interface-loop-behavior"
+  ]
+}

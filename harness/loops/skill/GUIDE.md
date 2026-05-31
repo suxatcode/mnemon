@@ -1,7 +1,7 @@
 # Skill Guide
 
 This guide defines when skill evolution behavior is useful. It does not decide
-specific file mutations. Mutations belong to `skill_manage.md`; review belongs
+specific file mutations. Mutations belong to `skill-manage`; review belongs
 to the curator subagent.
 
 ## Stance

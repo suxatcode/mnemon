@@ -13,14 +13,16 @@ harness/loops/memory/
 ├── env.sh
 ├── GUIDE.md
 ├── MEMORY.md
-├── hooks/
+├── hook-prompts/
 │   ├── prime.md
 │   ├── remind.md
 │   ├── nudge.md
 │   └── compact.md
 ├── skills/
-│   ├── memory_get.md
-│   └── memory_set.md
+│   ├── memory-get/
+│   │   └── SKILL.md
+│   └── memory-set/
+│       └── SKILL.md
 ├── subagents/
 │   └── dreaming.md
 ```
@@ -40,9 +42,9 @@ harness/loops/memory/
 | `loop.json` | Machine-readable loop manifest for standard lifecycle events, assets, state, and host adapters. |
 | `env.sh` | Runtime config: memory directory, env path, and dreaming threshold. |
 | `GUIDE.md` | Policy: when to read memory, when to write memory, and what is worth keeping. |
-| `hooks/*.md` | Four lifecycle reminders: Prime, Remind, Nudge, and Compact. |
-| `skills/memory_get.md` | Online long-term recall skill backed by `mnemon recall`. |
-| `skills/memory_set.md` | Online working-memory update skill backed by `MEMORY.md` edits. |
+| `hook-prompts/*.md` | Four lifecycle reminders: Prime, Remind, Nudge, and Compact. |
+| `skills/memory-get/SKILL.md` | Online long-term recall skill backed by `mnemon recall`. |
+| `skills/memory-set/SKILL.md` | Online working-memory update skill backed by `MEMORY.md` edits. |
 | `subagents/dreaming.md` | Offline consolidation worker backed by Mnemon writes and `MEMORY.md` compaction. |
 | Host adapter | Host-specific projection lives outside the loop under `harness/hosts/<host>/`. |
 
@@ -66,12 +68,12 @@ MNEMON_MEMORY_LOOP_DIR=<canonical-state>/harness/memory
 MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES=200
 ```
 
-`memory_set.md`, `memory_get.md`, and `dreaming.md` should never hard-code a
+`memory-set`, `memory-get`, and `dreaming.md` should never hard-code a
 Claude Code path. They should use `$MNEMON_MEMORY_LOOP_DIR` when it is available.
 If the host runtime cannot pass environment variables to skills, the Prime hook
 must inject the resolved path into the HostAgent context.
 
-`MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES` controls when hooks should suggest
+`MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES` controls when hook prompts should suggest
 `mnemon-dreaming` for an oversized `MEMORY.md`.
 
 ## Boundary
@@ -84,8 +86,8 @@ The key split is:
 
 ```text
 GUIDE.md decides when memory behavior is useful.
-memory_get.md maps read-memory behavior to Mnemon recall.
-memory_set.md maps write-memory behavior to MEMORY.md edits.
+memory-get maps read-memory behavior to Mnemon recall.
+memory-set maps write-memory behavior to MEMORY.md edits.
 dreaming.md maps maintenance behavior to Mnemon write + MEMORY.md compaction.
 ```
 

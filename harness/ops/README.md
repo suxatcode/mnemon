@@ -19,6 +19,8 @@ bash harness/ops/status.sh --host claude-code
 bash harness/ops/uninstall.sh --host claude-code --loop memory
 bash harness/ops/install.sh --host codex --loop memory
 bash harness/ops/install.sh --host codex --loop eval
+bash harness/ops/install.sh --host codex --loop goal
+bash harness/ops/install.sh --host claude-code --loop goal
 ```
 
 Host-specific projection logic lives under `harness/hosts/<host>/`. Loop assets

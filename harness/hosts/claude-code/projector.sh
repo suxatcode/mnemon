@@ -26,6 +26,9 @@ Skill loop install options:
   --no-nudge
   --no-compact
 
+Goal loop install options:
+  --host-skills-dir DIR
+
 Uninstall options:
   --purge-memory
   --purge-library
@@ -120,7 +123,7 @@ if [[ -z "${LOOP}" ]]; then
   usage >&2
   exit 2
 fi
-if [[ "${LOOP}" != "memory" && "${LOOP}" != "skill" ]]; then
+if [[ "${LOOP}" != "memory" && "${LOOP}" != "skill" && "${LOOP}" != "goal" ]]; then
   echo "unsupported loop for Claude Code: ${LOOP}" >&2
   exit 1
 fi
@@ -306,9 +309,39 @@ export MNEMON_SKILL_LOOP_USAGE_FILE="${CANONICAL_LOOP_DIR}/skills/.usage.jsonl"
 export MNEMON_SKILL_LOOP_PROPOSALS_DIR="${CANONICAL_LOOP_DIR}/proposals"
 export MNEMON_SKILL_LOOP_HOST_SKILLS_DIR="${host_skills_dir}"
 export MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS="\${MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS:-20}"
-export MNEMON_SKILL_LOOP_PROTECTED_SKILLS="\${MNEMON_SKILL_LOOP_PROTECTED_SKILLS:-skill_observe,skill_curate,skill_author,skill_manage,memory_get,memory_set}"
+export MNEMON_SKILL_LOOP_PROTECTED_SKILLS="\${MNEMON_SKILL_LOOP_PROTECTED_SKILLS:-skill-observe,skill-curate,skill-author,skill-manage,memory-get,memory-set,mnemon-goal}"
 EOF
   chmod 0755 "${CONFIG_DIR}/mnemon-skill/env.sh"
+}
+
+write_goal_projection_env() {
+  mkdir -p "${CONFIG_DIR}/mnemon-goal"
+  local host_skills_dir="${HOST_SKILLS_DIR:-${CONFIG_DIR}/skills}"
+  cat > "${CONFIG_DIR}/mnemon-goal/env.sh" <<EOF
+#!/usr/bin/env bash
+export MNEMON_GOAL_LOOP_ENV="${CANONICAL_LOOP_DIR}/env.sh"
+export MNEMON_GOAL_LOOP_DIR="${CANONICAL_LOOP_DIR}"
+export MNEMON_GOAL_LOOP_ROOT="$(pwd)"
+export MNEMON_GOAL_LOOP_GOALS_DIR="${MNEMON_DIR}/harness/goals"
+export MNEMON_GOAL_LOOP_STATUS_DIR="${MNEMON_DIR}/harness/status/goals"
+export MNEMON_GOAL_LOOP_HOST_SKILLS_DIR="${host_skills_dir}"
+EOF
+  chmod 0755 "${CONFIG_DIR}/mnemon-goal/env.sh"
+}
+
+append_goal_runtime_note() {
+  local skill_path="$1"
+  cat >> "${skill_path}" <<EOF
+
+## Claude Code Projection
+
+This skill is projected by the Mnemon Claude Code host adapter.
+
+- Canonical loop directory: \`${CANONICAL_LOOP_DIR}\`
+- Runtime env file: \`${CONFIG_DIR}/mnemon-goal/env.sh\`
+- If \`MNEMON_GOAL_LOOP_DIR\` is not already exported, use the canonical loop
+  directory above and the runtime env file above.
+EOF
 }
 
 settings_script() {
@@ -324,11 +357,11 @@ install_memory_loop() {
   if [[ ! -f "${CANONICAL_LOOP_DIR}/MEMORY.md" ]]; then
     install_file "${LOOP_DIR}/MEMORY.md" "${CANONICAL_LOOP_DIR}/MEMORY.md" 0644
   fi
-  mkdir -p "${CONFIG_DIR}/skills/memory_get" "${CONFIG_DIR}/skills/memory_set" "${CONFIG_DIR}/agents" "${CONFIG_DIR}/hooks/mnemon-memory"
+  mkdir -p "${CONFIG_DIR}/skills/memory-get" "${CONFIG_DIR}/skills/memory-set" "${CONFIG_DIR}/agents" "${CONFIG_DIR}/hooks/mnemon-memory"
   write_memory_projection_env
 
-  install_file "${LOOP_DIR}/skills/memory_get.md" "${CONFIG_DIR}/skills/memory_get/SKILL.md" 0644
-  install_file "${LOOP_DIR}/skills/memory_set.md" "${CONFIG_DIR}/skills/memory_set/SKILL.md" 0644
+  install_file "${LOOP_DIR}/skills/memory-get/SKILL.md" "${CONFIG_DIR}/skills/memory-get/SKILL.md" 0644
+  install_file "${LOOP_DIR}/skills/memory-set/SKILL.md" "${CONFIG_DIR}/skills/memory-set/SKILL.md" 0644
   install_file "${LOOP_DIR}/subagents/dreaming.md" "${CONFIG_DIR}/agents/mnemon-dreaming.md" 0644
 
   install_file "${SCRIPT_DIR}/memory/hooks/prime.sh" "${CONFIG_DIR}/hooks/mnemon-memory/prime.sh" 0755
@@ -365,18 +398,18 @@ install_skill_loop() {
     "${CANONICAL_LOOP_DIR}/skills/archived" \
     "${CANONICAL_LOOP_DIR}/proposals" \
     "${CANONICAL_LOOP_DIR}/reports" \
-    "${HOST_SKILLS_DIR}/skill_observe" \
-    "${HOST_SKILLS_DIR}/skill_curate" \
-    "${HOST_SKILLS_DIR}/skill_author" \
-    "${HOST_SKILLS_DIR}/skill_manage" \
+    "${HOST_SKILLS_DIR}/skill-observe" \
+    "${HOST_SKILLS_DIR}/skill-curate" \
+    "${HOST_SKILLS_DIR}/skill-author" \
+    "${HOST_SKILLS_DIR}/skill-manage" \
     "${CONFIG_DIR}/agents" \
     "${CONFIG_DIR}/hooks/mnemon-skill"
   write_skill_projection_env
 
-  install_file "${LOOP_DIR}/skills/skill_observe.md" "${HOST_SKILLS_DIR}/skill_observe/SKILL.md" 0644
-  install_file "${LOOP_DIR}/skills/skill_curate.md" "${HOST_SKILLS_DIR}/skill_curate/SKILL.md" 0644
-  install_file "${LOOP_DIR}/skills/skill_author.md" "${HOST_SKILLS_DIR}/skill_author/SKILL.md" 0644
-  install_file "${LOOP_DIR}/skills/skill_manage.md" "${HOST_SKILLS_DIR}/skill_manage/SKILL.md" 0644
+  install_file "${LOOP_DIR}/skills/skill-observe/SKILL.md" "${HOST_SKILLS_DIR}/skill-observe/SKILL.md" 0644
+  install_file "${LOOP_DIR}/skills/skill-curate/SKILL.md" "${HOST_SKILLS_DIR}/skill-curate/SKILL.md" 0644
+  install_file "${LOOP_DIR}/skills/skill-author/SKILL.md" "${HOST_SKILLS_DIR}/skill-author/SKILL.md" 0644
+  install_file "${LOOP_DIR}/skills/skill-manage/SKILL.md" "${HOST_SKILLS_DIR}/skill-manage/SKILL.md" 0644
   install_file "${LOOP_DIR}/subagents/curator.md" "${CONFIG_DIR}/agents/mnemon-skill-curator.md" 0644
 
   install_file "${SCRIPT_DIR}/skill/hooks/prime.sh" "${CONFIG_DIR}/hooks/mnemon-skill/prime.sh" 0755
@@ -390,6 +423,30 @@ install_skill_loop() {
   echo "Installed Mnemon skill loop for Claude Code."
   echo "Config:       ${CONFIG_DIR}"
   echo "State:        ${CANONICAL_LOOP_DIR}"
+  echo "Host skills:  ${HOST_SKILLS_DIR}"
+}
+
+install_goal_loop() {
+  ensure_python
+  [[ -n "${HOST_SKILLS_DIR}" ]] || HOST_SKILLS_DIR="${CONFIG_DIR}/skills"
+
+  copy_common_canonical_assets
+  mkdir -p \
+    "${MNEMON_DIR}/harness/goals" \
+    "${MNEMON_DIR}/harness/status/goals" \
+    "${HOST_SKILLS_DIR}/mnemon-goal" \
+    "${CONFIG_DIR}/mnemon-goal"
+  write_goal_projection_env
+
+  install_file "${LOOP_DIR}/GUIDE.md" "${CONFIG_DIR}/mnemon-goal/GUIDE.md" 0644
+  install_file "${LOOP_DIR}/skills/mnemon-goal/SKILL.md" "${HOST_SKILLS_DIR}/mnemon-goal/SKILL.md" 0644
+  append_goal_runtime_note "${HOST_SKILLS_DIR}/mnemon-goal/SKILL.md"
+
+  write_host_manifest "${CONFIG_DIR}"
+  echo "Installed Mnemon goal loop for Claude Code."
+  echo "Config:       ${CONFIG_DIR}"
+  echo "State:        ${CANONICAL_LOOP_DIR}"
+  echo "Goals:        ${MNEMON_DIR}/harness/goals"
   echo "Host skills:  ${HOST_SKILLS_DIR}"
 }
 
@@ -418,8 +475,8 @@ uninstall_memory_loop() {
   ensure_python
   python3 "$(settings_script)" uninstall --config-dir "${CONFIG_DIR}"
   rm -rf "${CONFIG_DIR}/hooks/mnemon-memory"
-  rm -rf "${CONFIG_DIR}/skills/memory_get"
-  rm -rf "${CONFIG_DIR}/skills/memory_set"
+  rm -rf "${CONFIG_DIR}/skills/memory-get"
+  rm -rf "${CONFIG_DIR}/skills/memory-set"
   rm -f "${CONFIG_DIR}/agents/mnemon-dreaming.md"
   rm -rf "${CONFIG_DIR}/mnemon-memory"
   if [[ "${PURGE_MEMORY}" == "1" ]]; then
@@ -448,10 +505,10 @@ uninstall_skill_loop() {
     done < <(find "${host_skills_dir}" -mindepth 2 -maxdepth 2 -name .mnemon-skill-generated -print 2>/dev/null)
   fi
   rm -rf "${CONFIG_DIR}/hooks/mnemon-skill"
-  rm -rf "${host_skills_dir}/skill_observe"
-  rm -rf "${host_skills_dir}/skill_curate"
-  rm -rf "${host_skills_dir}/skill_author"
-  rm -rf "${host_skills_dir}/skill_manage"
+  rm -rf "${host_skills_dir}/skill-observe"
+  rm -rf "${host_skills_dir}/skill-curate"
+  rm -rf "${host_skills_dir}/skill-author"
+  rm -rf "${host_skills_dir}/skill-manage"
   rm -f "${CONFIG_DIR}/agents/mnemon-skill-curator.md"
   rm -rf "${CONFIG_DIR}/mnemon-skill"
   if [[ "${PURGE_LIBRARY}" == "1" ]]; then
@@ -466,12 +523,30 @@ uninstall_skill_loop() {
   echo "Removed Mnemon skill loop from ${CONFIG_DIR}."
 }
 
+uninstall_goal_loop() {
+  local env_path="${CONFIG_DIR}/mnemon-goal/env.sh"
+  if [[ -f "${env_path}" ]]; then
+    # shellcheck source=/dev/null
+    source "${env_path}"
+  fi
+  local host_skills_dir="${MNEMON_GOAL_LOOP_HOST_SKILLS_DIR:-${HOST_SKILLS_DIR:-${CONFIG_DIR}/skills}}"
+
+  rm -rf "${host_skills_dir}/mnemon-goal"
+  rm -rf "${CONFIG_DIR}/mnemon-goal"
+  rm -f "${CANONICAL_LOOP_DIR}/GUIDE.md" "${CANONICAL_LOOP_DIR}/env.sh" "${CANONICAL_LOOP_DIR}/loop.json" "${CANONICAL_LOOP_DIR}/status.json"
+  rmdir "${CANONICAL_LOOP_DIR}" 2>/dev/null || true
+  remove_host_manifest_loop
+  echo "Removed Mnemon goal loop from ${CONFIG_DIR}."
+}
+
 case "${ACTION}:${LOOP}" in
   install:memory) install_memory_loop ;;
   install:skill) install_skill_loop ;;
-  status:memory|status:skill) status_loop ;;
+  install:goal) install_goal_loop ;;
+  status:memory|status:skill|status:goal) status_loop ;;
   uninstall:memory) uninstall_memory_loop ;;
   uninstall:skill) uninstall_skill_loop ;;
+  uninstall:goal) uninstall_goal_loop ;;
   *)
     echo "unsupported action/loop: ${ACTION}/${LOOP}" >&2
     exit 1

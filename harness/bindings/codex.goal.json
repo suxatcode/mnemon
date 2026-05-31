@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "codex.goal",
+  "host": "codex",
+  "loop": "goal",
+  "projection_path": ".codex",
+  "runtime_surface": ".codex/mnemon-goal",
+  "lifecycle_mapping": {
+    "prime": "SessionStart",
+    "remind": "UserPromptSubmit",
+    "nudge": "Stop",
+    "compact": "PreCompact",
+    "maintenance": "manual goal command or Codex /goal prompt"
+  },
+  "reconcile": ["init", "plan", "record_evidence", "verify", "complete", "block", "pause", "resume", "link_host", "no-op"]
+}

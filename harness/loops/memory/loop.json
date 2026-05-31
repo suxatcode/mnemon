@@ -53,9 +53,9 @@
   "surfaces": {
     "projection": [
       "GUIDE.md",
-      "hooks",
-      "memory_get",
-      "memory_set",
+      "hook-prompts",
+      "memory-get",
+      "memory-set",
       "dreaming",
       "runtime env"
     ],
@@ -79,15 +79,15 @@
     "runtime_files": [
       "MEMORY.md"
     ],
-    "hooks": {
-      "prime": "hooks/prime.md",
-      "remind": "hooks/remind.md",
-      "nudge": "hooks/nudge.md",
-      "compact": "hooks/compact.md"
+    "hook_prompts": {
+      "prime": "hook-prompts/prime.md",
+      "remind": "hook-prompts/remind.md",
+      "nudge": "hook-prompts/nudge.md",
+      "compact": "hook-prompts/compact.md"
     },
     "skills": [
-      "skills/memory_get.md",
-      "skills/memory_set.md"
+      "skills/memory-get/SKILL.md",
+      "skills/memory-set/SKILL.md"
     ],
     "subagents": [
       "subagents/dreaming.md"
@@ -103,6 +103,27 @@
     "loop_runtime": [
       "MEMORY.md"
     ]
+  },
+  "controllers": [
+    {
+      "name": "memory.dreaming.on_hot_write",
+      "watches": [
+        "memory.hot_write_observed"
+      ],
+      "enqueue": "memory.dreaming",
+      "reason": "Working memory changed and may need consolidation."
+    }
+  ],
+  "jobs": {
+    "memory.dreaming": {
+      "type": "semantic",
+      "spec": "subagents/dreaming.md",
+      "preferred_runner": "host-subagent",
+      "fallback_runner": "codex-app-server",
+      "governance": "report-or-proposal",
+      "prompt": "Run the memory dreaming job from subagents/dreaming.md and return structured evidence for any proposed memory consolidation.",
+      "max_turns": 3
+    }
   },
   "host_adapters": {
     "claude-code": "../../hosts/claude-code",

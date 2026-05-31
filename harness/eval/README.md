@@ -54,6 +54,19 @@ Run the eval projection smoke check with:
 make codex-eval-smoke
 ```
 
+Plan and start a declaration-driven Go runner eval with:
+
+```bash
+go run ./harness/cmd/mnemon-harness eval plan --suite default
+go run ./harness/cmd/mnemon-harness eval run --suite default --scenario memory-focused-recall
+go run ./harness/cmd/mnemon-harness eval report --run-id <run-id>
+```
+
+The Go command projects the declared eval and scenario-specific loop assets into
+an isolated Codex app-server workspace before the real-turn gate. It records a
+blocked report unless `--agent-turn --i-understand-model-cost` are both set.
+The run output includes the run id for `eval report`.
+
 To run an actual Codex turn, use:
 
 ```bash
@@ -78,6 +91,14 @@ Each eval run has:
 - `reports/`: machine-readable eval reports
 
 ## Scenario Suite
+
+Suite membership for the Codex app-server runner is declared under
+`harness/loops/eval/suites/*.json` using `scenario_ids`. Scenario prompts, loop
+requirements, expected skills, and Python compatibility handler names are
+declared in `harness/loops/eval/scenarios/codex-app.json`. The Python runner
+still owns setup and assertion functions during migration, while the Go runner
+uses the same suite and scenario declarations to select prompts and project loop
+assets.
 
 The default suite covers:
 

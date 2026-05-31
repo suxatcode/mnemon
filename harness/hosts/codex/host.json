@@ -2,31 +2,35 @@
   "schema_version": 2,
   "name": "codex",
   "display_name": "Codex",
-  "description": "Projects Mnemon harness loops into Codex repo-local skills and app-server readable state.",
+  "description": "Projects Mnemon harness loops into Codex repo-local skills, hooks, and app-server readable state.",
   "surfaces": {
     "projection": [
       ".codex/skills",
+      ".codex/hooks",
+      ".codex/hooks.json",
       ".codex/mnemon-memory",
       ".codex/mnemon-skill",
-      ".codex/mnemon-eval"
+      ".codex/mnemon-eval",
+      ".codex/mnemon-goal"
     ],
     "observation": [
       ".mnemon/hosts/codex/manifest.json",
       ".mnemon/harness/*/status.json",
       "app-server eval transcripts",
+      "goal evidence records",
       "skill usage evidence"
     ]
   },
   "lifecycle_mapping": {
-    "prime": "thread/start developer instructions",
-    "remind": "user prompt guidance",
-    "nudge": "turn completion guidance",
-    "compact": "thread compact guidance",
+    "prime": "SessionStart",
+    "remind": "UserPromptSubmit",
+    "nudge": "Stop",
+    "compact": "PreCompact",
     "maintenance": "app-server eval or manual skill invocation"
   },
   "supports": {
     "skills": true,
-    "hooks": false,
+    "hooks": true,
     "subagents": false,
     "app_server_eval": true
   }

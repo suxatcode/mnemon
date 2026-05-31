@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+INPUT="$(cat || true)"
+SESSION_ID="$(printf '%s' "${INPUT}" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+if [[ -n "${SESSION_ID}" ]]; then
+  MARKER_DIR="${TMPDIR:-/tmp}/mnemon-memory"
+  MARKER="${MARKER_DIR}/prime-${SESSION_ID}"
+  mkdir -p "${MARKER_DIR}"
+  if [[ -f "${MARKER}" ]]; then
+    exit 0
+  fi
+  touch "${MARKER}"
+fi
+
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="$(cd "${HOOK_DIR}/../.." && pwd)"
 ENV_PATH="${MNEMON_MEMORY_LOOP_ENV:-${CONFIG_DIR}/mnemon-memory/env.sh}"

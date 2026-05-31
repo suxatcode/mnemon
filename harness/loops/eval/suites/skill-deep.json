@@ -1,0 +1,22 @@
+{
+  "name": "skill-deep",
+  "description": "Longer real Codex app-server regression suite for skill loop behavior.",
+  "host": "codex",
+  "lifecycle": "promoted",
+  "runner": "codex-app-server",
+  "scenario_ids": [
+    "skill-observe-evidence",
+    "skill-skip-transient",
+    "skill-observe-missing",
+    "skill-manage-approved-create",
+    "skill-curate-proposal",
+    "skill-manage-unapproved-noop",
+    "skill-manage-approved-stale",
+    "skill-manage-approved-restore",
+    "skill-author-draft"
+  ],
+  "rubrics": [
+    "eval-asset-quality",
+    "interface-loop-behavior"
+  ]
+}
