@@ -17,8 +17,8 @@ type HookSelection struct {
 }
 
 // promptDir returns the directory where mnemon prompt files (guide.md,
-// skill.md) are written and read. Resolution follows the same convention as
-// the --data-dir flag: MNEMON_DATA_DIR env var if set, else ~/.mnemon.
+// skill.md) are written and read. Resolution follows MNEMON_DATA_DIR if set,
+// else ~/.mnemon.
 func promptDir() (string, error) {
 	if env := os.Getenv("MNEMON_DATA_DIR"); env != "" {
 		return filepath.Join(env, "prompt"), nil

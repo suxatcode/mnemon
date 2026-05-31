@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/mnemon-dev/mnemon/internal/setup/assets"
 )
 
 func TestOpenClawRegisterPluginWritesSelection(t *testing.T) {
@@ -87,5 +90,19 @@ func TestRemoveOpenClawPluginEntryRemovesEmptyConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("expected empty config file removal, got err=%v", err)
+	}
+}
+
+func TestOpenClawPrimeHookResolvesMnemonDataDir(t *testing.T) {
+	handler := string(assets.OpenClawHookHandler)
+	for _, want := range []string{
+		"process.env.MNEMON_DATA_DIR",
+		"LEGACY_GUIDE_PATH",
+		"existsSync(scopedPath)",
+		"readFileSync(guidePath()",
+	} {
+		if !strings.Contains(handler, want) {
+			t.Fatalf("OpenClaw prime hook missing %q", want)
+		}
 	}
 }
