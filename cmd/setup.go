@@ -189,13 +189,15 @@ func installClaudeCode(env *setup.Environment) error {
 		setup.StatusOK(0, 0, "Skill", path)
 	}
 
-	// Phase 2: Prompt files (guide.md + skill.md → ~/.mnemon/prompt/)
+	// Phase 2: Prompt files (guide.md + skill.md → PromptDir)
 	fmt.Println("\n[2/3] Prompts")
+	var promptPath string
 	if path, err := setup.WritePromptFiles(); err != nil {
 		setup.StatusError(0, 0, "Prompts", err)
 		return err
 	} else {
 		setup.StatusOK(0, 0, "Prompts", path)
+		promptPath = path
 	}
 
 	if path, err := setup.ClaudeWriteHook(configDir, "prime.sh", assets.ClaudePrimeHook); err != nil {
@@ -253,10 +255,10 @@ func installClaudeCode(env *setup.Environment) error {
 	fmt.Println()
 	fmt.Println("Setup complete!")
 	fmt.Printf("  Hooks   %s\n", strings.Join(hookNames, ", "))
-	fmt.Printf("  Prompts ~/.mnemon/prompt/ (guide.md, skill.md)\n")
+	fmt.Printf("  Prompts %s/ (guide.md, skill.md)\n", promptPath)
 	fmt.Println()
 	fmt.Println("Start a new Claude Code session to activate.")
-	fmt.Println("Edit ~/.mnemon/prompt/guide.md to customize behavior.")
+	fmt.Printf("Edit %s/guide.md to customize behavior.\n", promptPath)
 	fmt.Println("Run 'mnemon setup --eject' to remove.")
 
 	return nil
@@ -316,11 +318,13 @@ func installCodex(env *setup.Environment) error {
 	}
 
 	fmt.Println("\n[2/4] Prompts")
+	var promptPath string
 	if path, err := setup.WritePromptFiles(); err != nil {
 		setup.StatusError(0, 0, "Prompts", err)
 		return err
 	} else {
 		setup.StatusOK(0, 0, "Prompts", path)
+		promptPath = path
 	}
 
 	fmt.Println("\n[3/4] Hooks")
@@ -355,7 +359,7 @@ func installCodex(env *setup.Environment) error {
 	fmt.Println("Setup complete!")
 	fmt.Printf("  Skill   %s/skills/mnemon/SKILL.md\n", configDir)
 	fmt.Printf("  Hooks   %s/hooks.json (SessionStart, UserPromptSubmit, Stop)\n", configDir)
-	fmt.Printf("  Prompts ~/.mnemon/prompt/ (guide.md, skill.md)\n")
+	fmt.Printf("  Prompts %s/ (guide.md, skill.md)\n", promptPath)
 	fmt.Println()
 	fmt.Println("Start a new Codex session to activate.")
 	fmt.Println("Run 'mnemon setup --eject --target codex' to remove.")
@@ -397,13 +401,15 @@ func installOpenClaw(env *setup.Environment) error {
 		setup.StatusOK(0, 0, "Skill", path)
 	}
 
-	// Phase 2: Prompt files (guide.md + skill.md → ~/.mnemon/prompt/)
+	// Phase 2: Prompt files (guide.md + skill.md → PromptDir)
 	fmt.Println("\n[2/4] Prompts")
+	var promptPath string
 	if path, err := setup.WritePromptFiles(); err != nil {
 		setup.StatusError(0, 0, "Prompts", err)
 		return err
 	} else {
 		setup.StatusOK(0, 0, "Prompts", path)
+		promptPath = path
 	}
 
 	// Phase 3: Internal hook (agent:bootstrap → inject guide)
@@ -448,10 +454,10 @@ func installOpenClaw(env *setup.Environment) error {
 	fmt.Printf("  Skill   %s/skills/mnemon/SKILL.md\n", configDir)
 	fmt.Printf("  Hook    %s/hooks/mnemon-prime/ (agent:bootstrap)\n", configDir)
 	fmt.Printf("  Plugin  %s/extensions/mnemon/ (hooks: %s)\n", configDir, strings.Join(hookNames, ", "))
-	fmt.Printf("  Prompts ~/.mnemon/prompt/ (guide.md, skill.md)\n")
+	fmt.Printf("  Prompts %s/ (guide.md, skill.md)\n", promptPath)
 	fmt.Println()
 	fmt.Println("Restart the OpenClaw gateway to activate.")
-	fmt.Println("Edit ~/.mnemon/prompt/guide.md to customize behavior.")
+	fmt.Printf("Edit %s/guide.md to customize behavior.\n", promptPath)
 	fmt.Println("Run 'mnemon setup --eject' to remove.")
 
 	return nil
@@ -513,23 +519,25 @@ func installNanobot(env *setup.Environment) error {
 		setup.StatusOK(0, 0, "Skill", path)
 	}
 
-	// Phase 2: Prompt files (guide.md + skill.md → ~/.mnemon/prompt/)
+	// Phase 2: Prompt files (guide.md + skill.md → PromptDir)
 	fmt.Println("\n[2/2] Prompts")
+	var promptPath string
 	if path, err := setup.WritePromptFiles(); err != nil {
 		setup.StatusError(0, 0, "Prompts", err)
 		return err
 	} else {
 		setup.StatusOK(0, 0, "Prompts", path)
+		promptPath = path
 	}
 
 	// Summary
 	fmt.Println()
 	fmt.Println("Setup complete!")
 	fmt.Printf("  Skill   %s/skills/mnemon/SKILL.md\n", configDir)
-	fmt.Printf("  Prompts ~/.mnemon/prompt/ (guide.md, skill.md)\n")
+	fmt.Printf("  Prompts %s/ (guide.md, skill.md)\n", promptPath)
 	fmt.Println()
 	fmt.Println("Restart Nanobot to activate the mnemon skill.")
-	fmt.Println("Edit ~/.mnemon/prompt/guide.md to customize behavior.")
+	fmt.Printf("Edit %s/guide.md to customize behavior.\n", promptPath)
 	fmt.Println("Run 'mnemon setup --eject' to remove.")
 
 	return nil

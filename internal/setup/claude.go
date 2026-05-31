@@ -16,28 +16,41 @@ type HookSelection struct {
 	Compact bool // PreCompact — save insights before context compaction
 }
 
-// WritePromptFiles writes guide.md and skill.md to ~/.mnemon/prompt/.
-func WritePromptFiles() (string, error) {
+// promptDir returns the directory where mnemon prompt files (guide.md,
+// skill.md) are written and read. Resolution follows the same convention as
+// the --data-dir flag: MNEMON_DATA_DIR env var if set, else ~/.mnemon.
+func promptDir() (string, error) {
+	if env := os.Getenv("MNEMON_DATA_DIR"); env != "" {
+		return filepath.Join(env, "prompt"), nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	promptDir := filepath.Join(home, ".mnemon", "prompt")
-	if err := os.MkdirAll(promptDir, 0755); err != nil {
+	return filepath.Join(home, ".mnemon", "prompt"), nil
+}
+
+// WritePromptFiles writes guide.md and skill.md under promptDir.
+func WritePromptFiles() (string, error) {
+	dir, err := promptDir()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
 
-	guidePath := filepath.Join(promptDir, "guide.md")
+	guidePath := filepath.Join(dir, "guide.md")
 	if err := os.WriteFile(guidePath, assets.ClaudeGuide, 0644); err != nil {
 		return "", err
 	}
 
-	skillPath := filepath.Join(promptDir, "skill.md")
+	skillPath := filepath.Join(dir, "skill.md")
 	if err := os.WriteFile(skillPath, assets.ClaudeSkill, 0644); err != nil {
 		return "", err
 	}
 
-	return promptDir, nil
+	return dir, nil
 }
 
 // ClaudeWriteSkill writes the mnemon skill to the config dir.
