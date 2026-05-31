@@ -1,77 +1,84 @@
-# Mnemon Harness
+# Mnemon Harness 公开 Beta
 
-Mnemon Harness 是 Mnemon modular self-evolution harness 的正式中文文档入口。
+`mnemon-harness` 是一个实验性 beta 层，用来把 host agent 接入项目本地的受治理状态。它目前只支持源码构建，并且有意和稳定的 `mnemon` CLI 保持分离。
 
-Mnemon 建立在 memory-driven 原则之上：持久 agent 应该把经验转化为可治理的
-长期状态，并用这些状态改进未来行为。
+稳定版 Mnemon 仍然专注于记忆与召回。Harness 在 Codex、Claude Code 等 host agent 周围加入 lifecycle exchange、evidence、proposal、audit、coordination topology 和审阅 TUI。
 
-Mnemon 不替换宿主 agent runtime，而是通过 hooks、skills、subagents、文件系统资产和环境配置，把外置 evolution loop 挂载到已有 agent 上。
+## 1. What It Is
 
-这里的核心判断是：当宿主已经拥有 ReAct loop 和可读扩展面时，大量行为层面的
-agent 能力都可以外置实现。Mnemon 把这些能力包装成 harness loops，而不是
-重新实现一个 runtime。
+Mnemon Harness 是一个 governed agent-state substrate。
 
-Mnemon 也不只是 skill 集合。它拥有自己的 harness runtime substrate：loop
-layout、ops、environment、state、reports、proposals、locks、queues、
-host surface projection，以及可选的 daemon scheduling。
+```text
+host agent
+  <-> Lifecycle Exchange
+      context out: .codex/.claude projection files
+      signal in:   .mnemon/events.jsonl
+  <-> governed project state
+      profile + goals + proposals + audit + coordination
+```
 
-## 核心定位
+`.codex`、`.claude` 等目录只是投影表面。真正的 canonical state 是 `.mnemon/` 下的 append-only event log 和受治理记录。
 
-| 主题 | 设计 |
-| --- | --- |
-| Modular Agent Harness | [中文](modular-agent/DESIGN.md) / [EN](../../harness/modular-agent/DESIGN.md) |
-| Loop Standard | [中文](LOOP_STANDARD.md) / [EN](../../harness/LOOP_STANDARD.md) |
-| Host Projection | [中文](HOST_PROJECTION.md) / [EN](../../harness/HOST_PROJECTION.md) |
-| Harness Roadmap | [中文](ROADMAP.md) / [EN](../../harness/ROADMAP.md) |
-| YC Evolving 设计哲学 | [中文](YC_EVOLVING_DESIGN_PHILOSOPHY.md) / [EN](../../harness/YC_EVOLVING_DESIGN_PHILOSOPHY.md) |
-| Lifecycle Control Plane | [中文](LIFECYCLE_CONTROL_PLANE.md) / [EN](../../harness/LIFECYCLE_CONTROL_PLANE.md) / [site](../../site/lifecycle-control-plane/index.html) |
-| AI-Native Lifecycle Runtime | [中文](LIFECYCLE_RUNTIME.md) / [EN](../../harness/LIFECYCLE_RUNTIME.md) / [site](../../site/lifecycle-runtime/index.html) |
-| System Flow | [中文](SYSTEM_FLOW.md) / [EN](../../harness/SYSTEM_FLOW.md) / [site](../../site/system-flow/index.html) |
-| Memory Loop | [中文](memory/DESIGN.md) / [EN](../../harness/memory/DESIGN.md) / [site](../../site/memory/index.html) |
-| Skill Loop | [中文](skill/DESIGN.md) / [EN](../../harness/skill/DESIGN.md) / [site](../../site/skill/index.html) |
-| Eval Loop | [中文](eval/DESIGN.md) / [EN](../../harness/eval/DESIGN.md) |
+## 2. Current Beta Surface
 
-## 可安装资产
+公开 beta 包含：
 
-| Harness Loop | 实现 |
-| --- | --- |
-| Memory Loop | [harness/loops/memory](../../../harness/loops/memory/README.md) |
-| Skill Loop | [harness/loops/skill](../../../harness/loops/skill/README.md) |
-| Eval Loop | [harness/loops/eval](../../../harness/loops/eval/README.md) |
+- lifecycle event append/status/daemon 命令
+- Codex 与 Claude Code projection surface
+- projection envelope 与 readback verification
+- profile 投影到 host context
+- goal、eval、proposal、apply、audit 命令
+- coordination topology 与 governed coordination apply
+- hosts、evidence、proposals、profile、coordination、trace 的 TUI 视图
+- 由显式用户动作和 cost gate 保护的 Codex runner check
 
-## 仓库布局
+它不承诺生产可用、自动 apply、完整个人/team/org scope composition，或完整多 agent runtime。
 
-| 目录 | 作用 |
-| --- | --- |
-| `harness/loops/` | Canonical、host-agnostic loop templates。 |
-| `harness/hosts/` | Host projection adapters，例如 Claude Code，以及后续 Codex 支持。 |
-| `harness/bindings/` | Loop x host binding definitions。 |
-| `harness/control/` | Shared control-plane contracts。 |
-| `harness/ops/` | 统一 install、status 和 uninstall 入口，用来组合 loops 与 hosts。 |
+## 3. Separation From Stable Mnemon
 
-## 词汇
+`mnemon-harness` 从 `./harness/cmd/mnemon-harness` 构建。
 
-| 概念 | 含义 |
-| --- | --- |
-| loop template | 一个可挂载 harness loop 的标准包结构。 |
-| GUIDE | Markdown policy，用来判断某个 loop 何时应该行动。 |
-| ops | 安装、status、validate 和 uninstall 操作。 |
-| hook | Prime、Remind、Nudge、Compact 等宿主生命周期时机。 |
-| protocol | 定义可复用操作的 Markdown skill。 |
-| subagent | 用于较重 review 或 consolidation 的后台维护 agent。 |
-| projection | 把 canonical loop assets 渲染到 `.claude`、`.codex` 或其他 runtime surface 的宿主特定过程。 |
-| host manifest | 机器可读记录，描述已投影 loops、paths、lifecycle mappings 和 host capabilities。 |
-| daemon | 可选的 harness maintenance runner，用于调度 loop 后台工作。 |
-| substrate | Mnemon 拥有的运行时基座，用于 loop state、ops、projection、scheduling 和跨 loop 协议。 |
-| system flow | 从裸 HostAgent 到 bootstrap、hooks、daemon reconcile、`.mnemon` state 和 host projection 的端到端反馈路径。 |
+稳定版 `mnemon` binary 不 import harness package。它只暴露一个很窄、默认关闭的 event seam，让项目可以写入 harness 之后会读取的事件。
 
-## 边界
+```sh
+MNEMON_HARNESS_EVENT_EMIT=1 mnemon remember "..." --cat note
+mnemon event emit custom.observed --payload '{"ok":true}'
+```
 
-宿主 agent 保留 ReAct loop、prompt assembly、tool routing、native skill runtime、权限模型和 UI。Mnemon 提供可挂载的 harness loop，让宿主 agent 获得更持久、更可自进化的能力。
+如果没有 opt-in 环境变量或显式 `mnemon event` 命令，稳定版 Mnemon 的行为不变。
 
-简言之：宿主 agent 是 execution runtime；Mnemon 是 harness runtime substrate。
+## 4. Try It
 
-Claude Code 是第一个 reference host，因为它提供 hooks、skills 和 subagents。这个架构的目标不局限于 Claude Code。
+构建两个 binary：
 
-`mnemon-daemon` 后续可以作为 harness loop 的后台维护 runner。它属于
-harness layer，不是宿主 agent runtime。
+```sh
+go build -o mnemon .
+go build -o mnemon-harness ./harness/cmd/mnemon-harness
+```
+
+运行 no-model smoke：
+
+```sh
+tmpdir="$(mktemp -d)"
+./mnemon-harness lifecycle --root "$tmpdir" init
+./mnemon-harness lifecycle --root "$tmpdir" event append --json '{
+  "schema_version": 1,
+  "id": "evt_harness_smoke_001",
+  "ts": "2026-05-31T00:00:00Z",
+  "type": "memory.hot_write_observed",
+  "loop": "memory",
+  "host": "codex",
+  "actor": "host-agent",
+  "source": "harness-smoke",
+  "correlation_id": "corr_harness_smoke",
+  "payload": {"reason": "smoke"}
+}'
+./mnemon-harness lifecycle --root "$tmpdir" status refresh
+./mnemon-harness ui --root "$tmpdir"
+```
+
+更多命令示例见 [USAGE.md](USAGE.md)。
+
+## 5. Release Boundary
+
+这个 beta 只发布最少量公开文档。内部计划、内部验证材料、生成站点 HTML 和详细未来计划不进入这个分支。

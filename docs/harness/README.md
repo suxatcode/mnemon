@@ -1,86 +1,95 @@
-# Mnemon Harness
+# Mnemon Harness Public Beta
 
-Mnemon Harness is the formal documentation entry for Mnemon's modular
-self-evolution harness.
+`mnemon-harness` is an experimental beta layer for attaching host agents to
+project-local governed state. It is source-build only and intentionally separate
+from the stable `mnemon` CLI.
 
-Mnemon is built around a memory-driven principle: durable agents should turn
-experience into governed long-term state, then use that state to improve future
-behavior.
+Stable Mnemon remains a memory and recall tool. The harness adds lifecycle
+exchange, evidence, proposals, audit, coordination topology, and a review TUI
+around host agents such as Codex and Claude Code.
 
-Mnemon is not trying to replace an agent runtime. It attaches external evolution
-loops to an existing host agent through standard extension points such as hooks,
-skills, subagents, filesystem assets, and environment configuration.
+## 1. What It Is
 
-The key assumption is that many behavior-level agent capabilities can be
-externalized when the host already has a ReAct loop and readable extension
-surfaces. Mnemon packages those capabilities as harness loops instead of
-building another runtime.
+Mnemon Harness is a governed agent-state substrate.
 
-Mnemon is also not only a set of skills. It owns a harness runtime substrate:
-loop layout, ops, environment, state, reports, proposals, locks, queues,
-projection into host surfaces, and optional daemon scheduling.
+```text
+host agent
+  <-> Lifecycle Exchange
+      context out: .codex/.claude projection files
+      signal in:   .mnemon/events.jsonl
+  <-> governed project state
+      profile + goals + proposals + audit + coordination
+```
 
-## Core Positioning
+The host directories are projection surfaces. Canonical state lives in the
+append-only event log and governed records under `.mnemon/`.
 
-| Topic | Design |
-| --- | --- |
-| Modular Agent Harness | [EN](modular-agent/DESIGN.md) / [中文](../zh/harness/modular-agent/DESIGN.md) |
-| Loop Standard | [EN](LOOP_STANDARD.md) / [中文](../zh/harness/LOOP_STANDARD.md) |
-| Host Projection | [EN](HOST_PROJECTION.md) / [中文](../zh/harness/HOST_PROJECTION.md) |
-| Harness Roadmap | [EN](ROADMAP.md) / [中文](../zh/harness/ROADMAP.md) |
-| YC Evolving Design Philosophy | [EN](YC_EVOLVING_DESIGN_PHILOSOPHY.md) / [中文](../zh/harness/YC_EVOLVING_DESIGN_PHILOSOPHY.md) |
-| Lifecycle Control Plane | [EN](LIFECYCLE_CONTROL_PLANE.md) / [中文](../zh/harness/LIFECYCLE_CONTROL_PLANE.md) / [site](../site/lifecycle-control-plane/index.html) |
-| AI-Native Lifecycle Runtime | [EN](LIFECYCLE_RUNTIME.md) / [中文](../zh/harness/LIFECYCLE_RUNTIME.md) / [site](../site/lifecycle-runtime/index.html) |
-| System Flow | [EN](SYSTEM_FLOW.md) / [中文](../zh/harness/SYSTEM_FLOW.md) / [site](../site/system-flow/index.html) |
-| Memory Loop | [EN](memory/DESIGN.md) / [中文](../zh/harness/memory/DESIGN.md) / [site](../site/memory/index.html) |
-| Skill Loop | [EN](skill/DESIGN.md) / [中文](../zh/harness/skill/DESIGN.md) / [site](../site/skill/index.html) |
-| Eval Loop | [EN](eval/DESIGN.md) / [中文](../zh/harness/eval/DESIGN.md) |
+## 2. Current Beta Surface
 
-## Installable Assets
+The public beta includes:
 
-| Harness Loop | Implementation |
-| --- | --- |
-| Memory Loop | [harness/loops/memory](../../harness/loops/memory/README.md) |
-| Skill Loop | [harness/loops/skill](../../harness/loops/skill/README.md) |
-| Eval Loop | [harness/loops/eval](../../harness/loops/eval/README.md) |
+- lifecycle event append/status/daemon commands
+- Codex and Claude Code projection surfaces
+- projection envelope and readback verification
+- profile projection into host context
+- goal, eval, proposal, apply, and audit commands
+- coordination topology and governed coordination apply
+- TUI views for hosts, evidence, proposals, profile, coordination, and traces
+- Codex runner checks behind explicit user action and cost gates
 
-## Repository Layout
+It does not promise production readiness, automatic apply, broad org/team scope
+composition, or a full multi-agent runtime.
 
-| Directory | Role |
-| --- | --- |
-| `harness/loops/` | Canonical host-agnostic loop templates. |
-| `harness/hosts/` | Host projection adapters such as Claude Code and future Codex support. |
-| `harness/bindings/` | Loop x host binding definitions. |
-| `harness/control/` | Shared control-plane contracts. |
-| `harness/ops/` | Shared install, status, and uninstall entrypoints that compose loops with hosts. |
+## 3. Separation From Stable Mnemon
 
-## Vocabulary
+`mnemon-harness` is built from `./harness/cmd/mnemon-harness`.
 
-| Concept | Meaning |
-| --- | --- |
-| loop template | Standard package shape for one attachable harness loop. |
-| GUIDE | Markdown policy for deciding when a loop should act. |
-| ops | Installation, status, validation, and uninstall operations. |
-| hook | Host lifecycle timing such as Prime, Remind, Nudge, and Compact. |
-| protocol | Markdown skills that define reusable operations. |
-| subagent | Background maintenance agent for heavier review or consolidation. |
-| projection | Host-specific rendering of canonical loop assets into `.claude`, `.codex`, or another runtime surface. |
-| host manifest | Machine-readable record of projected loops, paths, lifecycle mappings, and host capabilities. |
-| daemon | Optional harness maintenance runner for scheduled loop work. |
-| substrate | Mnemon-owned runtime base for loop state, ops, projection, scheduling, and cross-loop protocols. |
-| system flow | End-to-end feedback path from a bare HostAgent through bootstrap, hooks, daemon reconcile, `.mnemon` state, and host projection. |
+The stable `mnemon` binary does not import harness packages. It exposes only a
+small default-off event seam so a project can write events that the harness may
+later read.
 
-## Boundary
+```sh
+MNEMON_HARNESS_EVENT_EMIT=1 mnemon remember "..." --cat note
+mnemon event emit custom.observed --payload '{"ok":true}'
+```
 
-The host agent keeps the ReAct loop, prompt assembly, tool routing, native skill
-runtime, permission model, and UI. Mnemon provides attachable harness loops
-that make the host agent more durable and self-improving.
+Without the opt-in environment variable or explicit `mnemon event` command,
+stable Mnemon behavior is unchanged.
 
-In short: the host agent is the execution runtime; Mnemon is the harness runtime
-substrate.
+## 4. Try It
 
-Claude Code is the first reference host because it exposes hooks, skills, and
-subagents. The architecture is intentionally broader than Claude Code.
+Build both binaries:
 
-`mnemon-daemon` may later provide a background maintenance runner for harness
-loops. It is part of the harness layer, not a host agent runtime.
+```sh
+go build -o mnemon .
+go build -o mnemon-harness ./harness/cmd/mnemon-harness
+```
+
+Run the no-model smoke path:
+
+```sh
+tmpdir="$(mktemp -d)"
+./mnemon-harness lifecycle --root "$tmpdir" init
+./mnemon-harness lifecycle --root "$tmpdir" event append --json '{
+  "schema_version": 1,
+  "id": "evt_harness_smoke_001",
+  "ts": "2026-05-31T00:00:00Z",
+  "type": "memory.hot_write_observed",
+  "loop": "memory",
+  "host": "codex",
+  "actor": "host-agent",
+  "source": "harness-smoke",
+  "correlation_id": "corr_harness_smoke",
+  "payload": {"reason": "smoke"}
+}'
+./mnemon-harness lifecycle --root "$tmpdir" status refresh
+./mnemon-harness ui --root "$tmpdir"
+```
+
+See [USAGE.md](USAGE.md) for command examples.
+
+## 5. Release Boundary
+
+This beta intentionally ships minimal public documentation. Internal planning,
+internal validation artifacts, generated site HTML, and detailed future plans are
+not part of this branch.
