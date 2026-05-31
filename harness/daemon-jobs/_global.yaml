@@ -1,0 +1,4 @@
+global_budget:
+  daily_cost_usd: 1.00
+  daily_real_turns: 20
+  enabled: true
