@@ -120,6 +120,18 @@ to `.pi/`. The extension maps Mnemon's lifecycle reminders onto Pi events
 (`resources_discover`, `before_agent_start`, `agent_end`,
 `session_before_compact`). Start a new Pi session or run `/reload` to activate.
 
+### [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+
+```bash
+mnemon setup --target hermes --yes
+```
+
+One command deploys the mnemon skill, prompt files, and Hermes shell hooks to
+`~/.hermes/`. The integration uses Hermes' native lifecycle hooks:
+`on_session_start`, `pre_llm_call`, `post_llm_call`, and optional
+`on_session_finalize`. Hermes may prompt once to approve the installed shell
+hooks.
+
 ### [NanoClaw](https://github.com/qwibitai/nanoclaw)
 
 NanoClaw runs agents inside Linux containers. Use the `/add-mnemon` skill to integrate:

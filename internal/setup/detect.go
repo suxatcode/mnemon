@@ -9,8 +9,8 @@ import (
 
 // Environment describes a detected LLM CLI environment.
 type Environment struct {
-	Name      string // "claude-code", "codex", "openclaw", "nanobot", "pi"
-	Display   string // "Claude Code", "Codex", "OpenClaw", "Nanobot", "Pi"
+	Name      string // "claude-code", "codex", "openclaw", "nanobot", "pi", "hermes"
+	Display   string // "Claude Code", "Codex", "OpenClaw", "Nanobot", "Pi", "Hermes Agent"
 	Detected  bool   // CLI binary or global config dir found
 	BinPath   string // exec.LookPath result
 	Installed bool   // mnemon integration present at ConfigDir
@@ -34,6 +34,7 @@ func DetectEnvironments(global bool) []Environment {
 		detectOpenClaw(global),
 		detectNanobot(global),
 		detectPi(global),
+		detectHermes(),
 	}
 }
 
@@ -228,6 +229,38 @@ func detectPi(global bool) Environment {
 		env.BinPath = binPath
 	}
 	if _, err := os.Stat(globalDir); err == nil {
+		env.Detected = true
+	}
+
+	skillPath := filepath.Join(configDir, "skills", "mnemon", "SKILL.md")
+	if _, err := os.Stat(skillPath); err == nil {
+		env.Installed = true
+	}
+
+	if env.BinPath != "" {
+		if out, err := exec.Command(env.BinPath, "--version").Output(); err == nil {
+			env.Version = cleanVersion(strings.TrimSpace(string(out)))
+		}
+	}
+
+	return env
+}
+
+func detectHermes() Environment {
+	home := HomeDir()
+	configDir := filepath.Join(home, ".hermes")
+
+	env := Environment{
+		Name:      "hermes",
+		Display:   "Hermes Agent",
+		ConfigDir: configDir,
+	}
+
+	if binPath, err := exec.LookPath("hermes"); err == nil {
+		env.Detected = true
+		env.BinPath = binPath
+	}
+	if _, err := os.Stat(configDir); err == nil {
 		env.Detected = true
 	}
 

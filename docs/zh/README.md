@@ -111,6 +111,17 @@ mnemon setup --target pi --yes
 （`resources_discover`、`before_agent_start`、`agent_end`、
 `session_before_compact`）。启动新的 Pi session 或运行 `/reload` 即可激活。
 
+### [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+
+```bash
+mnemon setup --target hermes --yes
+```
+
+一条命令将 mnemon skill、prompt 文件和 Hermes shell hooks 部署到
+`~/.hermes/`。该集成使用 Hermes 原生生命周期 hooks：
+`on_session_start`、`pre_llm_call`、`post_llm_call`，以及可选的
+`on_session_finalize`。Hermes 可能会在首次运行时提示批准这些 shell hooks。
+
 ### [NanoClaw](https://github.com/qwibitai/nanoclaw)
 
 NanoClaw 在 Linux 容器内运行智能体。使用 `/add-mnemon` 技能集成：

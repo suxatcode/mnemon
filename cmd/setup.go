@@ -24,13 +24,15 @@ var setupCmd = &cobra.Command{
 
 By default, installs to project-local config (.claude/, .codex/, .openclaw/, .nanobot/, .pi/).
 Use --global to install to user-wide config (~/.claude/, ~/.codex/, ~/.openclaw/, ~/.nanobot/workspace/, ~/.pi/agent/).
+Hermes Agent uses its native user config at ~/.hermes/.
 
-Supported environments: Claude Code, Codex, OpenClaw, Nanobot, Pi.
+Supported environments: Claude Code, Codex, OpenClaw, Nanobot, Pi, Hermes Agent.
 
 Examples:
   mnemon setup                              # Interactive: project-local install
   mnemon setup --global                     # Interactive: user-wide install
   mnemon setup --target claude-code         # Non-interactive: Claude Code only
+  mnemon setup --target hermes              # Non-interactive: Hermes Agent only
   mnemon setup --eject                      # Interactive: remove integrations
   mnemon setup --eject --target claude-code # Non-interactive: remove Claude Code only
   mnemon setup --yes                        # Auto-confirm all prompts`,
@@ -38,7 +40,7 @@ Examples:
 }
 
 func init() {
-	setupCmd.Flags().StringVar(&setupTarget, "target", "", "target environment (claude-code, codex, openclaw, nanobot, pi)")
+	setupCmd.Flags().StringVar(&setupTarget, "target", "", "target environment (claude-code, codex, openclaw, nanobot, pi, hermes)")
 	setupCmd.Flags().BoolVar(&setupEject, "eject", false, "remove mnemon integrations")
 	setupCmd.Flags().BoolVar(&setupYes, "yes", false, "auto-confirm all prompts (CI-friendly)")
 	setupCmd.Flags().BoolVar(&setupGlobal, "global", false, "install to user-wide config instead of project-local config")
@@ -46,8 +48,8 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	if setupTarget != "" && setupTarget != "claude-code" && setupTarget != "codex" && setupTarget != "openclaw" && setupTarget != "nanobot" && setupTarget != "pi" {
-		return fmt.Errorf("invalid target %q (must be claude-code, codex, openclaw, nanobot, or pi)", setupTarget)
+	if setupTarget != "" && setupTarget != "claude-code" && setupTarget != "codex" && setupTarget != "openclaw" && setupTarget != "nanobot" && setupTarget != "pi" && setupTarget != "hermes" {
+		return fmt.Errorf("invalid target %q (must be claude-code, codex, openclaw, nanobot, pi, or hermes)", setupTarget)
 	}
 
 	envs := setup.DetectEnvironments(setupGlobal)
@@ -83,7 +85,7 @@ func runInstallFlow(envs []setup.Environment) error {
 
 	if len(detected) == 0 {
 		fmt.Println("\nNo supported LLM CLI environments detected.")
-		fmt.Println("Install Claude Code, Codex, OpenClaw, Nanobot, or Pi, then run 'mnemon setup' again.")
+		fmt.Println("Install Claude Code, Codex, OpenClaw, Nanobot, Pi, or Hermes Agent, then run 'mnemon setup' again.")
 		return nil
 	}
 
@@ -133,6 +135,8 @@ func installEnv(env *setup.Environment) error {
 		err = installNanobot(env)
 	case "pi":
 		err = installPi(env)
+	case "hermes":
+		err = installHermes(env)
 	}
 	if err != nil {
 		return err
@@ -606,6 +610,118 @@ func installPi(env *setup.Environment) error {
 	return nil
 }
 
+// ─── Hermes Agent ───────────────────────────────────────────────────
+
+func installHermes(env *setup.Environment) error {
+	configDir := env.ConfigDir
+
+	fmt.Printf("\nSetting up Hermes Agent (%s)...\n", configDir)
+
+	fmt.Println("\n[1/4] Skill")
+	if path, err := setup.HermesWriteSkill(configDir); err != nil {
+		setup.StatusError(0, 0, "Skill", err)
+		return err
+	} else {
+		setup.StatusOK(0, 0, "Skill", path)
+	}
+
+	fmt.Println("\n[2/4] Prompts")
+	var promptPath string
+	if path, err := setup.WritePromptFiles(); err != nil {
+		setup.StatusError(0, 0, "Prompts", err)
+		return err
+	} else {
+		setup.StatusOK(0, 0, "Prompts", path)
+		promptPath = path
+	}
+
+	fmt.Println("\n[3/4] Hooks")
+	sel := selectHermesOptionalHooks()
+	if path, err := setup.HermesWriteHook(configDir, "prime.sh", assets.HermesPrimeHook); err != nil {
+		setup.StatusError(0, 0, "Hook: prime", err)
+		return err
+	} else {
+		setup.StatusOK(0, 0, "Hook: prime", path)
+	}
+	if sel.Remind {
+		if path, err := setup.HermesWriteHook(configDir, "remind.sh", assets.HermesRemindHook); err != nil {
+			setup.StatusError(0, 0, "Hook: remind", err)
+			return err
+		} else {
+			setup.StatusOK(0, 0, "Hook: remind", path)
+		}
+	}
+	if sel.Nudge {
+		if path, err := setup.HermesWriteHook(configDir, "nudge.sh", assets.HermesNudgeHook); err != nil {
+			setup.StatusError(0, 0, "Hook: nudge", err)
+			return err
+		} else {
+			setup.StatusOK(0, 0, "Hook: nudge", path)
+		}
+	}
+	if sel.Compact {
+		if path, err := setup.HermesWriteHook(configDir, "compact.sh", assets.HermesCompactHook); err != nil {
+			setup.StatusError(0, 0, "Hook: compact", err)
+			return err
+		} else {
+			setup.StatusOK(0, 0, "Hook: compact", path)
+		}
+	}
+
+	fmt.Println("\n[4/4] Config")
+	if path, err := setup.HermesRegisterHooks(configDir, sel); err != nil {
+		setup.StatusError(0, 0, "Config", err)
+		return err
+	} else {
+		setup.StatusUpdated(0, 0, "Config", path)
+	}
+
+	var hookNames []string
+	hookNames = append(hookNames, "prime")
+	if sel.Remind {
+		hookNames = append(hookNames, "remind")
+	}
+	if sel.Nudge {
+		hookNames = append(hookNames, "nudge")
+	}
+	if sel.Compact {
+		hookNames = append(hookNames, "compact")
+	}
+
+	fmt.Println()
+	fmt.Println("Setup complete!")
+	fmt.Printf("  Skill   %s/skills/mnemon/SKILL.md\n", configDir)
+	fmt.Printf("  Hooks   %s/config.yaml (%s)\n", configDir, strings.Join(hookNames, ", "))
+	fmt.Printf("  Prompts %s/ (guide.md, skill.md)\n", promptPath)
+	fmt.Println()
+	fmt.Println("Start a new Hermes session to activate.")
+	fmt.Println("Hermes may prompt once to approve the installed shell hooks.")
+	fmt.Println("Run 'mnemon setup --eject --target hermes' to remove.")
+
+	return nil
+}
+
+func selectHermesOptionalHooks() setup.HookSelection {
+	sel := setup.HookSelection{Remind: true, Nudge: true, Compact: false}
+
+	if setupYes || !setup.IsInteractive() {
+		return sel
+	}
+
+	opts := []string{
+		"Remind  — recall relevant memories before each LLM call (recommended)",
+		"Nudge   — queue remember guidance after each LLM response",
+		"Compact — queue preservation guidance on session finalization",
+	}
+	defs := []bool{true, true, false}
+	choices := setup.SelectMulti("Select hooks to enable", opts, defs)
+
+	sel.Remind = choices[0]
+	sel.Nudge = choices[1]
+	sel.Compact = choices[2]
+	return sel
+}
+
 // ─── Eject ──────────────────────────────────────────────────────────
 
 func runEjectFlow(envs []setup.Environment) error {
@@ -701,6 +817,13 @@ func ejectEnv(env *setup.Environment) error {
 
 	case "pi":
 		errs := setup.PiEject(env.ConfigDir)
+		ejectMarkdown("AGENTS.md", "Remove memory guidance from ./AGENTS.md?")
+		if len(errs) > 0 {
+			return errs[0]
+		}
+
+	case "hermes":
+		errs := setup.HermesEject(env.ConfigDir)
 		ejectMarkdown("AGENTS.md", "Remove memory guidance from ./AGENTS.md?")
 		if len(errs) > 0 {
 			return errs[0]
