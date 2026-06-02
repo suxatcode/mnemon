@@ -14,8 +14,11 @@ type Reconciler struct {
 	rebase map[string]int // per-CorrelationID deferral count; PERSISTS across RunOnce calls (Invariant #10)
 }
 
+// NewReconciler seeds its cursor from the durable decision log (Store.MaxDecidedSeq), so a process
+// restart resumes after the last consumed event instead of re-reading the log from 0 and re-deciding
+// already-accepted events (which would pollute pull feedback). The decision log is the cursor.
 func NewReconciler(s *kernel.Store, k *kernel.Kernel) *Reconciler {
-	return &Reconciler{store: s, kernel: k, rebase: map[string]int{}}
+	return &Reconciler{store: s, kernel: k, cursor: s.MaxDecidedSeq(), rebase: map[string]int{}}
 }
 
 // opFromEvent builds the KernelOp from a TRUSTED event. Actor and read-set come from the event envelope

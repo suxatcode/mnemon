@@ -138,6 +138,16 @@ func (s *Store) DecisionCount() int {
 	return n
 }
 
+// MaxDecidedSeq returns the highest event ingest_seq that already has a decision (0 if none, or if only
+// direct non-event ops have been applied — those carry ingest_seq 0). The decision log IS the
+// reconciler's durable cursor: a decision row means that event was consumed, so a fresh Reconciler
+// resumes from here instead of re-reading from 0 (Invariant #9 — exactly-once over a contiguous prefix).
+func (s *Store) MaxDecidedSeq() int64 {
+	var n int64
+	_ = s.db.QueryRow(`SELECT COALESCE(MAX(ingest_seq), 0) FROM decisions`).Scan(&n)
+	return n
+}
+
 // DecisionsForActor returns this actor's deferred decisions (the pull-feedback source, Invariant #8).
 func (s *Store) DecisionsForActor(actor contract.ActorID) ([]contract.Decision, error) {
 	rows, err := s.db.Query(`SELECT payload FROM decisions WHERE actor=? AND status='deferred' ORDER BY ingest_seq, rowid`, string(actor))
