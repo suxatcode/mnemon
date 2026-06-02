@@ -43,9 +43,12 @@ func TestPullFeedbackOrderedByIngestSeq(t *testing.T) {
 	}
 }
 
-// #4 (coverage): when two deferred decisions for an actor share an IngestSeq (e.g. direct non-event
-// Applies, all IngestSeq=0), the ORDER BY's `, rowid` tiebreak must give insertion order — not the
-// undefined order of a bare ORDER BY ingest_seq. OpIDs are chosen so alphabetical != insertion order.
+// #4 (contract): when two deferred decisions for an actor share an IngestSeq (e.g. direct non-event
+// Applies, all IngestSeq=0), pull feedback must come back in insertion order. The `, rowid` tiebreak in
+// DecisionsForActor makes this deterministic-by-construction rather than relying on the engine's natural
+// scan order. NOTE: this locks the OBSERVABLE order contract; it does not falsifiably isolate the clause
+// (modernc/sqlite's natural scan also happens to be rowid order today), but it guards the contract if a
+// future engine/planner change reorders ties. OpIDs are chosen so alphabetical != insertion order.
 func TestPullFeedbackTiebreakIsInsertionOrder(t *testing.T) {
 	s, k := newRecon(t)
 	X := contract.ResourceRef{Kind: "memory", ID: "X"}

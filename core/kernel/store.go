@@ -3,6 +3,7 @@ package kernel
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/mnemon-dev/mnemon/core/contract"
@@ -25,9 +26,18 @@ func OpenStore(path string) (*Store, error) {
 	for _, s := range []string{
 		`CREATE TABLE IF NOT EXISTS resources (kind TEXT, id TEXT, version INTEGER NOT NULL, fields TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(kind,id));`,
 		`CREATE TABLE IF NOT EXISTS events (ingest_seq INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL);`,
-		`CREATE TABLE IF NOT EXISTS decisions (decision_id TEXT PRIMARY KEY, op_id TEXT, ingest_seq INTEGER, actor TEXT, correlation_id TEXT, status TEXT, payload TEXT NOT NULL);`,
+		`CREATE TABLE IF NOT EXISTS decisions (decision_id TEXT PRIMARY KEY, op_id TEXT, ingest_seq INTEGER, actor TEXT, correlation_id TEXT, next_action TEXT, status TEXT, payload TEXT NOT NULL);`,
 	} {
 		if _, err := db.Exec(s); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
+	// Additive migrations for columns introduced after the initial schema, so OpenStore tolerates a
+	// decisions table created by older code (CREATE TABLE IF NOT EXISTS is a no-op on an existing table).
+	// ALTER ... ADD COLUMN is idempotent here: a "duplicate column" error (fresh DB already has it) is ignored.
+	for _, col := range []string{"correlation_id TEXT", "next_action TEXT"} {
+		if _, err := db.Exec(`ALTER TABLE decisions ADD COLUMN ` + col); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			db.Close()
 			return nil, err
 		}
@@ -92,16 +102,16 @@ func (t *Tx) ReadVersion(ref contract.ResourceRef) (contract.Version, error) {
 // AppendDecisionTx writes a decision INSIDE a caller's txn (used for accepted ops — crash-safe atomicity, Invariant #7).
 func (t *Tx) AppendDecisionTx(d contract.Decision) error {
 	b, _ := json.Marshal(d)
-	_, err := t.tx.Exec(`INSERT INTO decisions (decision_id,op_id,ingest_seq,actor,correlation_id,status,payload) VALUES (?,?,?,?,?,?,?)`,
-		d.DecisionID, d.OpID, d.IngestSeq, string(d.Actor), d.CorrelationID, string(d.Status), string(b))
+	_, err := t.tx.Exec(`INSERT INTO decisions (decision_id,op_id,ingest_seq,actor,correlation_id,next_action,status,payload) VALUES (?,?,?,?,?,?,?,?)`,
+		d.DecisionID, d.OpID, d.IngestSeq, string(d.Actor), d.CorrelationID, d.NextAction, string(d.Status), string(b))
 	return err
 }
 
 // AppendDecision writes a decision in its own txn (used for non-accepted ops — nothing to be atomic with).
 func (s *Store) AppendDecision(d contract.Decision) error {
 	b, _ := json.Marshal(d)
-	_, err := s.db.Exec(`INSERT INTO decisions (decision_id,op_id,ingest_seq,actor,correlation_id,status,payload) VALUES (?,?,?,?,?,?,?)`,
-		d.DecisionID, d.OpID, d.IngestSeq, string(d.Actor), d.CorrelationID, string(d.Status), string(b))
+	_, err := s.db.Exec(`INSERT INTO decisions (decision_id,op_id,ingest_seq,actor,correlation_id,next_action,status,payload) VALUES (?,?,?,?,?,?,?,?)`,
+		d.DecisionID, d.OpID, d.IngestSeq, string(d.Actor), d.CorrelationID, d.NextAction, string(d.Status), string(b))
 	return err
 }
 func (s *Store) AppendEvent(ev contract.Event) (int64, error) {
@@ -148,14 +158,15 @@ func (s *Store) MaxDecidedSeq() int64 {
 	return n
 }
 
-// DeferralCount returns how many deferred decisions a CorrelationID has accumulated in the durable log.
+// DeferralCount returns how many REBASE deferrals a CorrelationID has accumulated in the durable log.
 // It is the liveness-escalation counter (Invariant #10) derived from the decision log rather than held
-// in memory, so escalation survives a process restart exactly as the cursor does. Under rebase mode every
-// pre-escalation deferral carries NextAction=rebase, so counting all deferrals for the correlation is
-// behaviourally identical to counting only rebase-deferrals, with one fewer column to maintain.
+// in memory, so escalation survives a process restart exactly as the cursor does. It counts ONLY
+// next_action='rebase' deferrals — exactly the predicate the removed in-memory map used — so an unrelated
+// human_review deferral (from a defer_to_human / auto_merge_disjoint pass that shares the CorrelationID)
+// does NOT pre-seed the count and trigger premature escalation.
 func (s *Store) DeferralCount(correlationID string) int {
 	var n int
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM decisions WHERE correlation_id=? AND status='deferred'`, correlationID).Scan(&n)
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM decisions WHERE correlation_id=? AND status='deferred' AND next_action='rebase'`, correlationID).Scan(&n)
 	return n
 }
 
