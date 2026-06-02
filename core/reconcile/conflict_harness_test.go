@@ -28,7 +28,7 @@ func newRecon(t *testing.T) (*kernel.Store, *kernel.Kernel) {
 	return s, k
 }
 func casModes() contract.Modes {
-	return contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzPermissive}
+	return contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict}
 }
 
 // seedCreate / seedUpdate are TRUSTED setup writes (already-accepted state), applied directly via the kernel.
@@ -145,7 +145,7 @@ func TestArmB_ReadStaleVsWriteCAS(t *testing.T) {
 	{
 		s, k := build(t)
 		appendProposal(t, s, prop())
-		ds := NewReconciler(s, k).RunOnce(contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzPermissive})
+		ds := NewReconciler(s, k).RunOnce(contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict})
 		if len(ds) != 1 || ds[0].Status != contract.Deferred {
 			t.Fatalf("read_set: want 1 Deferred, got %+v", ds)
 		}
@@ -161,7 +161,7 @@ func TestArmB_ReadStaleVsWriteCAS(t *testing.T) {
 	{
 		s, k := build(t)
 		appendProposal(t, s, prop())
-		ds := NewReconciler(s, k).RunOnce(contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzPermissive})
+		ds := NewReconciler(s, k).RunOnce(contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict})
 		if len(ds) != 1 || ds[0].Status != contract.Accepted {
 			t.Fatalf("write_cas: want 1 Accepted, got %+v", ds)
 		}
@@ -196,7 +196,7 @@ func TestArmE_ReadSetGranularityPerResource(t *testing.T) {
 
 	// proposal: OpUpdate M based_on 1, ReadSet=[G@5] (per-resource; H deliberately omitted)
 	appendProposal(t, s, updateProposal("ee", "codex", "ce", M, 1, map[string]any{"content": "m1"}, []contract.ResourceVersion{{Ref: G, Version: 5}}))
-	ds := NewReconciler(s, k).RunOnce(contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzPermissive})
+	ds := NewReconciler(s, k).RunOnce(contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict})
 	if len(ds) != 1 || ds[0].Status != contract.Accepted {
 		t.Fatalf("per-resource read-set: G unchanged so proposal must be Accepted despite H changing; got %+v", ds)
 	}

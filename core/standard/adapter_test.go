@@ -54,7 +54,7 @@ func TestSecondAdapterParticipatesInReconcile(t *testing.T) {
 	ref := contract.ResourceRef{Kind: "memory", ID: "m1"}
 	seed := k.Apply(contract.KernelOp{OpID: "seed", Actor: "ext", Writes: []contract.ResourceWrite{
 		{Ref: ref, Kind: contract.OpCreate, Fields: map[string]any{"content": "v0"}}}},
-		contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzPermissive})
+		contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict})
 	if seed.Status != contract.Accepted {
 		t.Fatalf("seed: %s", seed.Reason)
 	}
@@ -70,7 +70,7 @@ func TestSecondAdapterParticipatesInReconcile(t *testing.T) {
 	}
 
 	ds := reconcile.NewReconciler(s, k).RunOnce(
-		contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzPermissive})
+		contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict})
 	if len(ds) != 1 || ds[0].Status != contract.Accepted {
 		t.Fatalf("adapter proposal must reconcile to an Accepted Decision, got %+v", ds)
 	}

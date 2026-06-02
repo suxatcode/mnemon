@@ -114,7 +114,12 @@ const (
 	IsolationProjectionReadSet = "projection_read_set"
 	// "serializable" intentionally ABSENT until P1 evidence shows it differs from projection_read_set (§10).
 
-	AuthzStrict     = "strict"
+	AuthzStrict = "strict" // enforce rules; violation -> Rejected. The only IMPLEMENTED authz mode.
+	// Reserved — NOT in AuthzCatalog until implemented with real, distinct teeth (mirrors `serializable`).
+	// The kernel currently enforces rules UNCONDITIONALLY (= strict, fail-closed), so advertising these as
+	// selectable would promise behavior it cannot deliver — and selecting dry_run would still commit.
+	// Deferred semantics if/when built: permissive & audit_only would both be "allow-despite-violation"
+	// (byte-identical — the anti-pattern that dropped `serializable`); dry_run = validate-but-never-commit.
 	AuthzPermissive = "permissive"
 	AuthzAuditOnly  = "audit_only"
 	AuthzDryRun     = "dry_run"
@@ -124,5 +129,5 @@ const (
 var (
 	ConflictCatalog  = map[string]bool{ConflictReject: true, ConflictRebase: true, ConflictAutoMergeDisjoint: true, ConflictDeferToHuman: true}
 	IsolationCatalog = map[string]bool{IsolationWriteCAS: true, IsolationProjectionReadSet: true}
-	AuthzCatalog     = map[string]bool{AuthzStrict: true, AuthzPermissive: true, AuthzAuditOnly: true, AuthzDryRun: true}
+	AuthzCatalog     = map[string]bool{AuthzStrict: true} // only strict is implemented; the rest are reserved (see consts above)
 )

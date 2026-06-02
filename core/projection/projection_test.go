@@ -19,7 +19,7 @@ func p1Rules() kernel.AuthorityRules {
 	}}
 }
 func writeCASModes() contract.Modes {
-	return contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzPermissive}
+	return contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict}
 }
 func newStoreKernel(t *testing.T) (*kernel.Store, *kernel.Kernel) {
 	t.Helper()

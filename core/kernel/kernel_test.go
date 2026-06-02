@@ -10,7 +10,7 @@ func permissiveRules() AuthorityRules {
 	return AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"user": {"memory", "goal", "skill"}}}
 }
 func p0Modes() contract.Modes {
-	return contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzPermissive}
+	return contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict}
 }
 func mustCreate(t *testing.T, k *Kernel, kind contract.ResourceKind, id contract.ResourceID, f map[string]any) {
 	t.Helper()
