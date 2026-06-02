@@ -32,11 +32,15 @@ type ResourceWrite struct {
 }
 
 // KernelOp is ALL-OR-NOTHING (Invariant #5). ReadSet = versions the proposer READ (Invariant #6).
+// IngestSeq is the triggering event's durable seq (events.rowid), stamped by the reconciler from a
+// TRUSTED source; 0 for a direct (non-event) Apply. It is the event<->decision audit link and the basis
+// for the reconciler's durable cursor.
 type KernelOp struct {
-	OpID    string
-	Actor   ActorID
-	Writes  []ResourceWrite
-	ReadSet []ResourceVersion
+	OpID      string
+	Actor     ActorID
+	Writes    []ResourceWrite
+	ReadSet   []ResourceVersion
+	IngestSeq int64
 }
 
 // ---- decisions ----

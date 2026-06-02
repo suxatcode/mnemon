@@ -32,7 +32,7 @@ func opFromEvent(ev contract.Event) contract.KernelOp {
 		b, _ := json.Marshal(raw)
 		_ = json.Unmarshal(b, &writes)
 	}
-	return contract.KernelOp{OpID: ev.ID, Actor: ev.Actor, Writes: writes, ReadSet: ev.BasedOn}
+	return contract.KernelOp{OpID: ev.ID, Actor: ev.Actor, Writes: writes, ReadSet: ev.BasedOn, IngestSeq: ev.IngestSeq}
 }
 
 func (r *Reconciler) RunOnce(modes contract.Modes) []contract.Decision {

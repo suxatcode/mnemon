@@ -23,7 +23,7 @@ func (k *Kernel) Store() *Store { return k.store }
 // multi-resource is all-or-nothing (Invariant #5). It persists exactly one terminal decision (Invariant #7):
 // the accept is written INSIDE the writes txn (crash-safe); non-accepts are written in their own txn.
 func (k *Kernel) Apply(op contract.KernelOp, m contract.Modes) contract.Decision {
-	d := contract.Decision{DecisionID: "dec_" + uuid.NewString(), OpID: op.OpID, Actor: op.Actor}
+	d := contract.Decision{DecisionID: "dec_" + uuid.NewString(), OpID: op.OpID, Actor: op.Actor, IngestSeq: op.IngestSeq}
 	var newVers []contract.ResourceVersion
 	var conflicts []contract.Conflict
 

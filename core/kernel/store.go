@@ -140,7 +140,7 @@ func (s *Store) DecisionCount() int {
 
 // DecisionsForActor returns this actor's deferred decisions (the pull-feedback source, Invariant #8).
 func (s *Store) DecisionsForActor(actor contract.ActorID) ([]contract.Decision, error) {
-	rows, err := s.db.Query(`SELECT payload FROM decisions WHERE actor=? AND status='deferred' ORDER BY ingest_seq`, string(actor))
+	rows, err := s.db.Query(`SELECT payload FROM decisions WHERE actor=? AND status='deferred' ORDER BY ingest_seq, rowid`, string(actor))
 	if err != nil {
 		return nil, err
 	}
