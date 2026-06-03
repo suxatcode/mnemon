@@ -21,8 +21,11 @@ type ProjectionView struct {
 // host-side surface: a Projection in, a contract.Event out.
 func Propose(actor contract.ActorID, corr string, view ProjectionView, ref contract.ResourceRef, basedOn contract.Version, fields map[string]any) contract.Event {
 	return contract.Event{
-		// OpID identifies the proposal (per actor+resource); CorrelationID is the retry-group key. They are
-		// distinct: two actors sharing one correlation must not collapse to the same OpID.
+		// OpID here is an ILLUSTRATIVE per-(actor,resource) identifier — NOT a global per-proposal uniqueness
+		// key (so the same actor proposing on the same resource under different correlations shares an OpID).
+		// That is harmless: the kernel keys decisions by DecisionID (a UUID) and groups retries by
+		// CorrelationID, never by OpID. A real host should mint a unique OpID per proposal. CorrelationID is
+		// the retry-group key and must be non-empty for liveness escalation to apply.
 		ID:            "ext_" + string(actor) + "_" + string(ref.Kind) + "_" + string(ref.ID),
 		Type:          "memory.write.proposed",
 		Actor:         actor,
