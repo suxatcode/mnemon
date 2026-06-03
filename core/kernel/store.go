@@ -115,7 +115,10 @@ func (s *Store) AppendDecision(d contract.Decision) error {
 	return err
 }
 func (s *Store) AppendEvent(ev contract.Event) (int64, error) {
-	b, _ := json.Marshal(ev)
+	b, err := json.Marshal(ev) // this is the durable ingest stream — never write a garbage payload silently
+	if err != nil {
+		return 0, err
+	}
 	res, err := s.db.Exec(`INSERT INTO events (payload) VALUES (?)`, string(b))
 	if err != nil {
 		return 0, err
@@ -136,7 +139,9 @@ func (s *Store) PendingEvents(afterSeq int64) ([]contract.Event, error) {
 			return nil, err
 		}
 		var ev contract.Event
-		_ = json.Unmarshal([]byte(p), &ev)
+		if err := json.Unmarshal([]byte(p), &ev); err != nil {
+			return nil, err // surface a corrupt payload; never manufacture a zero-value event
+		}
 		ev.IngestSeq = seq
 		out = append(out, ev)
 	}

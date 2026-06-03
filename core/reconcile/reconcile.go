@@ -43,8 +43,14 @@ func opFromEvent(ev contract.Event) contract.KernelOp {
 }
 
 func (r *Reconciler) RunOnce(modes contract.Modes) []contract.Decision {
-	evs, _ := r.store.PendingEvents(r.cursor)
 	var out []contract.Decision
+	evs, err := r.store.PendingEvents(r.cursor)
+	if err != nil {
+		// A corrupt ingest log is fail-stop: do not advance the cursor or manufacture decisions from a
+		// partial/garbage read — it needs operator attention. (Surfacing it to the caller would require a
+		// RunOnce signature change; the store-level error is the durable signal.)
+		return out
+	}
 	for _, ev := range evs { // strictly IngestSeq order (Invariant #9)
 		call := modes
 		// Escalate BEFORE Apply (so the persisted decision is terminal, #10). The deferral count is read
