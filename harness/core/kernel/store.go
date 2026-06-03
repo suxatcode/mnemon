@@ -27,6 +27,7 @@ func OpenStore(path string) (*Store, error) {
 		`CREATE TABLE IF NOT EXISTS resources (kind TEXT, id TEXT, version INTEGER NOT NULL, fields TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(kind,id));`,
 		`CREATE TABLE IF NOT EXISTS events (ingest_seq INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL);`,
 		`CREATE TABLE IF NOT EXISTS decisions (decision_id TEXT PRIMARY KEY, op_id TEXT, ingest_seq INTEGER, actor TEXT, correlation_id TEXT, next_action TEXT, status TEXT, payload TEXT NOT NULL);`,
+		`CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, seq INTEGER NOT NULL);`,
 	} {
 		if _, err := db.Exec(s); err != nil {
 			db.Close()
@@ -107,6 +108,20 @@ func (t *Tx) AppendDecisionTx(d contract.Decision) error {
 	return err
 }
 
+// Tx-scoped variants for the atomic dispatch transaction.
+func (t *Tx) AppendEvent(ev contract.Event) error {
+	b, err := json.Marshal(ev) // never write a garbage payload silently (mirrors Store.AppendEvent)
+	if err != nil {
+		return err
+	}
+	_, err = t.tx.Exec(`INSERT INTO events (payload) VALUES (?)`, string(b))
+	return err
+}
+func (t *Tx) SetCursor(name string, seq int64) error {
+	_, err := t.tx.Exec(`INSERT INTO cursors (name,seq) VALUES (?,?) ON CONFLICT(name) DO UPDATE SET seq=excluded.seq`, name, seq)
+	return err
+}
+
 // AppendDecision writes a decision in its own txn (used for non-accepted ops — nothing to be atomic with).
 func (s *Store) AppendDecision(d contract.Decision) error {
 	b, _ := json.Marshal(d)
@@ -161,6 +176,35 @@ func (s *Store) MaxDecidedSeq() int64 {
 	var n int64
 	_ = s.db.QueryRow(`SELECT COALESCE(MAX(ingest_seq), 0) FROM decisions`).Scan(&n)
 	return n
+}
+
+// GetCursor returns a named durable cursor (0 if unset). The runtime's dispatch position lives here, the
+// way the reconciler's decision position is derived from MaxDecidedSeq — both make the loop restart-safe.
+func (s *Store) GetCursor(name string) int64 {
+	var seq int64
+	err := s.db.QueryRow(`SELECT seq FROM cursors WHERE name=?`, name).Scan(&seq)
+	if err == sql.ErrNoRows {
+		return 0
+	}
+	return seq
+}
+func (s *Store) SetCursor(name string, seq int64) error {
+	_, err := s.db.Exec(`INSERT INTO cursors (name,seq) VALUES (?,?) ON CONFLICT(name) DO UPDATE SET seq=excluded.seq`, name, seq)
+	return err
+}
+
+// DispatchTx atomically appends all proposed events produced from ONE observed event AND advances the
+// dispatch cursor past it. All-or-nothing (Invariant R6 / finding #1): a crash can never leave appended
+// proposals with an un-advanced cursor (which would re-dispatch and duplicate).
+func (s *Store) DispatchTx(events []contract.Event, cursorName string, seq int64) error {
+	return s.WithTx(func(tx *Tx) error {
+		for _, ev := range events {
+			if err := tx.AppendEvent(ev); err != nil {
+				return err
+			}
+		}
+		return tx.SetCursor(cursorName, seq)
+	})
 }
 
 // DeferralCount returns how many REBASE deferrals a CorrelationID has accumulated in the durable log.
