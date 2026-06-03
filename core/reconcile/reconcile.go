@@ -14,18 +14,6 @@ import (
 // carries no decodable writes is a MALFORMED proposal and is still Rejected by the kernel (not skipped).
 func isProposal(ev contract.Event) bool { return strings.HasSuffix(ev.Type, ".proposed") }
 
-// effectiveCorrelation is the liveness-escalation grouping key (Invariant #10). It is the event's
-// CorrelationID, or — when that is empty — a per-event fallback (the event ID) so that distinct events
-// WITHOUT a declared correlation are each their own group and never collide on the empty-string bucket
-// (which would wrongly escalate unrelated proposals). Both the escalation read and the stored decision
-// use this same key (R2#1).
-func effectiveCorrelation(ev contract.Event) string {
-	if ev.CorrelationID != "" {
-		return ev.CorrelationID
-	}
-	return ev.ID
-}
-
 type Reconciler struct {
 	store  *kernel.Store
 	kernel *kernel.Kernel
@@ -58,16 +46,18 @@ func opFromEvent(ev contract.Event) contract.KernelOp {
 			writes = nil // malformed payload -> no writes -> kernel rejects it (never a phantom Accepted no-op, #3)
 		}
 	}
-	return contract.KernelOp{OpID: ev.ID, Actor: ev.Actor, Writes: writes, ReadSet: ev.BasedOn, IngestSeq: ev.IngestSeq, CorrelationID: effectiveCorrelation(ev)}
+	return contract.KernelOp{OpID: ev.ID, Actor: ev.Actor, Writes: writes, ReadSet: ev.BasedOn, IngestSeq: ev.IngestSeq, CorrelationID: ev.CorrelationID}
 }
 
 func (r *Reconciler) RunOnce(modes contract.Modes) []contract.Decision {
 	var out []contract.Decision
 	evs, err := r.store.PendingEvents(r.cursor)
 	if err != nil {
-		// A corrupt ingest log is fail-stop: do not advance the cursor or manufacture decisions from a
-		// partial/garbage read — it needs operator attention. (Surfacing it to the caller would require a
-		// RunOnce signature change; the store-level error is the durable signal.)
+		// A corrupt ingest log is FAIL-STOP: do not advance the cursor or manufacture decisions from a
+		// partial/garbage read. Note this is a hard stop — one corrupt row blocks reconciliation until it
+		// is repaired (no skip/quarantine). RunOnce cannot surface the error without a signature change; the
+		// durable signal is the error returned by Store.PendingEvents itself. When core is wired into a
+		// runtime, that caller should call PendingEvents (or a RunOnce that returns an error) to detect this.
 		return out
 	}
 	for _, ev := range evs { // strictly IngestSeq order (Invariant #9)
@@ -78,7 +68,11 @@ func (r *Reconciler) RunOnce(modes contract.Modes) []contract.Decision {
 		call := modes
 		// Escalate BEFORE Apply (so the persisted decision is terminal, #10). The deferral count is read
 		// from the durable log, not in-memory, so a restart cannot silently reset the escalation clock.
-		if modes.Conflict == contract.ConflictRebase && r.store.DeferralCount(effectiveCorrelation(ev)) >= 2 {
+		// Escalation requires a DECLARED CorrelationID: it is the only stable key that groups a proposal's
+		// retries. An event with no CorrelationID opts out of retry-grouping — it never escalates and never
+		// contributes to another group's count (the "" bucket is written but never read). This avoids both
+		// the empty-bucket collision and the per-event-ID "never groups" failure of a naive event-ID fallback.
+		if call.Conflict == contract.ConflictRebase && ev.CorrelationID != "" && r.store.DeferralCount(ev.CorrelationID) >= 2 {
 			call.Conflict = contract.ConflictDeferToHuman
 		}
 		d := r.kernel.Apply(opFromEvent(ev), call) // kernel is the serializer, not us (Invariant #2)

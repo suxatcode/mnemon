@@ -21,7 +21,9 @@ type ProjectionView struct {
 // host-side surface: a Projection in, a contract.Event out.
 func Propose(actor contract.ActorID, corr string, view ProjectionView, ref contract.ResourceRef, basedOn contract.Version, fields map[string]any) contract.Event {
 	return contract.Event{
-		ID:            "ext_" + corr,
+		// OpID identifies the proposal (per actor+resource); CorrelationID is the retry-group key. They are
+		// distinct: two actors sharing one correlation must not collapse to the same OpID.
+		ID:            "ext_" + string(actor) + "_" + string(ref.Kind) + "_" + string(ref.ID),
 		Type:          "memory.write.proposed",
 		Actor:         actor,
 		CorrelationID: corr,
