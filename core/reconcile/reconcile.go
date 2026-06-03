@@ -14,6 +14,18 @@ import (
 // carries no decodable writes is a MALFORMED proposal and is still Rejected by the kernel (not skipped).
 func isProposal(ev contract.Event) bool { return strings.HasSuffix(ev.Type, ".proposed") }
 
+// effectiveCorrelation is the liveness-escalation grouping key (Invariant #10). It is the event's
+// CorrelationID, or — when that is empty — a per-event fallback (the event ID) so that distinct events
+// WITHOUT a declared correlation are each their own group and never collide on the empty-string bucket
+// (which would wrongly escalate unrelated proposals). Both the escalation read and the stored decision
+// use this same key (R2#1).
+func effectiveCorrelation(ev contract.Event) string {
+	if ev.CorrelationID != "" {
+		return ev.CorrelationID
+	}
+	return ev.ID
+}
+
 type Reconciler struct {
 	store  *kernel.Store
 	kernel *kernel.Kernel
@@ -46,7 +58,7 @@ func opFromEvent(ev contract.Event) contract.KernelOp {
 			writes = nil // malformed payload -> no writes -> kernel rejects it (never a phantom Accepted no-op, #3)
 		}
 	}
-	return contract.KernelOp{OpID: ev.ID, Actor: ev.Actor, Writes: writes, ReadSet: ev.BasedOn, IngestSeq: ev.IngestSeq, CorrelationID: ev.CorrelationID}
+	return contract.KernelOp{OpID: ev.ID, Actor: ev.Actor, Writes: writes, ReadSet: ev.BasedOn, IngestSeq: ev.IngestSeq, CorrelationID: effectiveCorrelation(ev)}
 }
 
 func (r *Reconciler) RunOnce(modes contract.Modes) []contract.Decision {
@@ -66,7 +78,7 @@ func (r *Reconciler) RunOnce(modes contract.Modes) []contract.Decision {
 		call := modes
 		// Escalate BEFORE Apply (so the persisted decision is terminal, #10). The deferral count is read
 		// from the durable log, not in-memory, so a restart cannot silently reset the escalation clock.
-		if modes.Conflict == contract.ConflictRebase && r.store.DeferralCount(ev.CorrelationID) >= 2 {
+		if modes.Conflict == contract.ConflictRebase && r.store.DeferralCount(effectiveCorrelation(ev)) >= 2 {
 			call.Conflict = contract.ConflictDeferToHuman
 		}
 		d := r.kernel.Apply(opFromEvent(ev), call) // kernel is the serializer, not us (Invariant #2)

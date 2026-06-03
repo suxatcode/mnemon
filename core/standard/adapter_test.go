@@ -61,7 +61,10 @@ func TestSecondAdapterParticipatesInReconcile(t *testing.T) {
 
 	// the contract-only adapter builds a *.proposed event from what it read (read-set = based_on)
 	view := ProjectionView{Resources: []contract.ResourceVersion{{Ref: ref, Version: 1}}, Digest: "d"}
-	ev := Propose("ext", view, ref, 1, map[string]any{"content": "v1"})
+	ev := Propose("ext", "task1", view, ref, 1, map[string]any{"content": "v1"})
+	if ev.CorrelationID == "" {
+		t.Fatal("adapter must carry a non-empty CorrelationID (escalation grouping key)")
+	}
 	if ev.Type != "memory.write.proposed" {
 		t.Fatalf("adapter must emit a *.proposed event, got %q", ev.Type)
 	}

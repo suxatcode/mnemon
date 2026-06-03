@@ -15,13 +15,16 @@ type ProjectionView struct {
 }
 
 // Propose builds a *.proposed event from what the host read. based_on (the event read-set) is the set of
-// versions the proposal is premised on; the write itself rides in the payload. This is the entire
+// versions the proposal is premised on; the write itself rides in the payload. corr is the host's
+// retry-group / correlation key — it MUST be non-empty so the control plane can group this proposal's
+// retries for liveness escalation without colliding with unrelated proposals (R2#1). This is the entire
 // host-side surface: a Projection in, a contract.Event out.
-func Propose(actor contract.ActorID, view ProjectionView, ref contract.ResourceRef, basedOn contract.Version, fields map[string]any) contract.Event {
+func Propose(actor contract.ActorID, corr string, view ProjectionView, ref contract.ResourceRef, basedOn contract.Version, fields map[string]any) contract.Event {
 	return contract.Event{
-		ID:            "ext_" + string(actor),
+		ID:            "ext_" + corr,
 		Type:          "memory.write.proposed",
 		Actor:         actor,
+		CorrelationID: corr,
 		ResourceRefs:  []contract.ResourceRef{ref},
 		BasedOn:       view.Resources, // read-set the proposal is premised on
 		ContextDigest: view.Digest,    // provenance only
