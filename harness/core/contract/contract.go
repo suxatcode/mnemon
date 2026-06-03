@@ -133,3 +133,10 @@ var (
 	IsolationCatalog = map[string]bool{IsolationWriteCAS: true, IsolationProjectionReadSet: true}
 	AuthzCatalog     = map[string]bool{AuthzStrict: true} // only strict is implemented; the rest are reserved (see consts above)
 )
+
+// KindCatalog — the third define≠select guard (alongside the mode catalogs). The resolver checks
+// actor permissions and projection scopes against this; an actor may NOT be authorized to write, nor a
+// scope reference, a kind the schema guard does not know (else config could DEFINE a phantom kind that
+// the kernel silently accepts — an unknown kind has no required fields, so SchemaGuard.Validate passes).
+// Invariant: keys(kernel.DefaultSchemaGuard().Required) == KindCatalog (enforced by a kernel test).
+var KindCatalog = map[ResourceKind]bool{"memory": true, "goal": true, "skill": true}
