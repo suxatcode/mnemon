@@ -112,6 +112,46 @@ type ObservationEnvelope struct {
 	Event      Event
 }
 
+// ---- rule pre-gate (D4) ----
+// A rule is an ADMISSION CONTROLLER: it PROPOSES or ENQUEUES; it can NEVER write (S12). The kernel stays the
+// only writer. The rich semantics live in this server-side pre-gate, not in the minimal kernel.
+type RuleVerdict string
+
+const (
+	VerdictAllow           RuleVerdict = "allow"
+	VerdictDeny            RuleVerdict = "deny"
+	VerdictWarn            RuleVerdict = "warn"
+	VerdictRequestEvidence RuleVerdict = "request_evidence"
+	VerdictPropose         RuleVerdict = "propose"
+	VerdictEnqueueJob      RuleVerdict = "enqueue_job"
+)
+
+// RuleDecision is a rule's output: a verdict plus (for propose) a Proposal or (for enqueue_job) a Job. It is
+// return-only — a rule never holds a Store/Kernel, so it can describe an effect but never perform one (S12).
+type RuleDecision struct {
+	Verdict  RuleVerdict
+	Reasons  []string
+	Proposal *ProposedEvent
+	Job      *JobSpec
+}
+
+// JobSpec describes an effectful job for the at-least-once job lane. IdempotencyKey backs provider idempotency
+// (S4); EstCostUSD feeds the budget reserve (S6).
+type JobSpec struct {
+	Kind           string
+	IdempotencyKey string
+	EstCostUSD     float64
+	Args           map[string]any
+}
+
+// Diagnostic is the durable "why" of a reject/defer (S7: no silent drop). It is emitted as a "*.diagnostic"
+// event so every rejection class leaves an auditable trail.
+type Diagnostic struct {
+	Stage  string
+	Reason string
+	Ref    string
+}
+
 // ---- modes (the catalog NAMES live here — the standard advertises them) ----
 type Modes struct{ Conflict, Isolation, Authz string }
 
