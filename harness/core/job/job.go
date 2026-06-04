@@ -142,6 +142,11 @@ func Reserve(k *kernel.Kernel, budgetID string, actor contract.ActorID, cost flo
 	if version == 0 {
 		return contract.Decision{}, fmt.Errorf("budget %q does not exist", budgetID)
 	}
+	// cost must be non-negative: a negative cost would DECREASE spent_usd, laundering a spend-ceiling refund
+	// so cumulative real spend can exceed limit_usd while stored spent stays low (adversarial #1).
+	if cost < 0 {
+		return contract.Decision{}, fmt.Errorf("invalid cost: must be non-negative, got %.2f", cost)
+	}
 	limit, spent := asFloat(fields["limit_usd"]), asFloat(fields["spent_usd"])
 	if spent+cost > limit {
 		return contract.Decision{}, fmt.Errorf("over budget: spent %.2f + cost %.2f > limit %.2f", spent, cost, limit)

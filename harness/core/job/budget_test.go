@@ -55,6 +55,22 @@ func TestBudgetReserveIsAtomicWithWrite(t *testing.T) {
 	}
 }
 
+// adversarial #1: a negative cost must be refused — else it decreases spent_usd and launders an overshoot
+// of limit_usd (cumulative real spend > limit while stored spent stays low).
+func TestReserveRefusesNegativeCost(t *testing.T) {
+	k := newJobKernel(t, "agent")
+	seedBudget(t, k, "global", 10, 10) // fully spent
+	dw := contract.ResourceWrite{Ref: contract.ResourceRef{Kind: "memory", ID: "m1"}, Kind: contract.OpCreate, Fields: map[string]any{"content": "x"}}
+	if _, err := Reserve(k, "global", "agent", -10, dw); err == nil {
+		t.Fatal("a negative cost must be refused (it would launder a spend-ceiling refund)")
+	}
+	// spent must be unchanged (no laundering).
+	_, fields, _ := k.Store().GetResource(contract.ResourceRef{Kind: "budget", ID: "global"})
+	if asFloat(fields["spent_usd"]) != 10 {
+		t.Fatalf("spent must stay 10 after a refused negative reserve; got %v", fields["spent_usd"])
+	}
+}
+
 func TestReserveRefusesOverBudget(t *testing.T) {
 	k := newJobKernel(t, "agent")
 	seedBudget(t, k, "global", 10, 7)
