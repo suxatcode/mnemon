@@ -206,6 +206,10 @@ func (cs *ControlServer) dispatchOne(ev contract.Event) ([]contract.Event, []ker
 			break
 		}
 		stamped = append(stamped, e)
+	case contract.VerdictWarn:
+		// S7: a warn surfaces its reasons as a diagnostic — never a silent warn. (The action, if any, still
+		// rides whatever verdict won; a standalone warn produces no proposal.)
+		stamped = append(stamped, cs.diagnosticEvent(ev, contract.Diagnostic{Stage: "rule", Reason: "warn: " + strings.Join(dec.Reasons, "; "), Ref: ev.Type}))
 	case contract.VerdictDeny:
 		stamped = append(stamped, cs.diagnosticEvent(ev, contract.Diagnostic{Stage: "rule", Reason: strings.Join(dec.Reasons, "; "), Ref: ev.Type}))
 	case contract.VerdictEnqueueJob, contract.VerdictRequestEvidence:
@@ -214,12 +218,13 @@ func (cs *ControlServer) dispatchOne(ev contract.Event) ([]contract.Event, []ker
 			stamped = append(stamped, cs.diagnosticEvent(ev, contract.Diagnostic{Stage: "rule", Reason: "verdict " + string(dec.Verdict) + " carried no job spec", Ref: ev.Type}))
 			break
 		}
-		// S4: enqueue an outbox job. A non-empty idempotency key dedupes a retried request (UNIQUE no-op). An
-		// EMPTY key would make the outbox id ("job_") collide on the id PK and poison the dispatch loop, so a
-		// keyless job gets a unique per-observation id from the durable IngestSeq.
-		id := "job_" + dec.Job.IdempotencyKey
+		// S4: enqueue an outbox job. The keyed and keyless id namespaces are DISJOINT ("job_k_"+key vs
+		// "job_s_"+seq) so a literal key like "seq_1" can never collide with a keyless id and poison the
+		// dispatch loop on the outbox id PK. A non-empty key still dedupes a retry via idempotency_key UNIQUE;
+		// a keyless job gets a unique per-observation id from the durable IngestSeq.
+		id := "job_k_" + dec.Job.IdempotencyKey
 		if dec.Job.IdempotencyKey == "" {
-			id = fmt.Sprintf("job_seq_%d", ev.IngestSeq)
+			id = fmt.Sprintf("job_s_%d", ev.IngestSeq)
 		}
 		payload, _ := json.Marshal(jobPayload{Spec: *dec.Job, Actor: ev.Actor, TriggerID: ev.ID, Correlation: ev.CorrelationID})
 		jobs = append(jobs, kernel.OutboxRow{
@@ -251,15 +256,19 @@ func (cs *ControlServer) runJobLane() error {
 			continue
 		}
 		trigger := contract.Event{ID: jp.TriggerID, Type: "job.observed", Actor: jp.Actor, CorrelationID: jp.Correlation}
+		// The receipt/dedup identity is the idempotency key when present; a keyless job uses its unique outbox
+		// row id so two keyless jobs get distinct receipts (never collide on a shared runner effect id).
 		effectKey := jp.Spec.IdempotencyKey
+		if effectKey == "" {
+			effectKey = row.ID
+		}
 		// Idempotent recovery: if the effect's receipt already exists (it ran, perhaps before a crash that
-		// preceded the ack), do NOT re-run — just ack so the row drains. This closes the infinite-re-run wedge
-		// and makes delivery dedup keyed on the idempotency key, not the runner's effect id.
-		if effectKey != "" {
-			if v, _, _ := cs.store.GetResource(contract.ResourceRef{Kind: "receipt", ID: contract.ResourceID(effectKey)}); v != 0 {
-				_ = cs.store.AckOutbox(row.ID, string(cs.laneOwner))
-				continue
-			}
+		// preceded the ack), do NOT re-run — re-mint the proposal recorded in the receipt (so a crash between
+		// Finish and the mint does not lose the governed write), then ack so the row drains.
+		if v, fields, _ := cs.store.GetResource(contract.ResourceRef{Kind: "receipt", ID: contract.ResourceID(effectKey)}); v != 0 {
+			cs.remintFromReceipt(jp, fields)
+			_ = cs.store.AckOutbox(row.ID, string(cs.laneOwner))
+			continue
 		}
 		lease, err := job.Claim(cs.kernel, row.ID, cs.laneOwner, cs.nowUnix(), cs.laneTTL)
 		if err != nil {
@@ -273,10 +282,9 @@ func (cs *ControlServer) runJobLane() error {
 			}
 			continue
 		}
-		// Key the receipt by the idempotency key (the deterministic dedup identity), not the runner's effect id.
-		if effectKey != "" {
-			result.EffectID = effectKey
-		}
+		// Key the receipt by the dedup identity (idempotency key, or the unique row id for a keyless job), not
+		// the runner's effect id.
+		result.EffectID = effectKey
 		if err := job.Finish(cs.kernel, lease, result, cs.nowUnix()); err != nil {
 			// S7: a stale-fence / duplicate-effect finish is diagnosed (and the row is not acked -> retried).
 			if _, aerr := cs.store.AppendEvent(cs.diagnosticEvent(trigger, contract.Diagnostic{Stage: "finish", Reason: err.Error(), Ref: row.ID})); aerr != nil {
@@ -299,6 +307,26 @@ func (cs *ControlServer) runJobLane() error {
 		_ = cs.store.AckOutbox(row.ID, string(cs.laneOwner))
 	}
 	return nil
+}
+
+// remintFromReceipt re-mints the proposal recorded in a completed effect's receipt (recovery after a crash
+// between Finish and the original mint). It is idempotent at the state level: if the proposal was already
+// minted+applied, the re-minted one races the same version and the kernel CAS defers it (no double-write).
+func (cs *ControlServer) remintFromReceipt(jp jobPayload, receiptFields map[string]any) {
+	raw, ok := receiptFields["proposal"].(string)
+	if !ok || raw == "" {
+		return
+	}
+	var cand contract.ProposedEvent
+	if json.Unmarshal([]byte(raw), &cand) != nil {
+		return
+	}
+	view := cs.scopedView(jp.Actor)
+	b := config.ResolvedBinding{Actor: jp.Actor, Emits: cand.Type}
+	trigger := contract.Event{ID: jp.TriggerID, Type: "job.observed", Actor: jp.Actor, CorrelationID: jp.Correlation}
+	if e, serr := cs.bridge.Stamp(b, view, trigger, cand); serr == nil {
+		_, _ = cs.store.AppendEvent(e)
+	}
 }
 
 // scopedView builds the actor's scoped projection. (P2 strengthens the scoping + digest behind this seam;

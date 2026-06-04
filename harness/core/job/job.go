@@ -4,6 +4,7 @@
 package job
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/mnemon-dev/mnemon/harness/core/contract"
@@ -107,13 +108,20 @@ func Claim(k *kernel.Kernel, jobID string, owner contract.ActorID, now, ttl int6
 // based_on the held Fence (a stale fence -> the whole op is rejected, so NO receipt leaks), and the receipt
 // resource is created. The lease is released by setting fence_until to now (immediately expired).
 func Finish(k *kernel.Kernel, lease Lease, result Result, now int64) error {
+	receiptFields := map[string]any{"job_id": lease.JobID, "effect_id": result.EffectID, "outcome": result.Outcome}
+	// Store the proposal candidate in the receipt so a crash between Finish and the proposal mint does NOT lose
+	// the governed write: recovery (the receipt already exists) re-mints from here instead of re-running.
+	if result.ProposalCandidate != nil {
+		if b, err := json.Marshal(result.ProposalCandidate); err == nil {
+			receiptFields["proposal"] = string(b)
+		}
+	}
 	op := contract.KernelOp{
 		OpID:  "finish_" + lease.JobID + "_" + result.EffectID,
 		Actor: lease.Owner,
 		Writes: []contract.ResourceWrite{
 			{Ref: leaseRef(lease.JobID), Kind: contract.OpUpdate, BasedOn: lease.Fence, Fields: leaseFields(lease.JobID, lease.Owner, now)},
-			{Ref: contract.ResourceRef{Kind: "receipt", ID: contract.ResourceID(result.EffectID)}, Kind: contract.OpCreate,
-				Fields: map[string]any{"job_id": lease.JobID, "effect_id": result.EffectID, "outcome": result.Outcome}},
+			{Ref: contract.ResourceRef{Kind: "receipt", ID: contract.ResourceID(result.EffectID)}, Kind: contract.OpCreate, Fields: receiptFields},
 		},
 	}
 	d := k.Apply(op, jobModes())

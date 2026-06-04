@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -154,6 +156,111 @@ func TestConcurrentTickIsSafe(t *testing.T) {
 	wg.Wait()
 	if v, _ := s.GetVersion(contract.ResourceRef{Kind: "memory", ID: "m1"}); v != 2 {
 		t.Fatalf("concurrent Tick must dispatch the observation exactly once (m1 @2); got %d", v)
+	}
+}
+
+// re-verify MED: keyed and keyless outbox id namespaces must be DISJOINT — a literal key "seq_<N>" must not
+// collide with the keyless job_seq_<N> id PK and poison the dispatch loop.
+func TestKeylessAndLiteralSeqKeyDoNotCollide(t *testing.T) {
+	keyFromPayload := rule.NewNativeRule("k", "agent", "memory.write.proposed", []string{"memory.observed"},
+		func(in rule.RuleInput) (contract.RuleDecision, error) {
+			key, _ := in.Event.Payload["key"].(string)
+			return contract.RuleDecision{Verdict: contract.VerdictEnqueueJob, Job: &contract.JobSpec{Kind: "g", IdempotencyKey: key}}, nil
+		})
+	s, cs := newServerWithLane(t, rule.NewRuleSet(keyFromPayload), job.NewFakeRunner(nil))
+	// e1 (IngestSeq 1) -> keyless ; e2 -> keyed "seq_1" (would collide with keyless "job_seq_1" pre-fix).
+	if _, _, err := cs.Ingest("agent", contract.ObservationEnvelope{ExternalID: "e1", Event: contract.Event{Type: "memory.observed", CorrelationID: "c1"}}); err != nil {
+		t.Fatalf("ingest e1: %v", err)
+	}
+	if _, _, err := cs.Ingest("agent", contract.ObservationEnvelope{ExternalID: "e2", Event: contract.Event{Type: "memory.observed", CorrelationID: "c2", Payload: map[string]any{"key": "seq_1"}}}); err != nil {
+		t.Fatalf("ingest e2: %v", err)
+	}
+	if _, err := cs.Tick(); err != nil {
+		t.Fatalf("a keyless job and a literal seq_-key job must not collide on the outbox id; got %v", err)
+	}
+	for _, ev := range func() []contract.Event { e, _ := s.PendingEvents(s.GetCursor("server_dispatch")); return e }() {
+		if ev.Type == "memory.observed" {
+			t.Fatal("an observed event was not dispatched (poison loop)")
+		}
+	}
+}
+
+// re-verify MED: a crash between job.Finish (receipt committed) and the proposal mint must not lose the
+// governed write — recovery re-mints the proposal from the receipt without re-running the effect.
+func TestLaneRemintsProposalFromReceiptOnRecovery(t *testing.T) {
+	runner := job.NewFakeRunner(laneProposal())
+	s, cs := newServerWithLane(t, rule.NewRuleSet(requestEvidenceRule()), runner)
+	propJSON, _ := json.Marshal(laneProposal())
+	lk := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"lane": {"receipt"}}})
+	if d := lk.Apply(contract.KernelOp{OpID: "pre", Actor: "lane", Writes: []contract.ResourceWrite{
+		{Ref: contract.ResourceRef{Kind: "receipt", ID: "ev-job"}, Kind: contract.OpCreate, Fields: map[string]any{"job_id": "job_k_ev-job", "effect_id": "ev-job", "outcome": "ok", "proposal": string(propJSON)}}}},
+		contract.Modes{Conflict: contract.ConflictReject, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict}); d.Status != contract.Accepted {
+		t.Fatalf("pre-write receipt+proposal: %s", d.Reason)
+	}
+	if _, _, err := cs.Ingest("agent", contract.ObservationEnvelope{ExternalID: "e1", Event: contract.Event{Type: "memory.observed", CorrelationID: "c1"}}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if _, err := cs.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	if runner.Calls() != 0 {
+		t.Fatalf("recovery must NOT re-run the effect; got %d", runner.Calls())
+	}
+	if v, _ := s.GetVersion(contract.ResourceRef{Kind: "memory", ID: "m1"}); v != 2 {
+		t.Fatalf("recovery must re-mint the proposal from the receipt (m1 @2); got %d", v)
+	}
+}
+
+// re-verify LOW: two distinct keyless jobs must each get a distinct receipt (keyed by the unique outbox row
+// id) and both drain — neither wedges on a shared runner effect id.
+func TestTwoKeylessJobsBothDrain(t *testing.T) {
+	keyless := rule.NewNativeRule("kl", "agent", "memory.write.proposed", []string{"memory.observed"},
+		func(rule.RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictEnqueueJob, Job: &contract.JobSpec{Kind: "g", IdempotencyKey: ""}}, nil
+		})
+	runner := job.NewFakeRunner(nil)
+	s, cs := newServerWithLane(t, rule.NewRuleSet(keyless), runner)
+	for _, id := range []string{"e1", "e2"} {
+		if _, _, err := cs.Ingest("agent", contract.ObservationEnvelope{ExternalID: id, Event: contract.Event{Type: "memory.observed", CorrelationID: "c-" + id}}); err != nil {
+			t.Fatalf("ingest %s: %v", id, err)
+		}
+	}
+	if _, err := cs.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	if runner.Calls() != 2 {
+		t.Fatalf("both keyless jobs must run (distinct receipts); got %d", runner.Calls())
+	}
+	// each keyless job must own a DISTINCT receipt (keyed by its unique outbox row id job_s_<seq>); on the
+	// broken path both collapse to the runner's shared effect id and the second wedges with no receipt.
+	for _, id := range []contract.ResourceID{"job_s_1", "job_s_2"} {
+		if v, _, _ := s.GetResource(contract.ResourceRef{Kind: "receipt", ID: id}); v != 1 {
+			t.Fatalf("keyless job %q must own a distinct receipt; got v%d", id, v)
+		}
+	}
+}
+
+// re-verify LOW: a VerdictWarn must surface its reasons as a diagnostic, not be silently dropped.
+func TestWarnVerdictEmitsDiagnostic(t *testing.T) {
+	warnRule := rule.NewNativeRule("w", "agent", "memory.write.proposed", []string{"memory.observed"},
+		func(rule.RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictWarn, Reasons: []string{"heads up"}}, nil
+		})
+	s, _, cs := newServerWith(t, rule.NewRuleSet(warnRule))
+	if _, _, err := cs.Ingest("agent", contract.ObservationEnvelope{ExternalID: "e1", Event: contract.Event{Type: "memory.observed", CorrelationID: "c1"}}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if _, err := cs.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	found := false
+	for _, dg := range diagEvents(t, s) {
+		if reason, _ := dg.Payload["reason"].(string); strings.Contains(reason, "heads up") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("a warn verdict must surface its reasons as a diagnostic (no silent warn)")
 	}
 }
 
