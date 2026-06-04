@@ -152,6 +152,16 @@ type Diagnostic struct {
 	Ref    string
 }
 
+// Subscription is a scope descriptor: which refs an actor may see, at what privacy tier. It lives in contract
+// (not server) to avoid a projection<->server cycle (D11/blocker #3). The server builds an actor's scoped
+// projection from its Subscription, and the projection identity (forActor) is the authenticated principal — a
+// client never names its own scope on the wire (S9).
+type Subscription struct {
+	Actor       ActorID
+	Refs        []ResourceRef
+	PrivacyTier string
+}
+
 // ---- modes (the catalog NAMES live here — the standard advertises them) ----
 type Modes struct{ Conflict, Isolation, Authz string }
 
