@@ -3,6 +3,7 @@ package kernel
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -44,6 +45,7 @@ func OpenStore(path string) (*Store, error) {
 		`CREATE TABLE IF NOT EXISTS decisions (decision_id TEXT PRIMARY KEY, op_id TEXT, ingest_seq INTEGER, actor TEXT, correlation_id TEXT, next_action TEXT, status TEXT, payload TEXT NOT NULL);`,
 		`CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, seq INTEGER NOT NULL);`,
 		`CREATE TABLE IF NOT EXISTS inbox_dedupe (source TEXT, external_id TEXT, event_seq INTEGER NOT NULL, PRIMARY KEY(source,external_id));`,
+		`CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, kind TEXT NOT NULL, event_seq INTEGER NOT NULL DEFAULT 0, target TEXT NOT NULL DEFAULT '', payload TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', idempotency_key TEXT UNIQUE, attempts INTEGER NOT NULL DEFAULT 0, lease_owner TEXT NOT NULL DEFAULT '', lease_until INTEGER NOT NULL DEFAULT 0);`,
 	} {
 		if _, err := db.Exec(s); err != nil {
 			db.Close()
@@ -217,6 +219,96 @@ func (t *Tx) lookupDedupe(source contract.ActorID, externalID string) (int64, bo
 func (t *Tx) insertDedupe(source contract.ActorID, externalID string, seq int64) error {
 	_, err := t.tx.Exec(`INSERT INTO inbox_dedupe (source, external_id, event_seq) VALUES (?,?,?)`, string(source), externalID, seq)
 	return err
+}
+
+// OutboxRow is one pending external effect (a projection invalidation, a job to run). The outbox is the
+// transactional-outbox substrate (S2: enqueued in the SAME tx as the decision that produced it; S4: delivery
+// is at-least-once with a per-row lease + an idempotency key, NEVER exactly-once).
+type OutboxRow struct {
+	ID             string
+	Kind           string
+	EventSeq       int64
+	Target         string
+	Payload        string
+	Status         string
+	IdempotencyKey string
+	Attempts       int
+	LeaseOwner     string
+	LeaseUntil     int64 // unix seconds; 0 = unleased
+}
+
+// EnqueueOutbox inserts a pending effect INSIDE a caller's txn so it commits atomically with the decision
+// (S2). A duplicate idempotency key is a silent no-op (S4 — at-least-once delivery must never enqueue the
+// same effect twice). An empty key is stored as NULL: multiple NULLs are distinct in a UNIQUE index, so
+// keyless rows (e.g. invalidations) never collide with each other.
+func (t *Tx) EnqueueOutbox(row OutboxRow) error {
+	var key any
+	if row.IdempotencyKey != "" {
+		key = row.IdempotencyKey
+	}
+	status := row.Status
+	if status == "" {
+		status = "pending"
+	}
+	_, err := t.tx.Exec(
+		`INSERT INTO outbox (id,kind,event_seq,target,payload,status,idempotency_key,attempts,lease_owner,lease_until)
+		 VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(idempotency_key) DO NOTHING`,
+		row.ID, row.Kind, row.EventSeq, row.Target, row.Payload, status, key, row.Attempts, row.LeaseOwner, row.LeaseUntil)
+	return err
+}
+
+// ClaimOutbox leases every currently-claimable row (not acked, and either unleased or with an expired lease)
+// to owner for ttl, bumping attempts, and returns them. The single writer connection serializes claims, so
+// two workers never both win the same row (S4 delivery lease). Rows are read fully before the UPDATE so the
+// single connection is not held by an open cursor during the writes.
+func (s *Store) ClaimOutbox(owner string, ttl time.Duration) ([]OutboxRow, error) {
+	now := time.Now().Unix()
+	until := now + int64(ttl/time.Second)
+	var claimed []OutboxRow
+	err := s.WithTx(func(tx *Tx) error {
+		rows, err := tx.tx.Query(
+			`SELECT id,kind,event_seq,target,payload,COALESCE(idempotency_key,''),attempts FROM outbox
+			 WHERE status!='acked' AND (lease_owner='' OR lease_until<=?) ORDER BY id`, now)
+		if err != nil {
+			return err
+		}
+		var batch []OutboxRow
+		for rows.Next() {
+			var r OutboxRow
+			if err := rows.Scan(&r.ID, &r.Kind, &r.EventSeq, &r.Target, &r.Payload, &r.IdempotencyKey, &r.Attempts); err != nil {
+				rows.Close()
+				return err
+			}
+			batch = append(batch, r)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for i := range batch {
+			r := &batch[i]
+			if _, err := tx.tx.Exec(`UPDATE outbox SET status='claimed', lease_owner=?, lease_until=?, attempts=attempts+1 WHERE id=?`, owner, until, r.ID); err != nil {
+				return err
+			}
+			r.Status, r.LeaseOwner, r.LeaseUntil, r.Attempts = "claimed", owner, until, r.Attempts+1
+		}
+		claimed = batch
+		return nil
+	})
+	return claimed, err
+}
+
+// AckOutbox marks a delivered effect done. It must be acked by the lease holder (a stale worker whose lease
+// expired and was reclaimed cannot ack the new holder's row) — an ack of a row not held by owner is an error.
+func (s *Store) AckOutbox(id, owner string) error {
+	res, err := s.db.Exec(`UPDATE outbox SET status='acked' WHERE id=? AND lease_owner=?`, id, owner)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("ack outbox %q: not held by %q", id, owner)
+	}
+	return nil
 }
 
 // AppendDecisionTx writes a decision INSIDE a caller's txn (used for accepted ops — crash-safe atomicity, Invariant #7).
