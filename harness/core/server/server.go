@@ -249,13 +249,15 @@ func (cs *ControlServer) runJobLane() error {
 	if cs.runner == nil {
 		return nil
 	}
-	claimed, err := cs.store.ClaimOutbox(string(cs.laneOwner), time.Duration(cs.laneTTL)*time.Second)
+	// the lane claims ONLY job rows — leasing an invalidation row it never delivers would churn that row's
+	// lease/attempts every Tick and starve its real delivery worker (S2).
+	claimed, err := cs.store.ClaimOutbox(string(cs.laneOwner), time.Duration(cs.laneTTL)*time.Second, "job")
 	if err != nil {
 		return err
 	}
 	for _, row := range claimed {
 		if row.Kind != "job" {
-			continue // invalidations etc. are not job-lane work
+			continue // defensive: ClaimOutbox already filtered to job rows
 		}
 		var jp jobPayload
 		if err := json.Unmarshal([]byte(row.Payload), &jp); err != nil {

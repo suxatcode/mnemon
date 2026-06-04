@@ -240,6 +240,23 @@ func TestTwoKeylessJobsBothDrain(t *testing.T) {
 	}
 }
 
+// re-verify MED: the job lane must claim ONLY job rows — it must not lease/churn invalidation rows (which it
+// never delivers), or it starves a future S2 invalidation-delivery consumer.
+func TestLaneDoesNotLeaseInvalidationRows(t *testing.T) {
+	s, cs := newServerWithLane(t, rule.NewRuleSet(proposeRule()), job.NewFakeRunner(nil))
+	if _, _, err := cs.Ingest("agent", contract.ObservationEnvelope{ExternalID: "e1", Event: contract.Event{Type: "memory.observed", CorrelationID: "c1"}}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if _, err := cs.Tick(); err != nil { // propose accepted -> invalidation row enqueued; lane runs (no jobs)
+		t.Fatalf("tick: %v", err)
+	}
+	// the invalidation row must still be claimable by its own delivery worker — not held by the lane.
+	claimed, _ := s.ClaimOutbox("invalidation-worker", time.Minute, "invalidation")
+	if len(claimed) != 1 || claimed[0].Kind != "invalidation" {
+		t.Fatalf("an invalidation row must be claimable by its delivery worker, not leased by the lane; got %+v", claimed)
+	}
+}
+
 // re-verify LOW: a VerdictWarn must surface its reasons as a diagnostic, not be silently dropped.
 func TestWarnVerdictEmitsDiagnostic(t *testing.T) {
 	warnRule := rule.NewNativeRule("w", "agent", "memory.write.proposed", []string{"memory.observed"},

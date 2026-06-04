@@ -265,15 +265,27 @@ func (t *Tx) EnqueueOutbox(row OutboxRow) error {
 // ClaimOutbox leases every currently-claimable row (not acked, and either unleased or with an expired lease)
 // to owner for ttl, bumping attempts, and returns them. The single writer connection serializes claims, so
 // two workers never both win the same row (S4 delivery lease). Rows are read fully before the UPDATE so the
-// single connection is not held by an open cursor during the writes.
-func (s *Store) ClaimOutbox(owner string, ttl time.Duration) ([]OutboxRow, error) {
+// single connection is not held by an open cursor during the writes. If kinds is non-empty, ONLY rows of
+// those kinds are claimed — a delivery worker must lease only the rows it actually delivers (so the job lane
+// never grabs invalidation rows, and vice-versa); empty kinds claims every kind.
+func (s *Store) ClaimOutbox(owner string, ttl time.Duration, kinds ...string) ([]OutboxRow, error) {
 	now := time.Now().Unix()
 	until := now + int64(ttl/time.Second)
+	where := `status!='acked' AND (lease_owner='' OR lease_until<=?)`
+	args := []any{now}
+	if len(kinds) > 0 {
+		ph := make([]string, len(kinds))
+		for i, k := range kinds {
+			ph[i] = "?"
+			args = append(args, k)
+		}
+		where += ` AND kind IN (` + strings.Join(ph, ",") + `)`
+	}
 	var claimed []OutboxRow
 	err := s.WithTx(func(tx *Tx) error {
 		rows, err := tx.tx.Query(
 			`SELECT id,kind,event_seq,target,payload,COALESCE(idempotency_key,''),attempts FROM outbox
-			 WHERE status!='acked' AND (lease_owner='' OR lease_until<=?) ORDER BY id`, now)
+			 WHERE `+where+` ORDER BY id`, args...)
 		if err != nil {
 			return err
 		}
