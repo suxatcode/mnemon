@@ -43,6 +43,7 @@ func OpenStore(path string) (*Store, error) {
 		`CREATE TABLE IF NOT EXISTS events (ingest_seq INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL);`,
 		`CREATE TABLE IF NOT EXISTS decisions (decision_id TEXT PRIMARY KEY, op_id TEXT, ingest_seq INTEGER, actor TEXT, correlation_id TEXT, next_action TEXT, status TEXT, payload TEXT NOT NULL);`,
 		`CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, seq INTEGER NOT NULL);`,
+		`CREATE TABLE IF NOT EXISTS inbox_dedupe (source TEXT, external_id TEXT, event_seq INTEGER NOT NULL, PRIMARY KEY(source,external_id));`,
 	} {
 		if _, err := db.Exec(s); err != nil {
 			db.Close()
@@ -170,6 +171,52 @@ func (t *Tx) AppendEventReturningSeq(ev contract.Event) (int64, error) {
 		return 0, err
 	}
 	return res.LastInsertId()
+}
+
+// IngestObservation appends an observation exactly once per (Source,ExternalID): a retried envelope returns
+// the original seq with dup=true and never double-appends (S1). The dedupe lookup, the event append (with its
+// LSN via AppendEventReturningSeq, review #6), and the dedupe-row insert are ONE transaction; the single
+// writer connection serializes concurrent ingests, so the SELECT-then-INSERT cannot race. The server stamps
+// env.Event.Actor from the authenticated principal BEFORE calling (D7) — the store trusts the envelope.
+func (s *Store) IngestObservation(env contract.ObservationEnvelope) (int64, bool, error) {
+	var seq int64
+	var dup bool
+	err := s.WithTx(func(tx *Tx) error {
+		existing, found, e := tx.lookupDedupe(env.Source, env.ExternalID)
+		if e != nil {
+			return e
+		}
+		if found {
+			seq, dup = existing, true
+			return nil
+		}
+		s2, e := tx.AppendEventReturningSeq(env.Event)
+		if e != nil {
+			return e
+		}
+		if e := tx.insertDedupe(env.Source, env.ExternalID, s2); e != nil {
+			return e
+		}
+		seq = s2
+		return nil
+	})
+	return seq, dup, err
+}
+
+func (t *Tx) lookupDedupe(source contract.ActorID, externalID string) (int64, bool, error) {
+	var seq int64
+	err := t.tx.QueryRow(`SELECT event_seq FROM inbox_dedupe WHERE source=? AND external_id=?`, string(source), externalID).Scan(&seq)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return seq, true, nil
+}
+func (t *Tx) insertDedupe(source contract.ActorID, externalID string, seq int64) error {
+	_, err := t.tx.Exec(`INSERT INTO inbox_dedupe (source, external_id, event_seq) VALUES (?,?,?)`, string(source), externalID, seq)
+	return err
 }
 
 // AppendDecisionTx writes a decision INSIDE a caller's txn (used for accepted ops — crash-safe atomicity, Invariant #7).

@@ -103,6 +103,15 @@ type ProposedEvent struct {
 	Payload map[string]any
 }
 
+// ObservationEnvelope is what an edge submits to the control server. Source is the AUTHENTICATED principal
+// (the server overwrites Event.Actor from it — never the client payload, D7/S9); ExternalID is the edge's
+// idempotency key for exactly-once ingest (S1: a retried (Source,ExternalID) returns the original seq).
+type ObservationEnvelope struct {
+	Source     ActorID
+	ExternalID string
+	Event      Event
+}
+
 // ---- modes (the catalog NAMES live here — the standard advertises them) ----
 type Modes struct{ Conflict, Isolation, Authz string }
 
