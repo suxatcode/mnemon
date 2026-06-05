@@ -5,11 +5,13 @@
 package replay
 
 import (
+	"encoding/json"
 	"sort"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/core/contract"
 	"github.com/mnemon-dev/mnemon/harness/core/kernel"
+	"github.com/mnemon-dev/mnemon/harness/core/projection"
 	"github.com/mnemon-dev/mnemon/harness/core/reconcile"
 	"github.com/mnemon-dev/mnemon/harness/core/rule"
 )
@@ -42,78 +44,66 @@ func permissiveAuthority(events []contract.Event) kernel.AuthorityRules {
 // masked dynamic fields. The candidate ruleset is retained for signature symmetry with Shadow — pure replay
 // needs no policy because the logged proposals are authoritative (event-sourcing).
 func Replay(events []contract.Event, candidate rule.RuleSet) []contract.Decision {
-	return drive(events, nil)
+	return drive(events)
 }
 
-// Shadow replays the same event log under the LIVE and the CANDIDATE policies (each on its own throwaway
-// kernel) and reports the diff — never committing to a live store or advancing a cursor (S8). A candidate
-// that denies writes the live policy accepted yields a non-clean report; an identical candidate is clean. It
-// reports diffs, never pass/fail (the operator gates promotion on Clean).
-func Shadow(events []contract.Event, live, candidate rule.RuleSet) rule.ShadowReport {
-	liveDecs := drive(events, &live)
-	candDecs := drive(events, &candidate)
-	diffs := diffDecisions(liveDecs, candDecs)
+// Shadow asks the governance question "would promoting this candidate rule set change behavior?" by RE-RUNNING
+// both policies' rules over the OBSERVED events of the log and diffing their rule decisions (S8). This is the
+// faithful model: a rule handles OBSERVED events and EMITS proposals/denies/jobs — so the candidate's behavior
+// change lives in observed->decision, NOT in re-reconciling the already-minted *.proposed events (the prior
+// model never ran the candidate's rules at all, so every real rule change passed Clean).
+//
+// It seeds a throwaway kernel with the canonical state (the logged proposals) so each rule sees realistic
+// resource state, then for every observed event evaluates live and candidate against the same scoped view and
+// compares verdict + proposal (type + payload) + job + trusted origin actor. The seeded kernel is NEVER mutated
+// by the comparison (read-only, S8). It reports diffs, never pass/fail (the operator gates promotion on Clean).
+func Shadow(events []contract.Event, subs map[contract.ActorID]contract.Subscription, live, candidate rule.RuleSet) rule.ShadowReport {
+	s, err := kernel.OpenStore(":memory:")
+	if err != nil {
+		return rule.ShadowReport{}
+	}
+	defer s.Close()
+	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), permissiveAuthority(events))
+	r := reconcile.NewReconciler(s, k)
+	for _, ev := range events {
+		if _, err := s.AppendEvent(ev); err != nil {
+			continue
+		}
+	}
+	r.RunOnce(canonicalModes) // apply the logged proposals -> canonical resource state for the views below
+
+	diffs := 0
+	for _, ev := range events {
+		if isProposal(ev) || strings.HasSuffix(ev.Type, ".diagnostic") {
+			continue // only OBSERVED events drive the rules
+		}
+		view := projection.ScopedView(s, subs[ev.Actor])
+		in := rule.RuleInput{Event: ev, View: view}
+		ld, _ := live.Evaluate(in)
+		cd, _ := candidate.Evaluate(in)
+		if canonicalRuleDecision(ld) != canonicalRuleDecision(cd) {
+			diffs++
+		}
+	}
 	return rule.ShadowReport{Clean: diffs == 0, Diffs: diffs}
 }
 
-// diffDecisions counts the decisions that differ between two replays, keyed by the durable IngestSeq and
-// compared on the masked, outcome-bearing fields (a missing or differing decision on either side is one diff).
-// The key is IngestSeq — the event's autoincrement rowid, unique per decision — NOT OpID (= the
-// client-controllable Event.ID, which can collide): keying by a non-unique field collapsed two decisions that
-// shared an id to the last one (last-write-wins), hiding a real divergence and producing a FALSE-CLEAN report
-// the Promote gate trusts (S8).
-func diffDecisions(a, b []contract.Decision) int {
-	index := func(ds []contract.Decision) map[int64]contract.Decision {
-		m := make(map[int64]contract.Decision, len(ds))
-		for _, d := range ds {
-			m[d.IngestSeq] = maskDynamic(d)
-		}
-		return m
-	}
-	am, bm := index(a), index(b)
-	diffs := 0
-	for seq, ad := range am {
-		if bd, ok := bm[seq]; !ok || !sameOutcome(ad, bd) {
-			diffs++
-		}
-	}
-	for seq := range bm {
-		if _, ok := am[seq]; !ok {
-			diffs++
-		}
-	}
-	return diffs
+// canonicalRuleDecision serializes the behaviorally-meaningful fields of a rule decision (verdict, proposal
+// type+payload, job, and the trusted origin actor) to a stable string for comparison. Advisory Reasons are
+// excluded (they do not change behavior). json.Marshal sorts map keys, so equal payloads compare equal.
+func canonicalRuleDecision(d contract.RuleDecision) string {
+	b, _ := json.Marshal(struct {
+		Verdict  contract.RuleVerdict
+		Proposal *contract.ProposedEvent
+		Job      *contract.JobSpec
+		Actor    contract.ActorID
+	}{d.Verdict, d.Proposal, d.Job, d.ProposalActor})
+	return string(b)
 }
 
-// sameOutcome compares the masked, non-dynamic decision fields by CONTENT — not just the COUNT of
-// Conflicts/NewVersions. A length-only compare reported a candidate that re-derived a divergent conflict
-// (different raced ref/version) or a different resulting version as equal, defeating the S8/D1 equivalence the
-// Clean gate provides. maskDynamic sorts both slices, so the element-wise compare is order-insensitive.
-func sameOutcome(a, b contract.Decision) bool {
-	if a.Status != b.Status || a.NextAction != b.NextAction || a.IngestSeq != b.IngestSeq {
-		return false
-	}
-	if len(a.Conflicts) != len(b.Conflicts) || len(a.NewVersions) != len(b.NewVersions) {
-		return false
-	}
-	for i := range a.Conflicts {
-		if a.Conflicts[i] != b.Conflicts[i] {
-			return false
-		}
-	}
-	for i := range a.NewVersions {
-		if a.NewVersions[i] != b.NewVersions[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// drive replays the events on a throwaway kernel and returns the reconciler's decisions. If filter is
-// non-nil, a *.proposed event the filter would DENY is neutralized (re-typed so the reconciler skips it,
-// preserving every other event's durable seq) — this is how Shadow diffs a candidate policy without re-
-// ordering the log.
-func drive(events []contract.Event, filter *rule.RuleSet) []contract.Decision {
+// drive replays the events on a throwaway kernel and returns the reconciler's decisions (event-sourcing
+// reproduce-from-log: the logged proposals are authoritative). It never touches a live store/cursor.
+func drive(events []contract.Event) []contract.Decision {
 	s, err := kernel.OpenStore(":memory:")
 	if err != nil {
 		return nil
@@ -122,14 +112,7 @@ func drive(events []contract.Event, filter *rule.RuleSet) []contract.Decision {
 	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), permissiveAuthority(events))
 	r := reconcile.NewReconciler(s, k)
 	for _, ev := range events {
-		e := ev
-		if filter != nil && isProposal(ev) {
-			dec, _ := filter.Evaluate(rule.RuleInput{Event: ev})
-			if dec.Verdict == contract.VerdictDeny {
-				e.Type = ev.Type + ".shadow_denied" // not a proposal -> reconciler skips; seq preserved
-			}
-		}
-		if _, err := s.AppendEvent(e); err != nil {
+		if _, err := s.AppendEvent(ev); err != nil {
 			continue
 		}
 	}
