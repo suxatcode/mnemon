@@ -153,9 +153,9 @@ func runDemo() error {
 	}
 	m1v, _ := s.GetVersion(ref("m1"))
 	m2v, _ := s.GetVersion(ref("m2"))
-	rv, rf, _ := s.GetResource(contract.ResourceRef{Kind: "receipt", ID: "gather-1"})
+	rv, rf, _ := s.GetResource(contract.ResourceRef{Kind: "receipt", ID: "job_k_gather-1"})
 	fmt.Printf("· diagnostics: %v\n", stages)
-	fmt.Printf("· state: memory/m1@%d  memory/m2@%d  receipt/gather-1@%d(%v)\n", m1v, m2v, rv, rf["outcome"])
+	fmt.Printf("· state: memory/m1@%d  memory/m2@%d  receipt/job_k_gather-1@%d(%v)\n", m1v, m2v, rv, rf["outcome"])
 
 	rep := replay.Replay(evs, rule.RuleSet{})
 	repAccept := 0

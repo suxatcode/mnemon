@@ -86,7 +86,7 @@ func TestFullChainWithWasmRule(t *testing.T) {
 	if v, _ := s.GetVersion(contract.ResourceRef{Kind: "memory", ID: "m2"}); v != 1 {
 		t.Fatalf("job lane (FakeRunner) must create m2@1; got %d", v)
 	}
-	if v, f, _ := s.GetResource(contract.ResourceRef{Kind: "receipt", ID: "gather-1"}); v != 1 || f["outcome"] != "ok" {
+	if v, f, _ := s.GetResource(contract.ResourceRef{Kind: "receipt", ID: "job_k_gather-1"}); v != 1 || f["outcome"] != "ok" {
 		t.Fatalf("the job must write a receipt; got v%d %v", v, f)
 	}
 	var accepted, deferred int

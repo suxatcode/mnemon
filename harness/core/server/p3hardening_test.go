@@ -70,7 +70,7 @@ func TestLaneSkipsJobWithExistingReceipt(t *testing.T) {
 	// pre-write the receipt keyed by the idempotency key (the deterministic dedup identity).
 	lk := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"lane": {"receipt"}}})
 	if d := lk.Apply(contract.KernelOp{OpID: "pre", Actor: "lane", Writes: []contract.ResourceWrite{
-		{Ref: contract.ResourceRef{Kind: "receipt", ID: "ev-job"}, Kind: contract.OpCreate, Fields: map[string]any{"job_id": "job_ev-job", "effect_id": "ev-job", "outcome": "ok"}}}},
+		{Ref: contract.ResourceRef{Kind: "receipt", ID: "job_k_ev-job"}, Kind: contract.OpCreate, Fields: map[string]any{"job_id": "job_k_ev-job", "effect_id": "job_k_ev-job", "outcome": "ok"}}}},
 		contract.Modes{Conflict: contract.ConflictReject, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict}); d.Status != contract.Accepted {
 		t.Fatalf("pre-write receipt: %s", d.Reason)
 	}
@@ -193,7 +193,7 @@ func TestLaneRemintsProposalFromReceiptOnRecovery(t *testing.T) {
 	propJSON, _ := json.Marshal(laneProposal())
 	lk := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"lane": {"receipt"}}})
 	if d := lk.Apply(contract.KernelOp{OpID: "pre", Actor: "lane", Writes: []contract.ResourceWrite{
-		{Ref: contract.ResourceRef{Kind: "receipt", ID: "ev-job"}, Kind: contract.OpCreate, Fields: map[string]any{"job_id": "job_k_ev-job", "effect_id": "ev-job", "outcome": "ok", "proposal": string(propJSON)}}}},
+		{Ref: contract.ResourceRef{Kind: "receipt", ID: "job_k_ev-job"}, Kind: contract.OpCreate, Fields: map[string]any{"job_id": "job_k_ev-job", "effect_id": "job_k_ev-job", "outcome": "ok", "proposal": string(propJSON)}}}},
 		contract.Modes{Conflict: contract.ConflictReject, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict}); d.Status != contract.Accepted {
 		t.Fatalf("pre-write receipt+proposal: %s", d.Reason)
 	}

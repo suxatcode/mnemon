@@ -288,12 +288,13 @@ func (cs *ControlServer) runJobLane() error {
 			continue
 		}
 		trigger := contract.Event{ID: jp.TriggerID, Type: "job.observed", Actor: jp.Actor, CorrelationID: jp.Correlation}
-		// The receipt/dedup identity is the idempotency key when present; a keyless job uses its unique outbox
-		// row id so two keyless jobs get distinct receipts (never collide on a shared runner effect id).
-		effectKey := jp.Spec.IdempotencyKey
-		if effectKey == "" {
-			effectKey = row.ID
-		}
+		// The receipt/dedup identity is the outbox ROW ID, whose keyed/keyless namespaces are already DISJOINT
+		// ("job_k_"+key vs "job_s_"+seq). Keying the receipt by the raw idempotency key reopened the collision one
+		// layer down: a keyed job whose literal key equals a keyless row id ("job_s_<seq>") forged that keyless
+		// job's receipt, silently dropping one of two distinct effects (S4). The row id is disjoint by
+		// construction and still stable across a keyed retry (the outbox UNIQUE(idempotency_key) yields one row
+		// per key), so two distinct jobs always get two distinct receipts.
+		effectKey := row.ID
 		// Idempotent recovery: if the effect's receipt already exists (it ran, perhaps before a crash that
 		// preceded the ack), do NOT re-run — re-mint the proposal recorded in the receipt (so a crash between
 		// Finish and the mint does not lose the governed write), then ack so the row drains.
