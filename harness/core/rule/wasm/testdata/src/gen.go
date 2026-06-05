@@ -180,6 +180,13 @@ func main() {
 		cat(name("env"), name("extra"), []byte{0x00, 0x00}),
 	)))
 	write("harness/core/rule/wasm/testdata/two_imports.wasm", cat(header, voidType, twoImports))
+
+	// two_import_sections.wasm: a malformed module with TWO import sections — the first exactly
+	// {env.read_state_view}, the second smuggling {env.extra}. Proves the promotion parser does not stop at
+	// the first import section (which would let the extra import slip past the gate).
+	impA := section(2, vec(1, cat(name("env"), name("read_state_view"), []byte{0x00, 0x00})))
+	impB := section(2, vec(1, cat(name("env"), name("extra"), []byte{0x00, 0x00})))
+	write("harness/core/rule/wasm/testdata/two_import_sections.wasm", cat(header, voidType, impA, impB))
 }
 
 func write(path string, b []byte) {

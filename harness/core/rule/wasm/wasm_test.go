@@ -58,6 +58,21 @@ func TestWasmRunawayIsKilledByDeadline(t *testing.T) {
 	}
 }
 
+// adversarial #1: a deadline-kill closes the SHARED module — the long-lived seat must recover (re-instantiate)
+// on the next call rather than stay permanently bricked.
+func TestWasmSeatRecoversAfterModuleClose(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(ctx, readBytes(t, "testdata/rule_allow_if_evidence.wasm"), Limits{Timeout: 100 * time.Millisecond, MemPages: 16})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	r.(*wasmRule).mod.Close(ctx) // simulate a deadline kill closing the shared module
+	d, err := r.Evaluate(rule.RuleInput{Event: evWith(map[string]any{"evidence": "x"})})
+	if err != nil || d.Verdict != contract.VerdictPropose {
+		t.Fatalf("the seat must recover after a module close, not stay bricked; got %q err=%v", d.Verdict, err)
+	}
+}
+
 // S12: the module imports only env.read_state_view -> it instantiates with NO wasi registered.
 func TestWasmInstantiatesWithoutWASI(t *testing.T) {
 	ctx := context.Background()

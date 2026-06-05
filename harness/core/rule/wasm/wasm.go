@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/mnemon-dev/mnemon/harness/core/contract"
@@ -26,12 +27,14 @@ type Limits struct {
 }
 
 type wasmRule struct {
-	ctx      context.Context
-	runtime  wazero.Runtime
-	mod      api.Module
-	alloc    api.Function
-	evaluate api.Function
-	limits   Limits
+	mu        sync.Mutex // the seat is shared across Ticks; serialize Evaluate + re-instantiation
+	ctx       context.Context
+	runtime   wazero.Runtime
+	wasmBytes []byte // retained so a deadline-killed module can be re-instantiated (no permanent brick)
+	mod       api.Module
+	alloc     api.Function
+	evaluate  api.Function
+	limits    Limits
 	// metadata for the rule seat (fixed to the committed module's purpose; the manifest governs promotion).
 	id, emits string
 	actor     contract.ActorID
@@ -67,7 +70,7 @@ func New(ctx context.Context, wasmBytes []byte, limits Limits) (rule.Rule, error
 		return nil, fmt.Errorf("wasm rule must export memory, alloc, and evaluate")
 	}
 	return &wasmRule{
-		ctx: ctx, runtime: rt, mod: mod, alloc: alloc, evaluate: evaluate, limits: limits,
+		ctx: ctx, runtime: rt, wasmBytes: wasmBytes, mod: mod, alloc: alloc, evaluate: evaluate, limits: limits,
 		id: "wasm-allow-if-evidence", actor: "agent", emits: "memory.write.proposed",
 		handles: map[string]bool{"memory.observed": true},
 	}, nil
@@ -78,10 +81,37 @@ func (r *wasmRule) Actor() contract.ActorID { return r.actor }
 func (r *wasmRule) Emits() string           { return r.emits }
 func (r *wasmRule) Handles(t string) bool   { return r.handles[t] }
 
-// Evaluate marshals the typed input to JSON, hands it to the module via alloc+memory, runs evaluate under a
-// per-call deadline, and decodes the returned JSON RuleDecision. On a runaway module the deadline expires and
-// wazero returns a sys.ExitError-wrapped error (never a hang). The module can only RETURN a decision.
+// Evaluate runs the rule under a per-call deadline. On a runaway the deadline expires and wazero returns an
+// error (never a hang). WithCloseOnContextDone closes the SHARED module on expiry, which would otherwise
+// permanently brick this long-lived seat — so on ANY call error Evaluate re-instantiates the module (cheap,
+// on the same runtime + host import) and retries ONCE: a single runaway never disables the rule for later
+// benign inputs. Serialized by r.mu since the seat is reused across Ticks. The module can only RETURN a
+// decision (it holds no Store/Kernel — S12).
 func (r *wasmRule) Evaluate(in rule.RuleInput) (contract.RuleDecision, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	d, err := r.evalOnce(in)
+	if err != nil {
+		if rerr := r.reinstantiate(); rerr != nil {
+			return contract.RuleDecision{}, err
+		}
+		return r.evalOnce(in)
+	}
+	return d, nil
+}
+
+// reinstantiate rebuilds the rule module on the existing runtime (the host "env" import persists), recovering
+// a seat whose module was closed by a deadline kill.
+func (r *wasmRule) reinstantiate() error {
+	mod, err := r.runtime.InstantiateWithConfig(r.ctx, r.wasmBytes, wazero.NewModuleConfig())
+	if err != nil {
+		return err
+	}
+	r.mod, r.alloc, r.evaluate = mod, mod.ExportedFunction("alloc"), mod.ExportedFunction("evaluate")
+	return nil
+}
+
+func (r *wasmRule) evalOnce(in rule.RuleInput) (contract.RuleDecision, error) {
 	inJSON, err := json.Marshal(in)
 	if err != nil {
 		return contract.RuleDecision{}, err

@@ -29,11 +29,13 @@ func NewRegistry(rules ...Rule) *Registry { return &Registry{active: rules} }
 // Active returns the current active rule set.
 func (reg *Registry) Active() RuleSet { return NewRuleSet(reg.active...) }
 
-// Promote admits candidate (with bytes wasmBytes, described by m) into the active set iff: sha256(wasmBytes)
-// == m.SHA256 (signed/pinned identity), the wasm import section is EXACTLY {env.read_state_view} (no WASI, no
-// extra host reach), and report.Clean (the candidate's replay/shadow produced no divergence the operator did
-// not accept). Any failure leaves the active set untouched.
-func (reg *Registry) Promote(wasmBytes []byte, candidate Rule, m Manifest, report ShadowReport) error {
+// Promote admits a rule into the active set iff: sha256(wasmBytes) == m.SHA256 (signed/pinned identity), the
+// wasm import section is EXACTLY {env.read_state_view} (no WASI, no extra host reach), and report.Clean (the
+// shadow produced no divergence the operator did not accept). The active rule is BUILT FROM the verified
+// bytes via build (so the rule that goes active is structurally the verified module, not an unrelated
+// candidate — build, e.g. wasmrule.New, also re-validates the bytes by instantiation, defense-in-depth). Any
+// failure leaves the active set untouched.
+func (reg *Registry) Promote(wasmBytes []byte, build func([]byte) (Rule, error), m Manifest, report ShadowReport) error {
 	sum := sha256.Sum256(wasmBytes)
 	if hex.EncodeToString(sum[:]) != m.SHA256 {
 		return fmt.Errorf("promotion: sha256 mismatch (bytes do not match manifest)")
@@ -48,7 +50,11 @@ func (reg *Registry) Promote(wasmBytes []byte, candidate Rule, m Manifest, repor
 	if !report.Clean {
 		return fmt.Errorf("promotion: shadow report not clean (%d diffs)", report.Diffs)
 	}
-	reg.active = append(reg.active, candidate)
+	r, err := build(wasmBytes)
+	if err != nil {
+		return fmt.Errorf("promotion: build rule from verified bytes: %w", err)
+	}
+	reg.active = append(reg.active, r)
 	return nil
 }
 
@@ -75,7 +81,8 @@ func (e edgeRule) Evaluate(in RuleInput) (contract.RuleDecision, error) {
 		return contract.RuleDecision{}, err
 	}
 	if d.Verdict == contract.VerdictDeny || d.Verdict == contract.VerdictWarn {
-		return d, nil
+		// an edge may refuse/warn but never AUTHOR — strip any proposal/job riding on the verdict.
+		return contract.RuleDecision{Verdict: d.Verdict, Reasons: d.Reasons}, nil
 	}
 	return contract.RuleDecision{
 		Verdict: contract.VerdictWarn,
@@ -93,6 +100,8 @@ func wasmImports(b []byte) ([]string, error) {
 		return nil, fmt.Errorf("not a wasm module")
 	}
 	p := 8
+	var imports []string
+	importSections := 0
 	for p < len(b) {
 		secID := b[p]
 		p++
@@ -106,11 +115,22 @@ func wasmImports(b []byte) ([]string, error) {
 			return nil, fmt.Errorf("section overruns module")
 		}
 		if secID == 2 { // import section
-			return parseImports(b, p, end)
+			// A well-formed module has AT MOST ONE import section (WASM spec §5.5.2). A second one is
+			// malformed AND a smuggling vector (extra imports the gate would otherwise miss if it stopped at
+			// the first) — reject it outright rather than scan past it.
+			importSections++
+			if importSections > 1 {
+				return nil, fmt.Errorf("malformed module: multiple import sections")
+			}
+			imps, err := parseImports(b, p, end)
+			if err != nil {
+				return nil, err
+			}
+			imports = imps
 		}
 		p = end
 	}
-	return nil, nil // no import section -> no imports
+	return imports, nil
 }
 
 func parseImports(b []byte, p, end int) ([]string, error) {
