@@ -214,6 +214,9 @@ func (cs *ControlServer) dispatchOne(ev contract.Event) ([]contract.Event, []ker
 	switch dec.Verdict {
 	case contract.VerdictPropose:
 		if dec.Proposal == nil {
+			// S7: a propose verdict that carries no proposal is diagnosed, never silently dropped — symmetric
+			// with the deny and enqueue_job/request_evidence nil-payload branches.
+			stamped = append(stamped, cs.diagnosticEvent(ev, contract.Diagnostic{Stage: "rule", Reason: "verdict propose carried no proposal", Ref: ev.Type}))
 			break
 		}
 		b, ok := cs.proposerBinding(ev, dec)
@@ -295,7 +298,9 @@ func (cs *ControlServer) runJobLane() error {
 		// preceded the ack), do NOT re-run — re-mint the proposal recorded in the receipt (so a crash between
 		// Finish and the mint does not lose the governed write), then ack so the row drains.
 		if v, fields, _ := cs.store.GetResource(contract.ResourceRef{Kind: "receipt", ID: contract.ResourceID(effectKey)}); v != 0 {
-			cs.remintFromReceipt(jp, fields)
+			if err := cs.remintFromReceipt(jp, fields); err != nil {
+				return err
+			}
 			_ = cs.store.AckOutbox(row.ID, string(cs.laneOwner))
 			continue
 		}
@@ -341,21 +346,27 @@ func (cs *ControlServer) runJobLane() error {
 // remintFromReceipt re-mints the proposal recorded in a completed effect's receipt (recovery after a crash
 // between Finish and the original mint). It is idempotent at the state level: if the proposal was already
 // minted+applied, the re-minted one races the same version and the kernel CAS defers it (no double-write).
-func (cs *ControlServer) remintFromReceipt(jp jobPayload, receiptFields map[string]any) {
+// If the recorded proposal is OUT OF SCOPE, the bridge rejects it and recovery emits a stage:bridge diagnostic
+// — mirroring the live lane path's no-silent-drop guarantee (S7), never swallowing the reject while acking.
+func (cs *ControlServer) remintFromReceipt(jp jobPayload, receiptFields map[string]any) error {
 	raw, ok := receiptFields["proposal"].(string)
 	if !ok || raw == "" {
-		return
+		return nil
 	}
 	var cand contract.ProposedEvent
 	if json.Unmarshal([]byte(raw), &cand) != nil {
-		return
+		return nil
 	}
 	view := cs.scopedView(jp.Actor)
 	b := config.ResolvedBinding{Actor: jp.Actor, Emits: cand.Type}
 	trigger := contract.Event{ID: jp.TriggerID, Type: "job.observed", Actor: jp.Actor, CorrelationID: jp.Correlation}
-	if e, serr := cs.bridge.Stamp(b, view, trigger, cand); serr == nil {
-		_, _ = cs.store.AppendEvent(e)
+	e, serr := cs.bridge.Stamp(b, view, trigger, cand)
+	if serr != nil {
+		_, aerr := cs.store.AppendEvent(cs.diagnosticEvent(trigger, contract.Diagnostic{Stage: "bridge", Reason: serr.Error(), Ref: string(jp.Actor)}))
+		return aerr
 	}
+	_, aerr := cs.store.AppendEvent(e)
+	return aerr
 }
 
 // scopedView builds the actor's scoped projection. (P2 strengthens the scoping + digest behind this seam;
