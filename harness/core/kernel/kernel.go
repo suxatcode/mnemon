@@ -36,12 +36,24 @@ func (k *Kernel) Apply(op contract.KernelOp, m contract.Modes) contract.Decision
 		_ = k.store.AppendDecision(d)
 		return d
 	}
+	// Every write must name a supported op kind, and the writes must target DISTINCT resources. Aliasing one
+	// ref twice in a single op would apply sequentially with last-write-wins and report two NewVersions for one
+	// resource — degenerating multi-RESOURCE all-or-nothing (Invariant #5) into a self-cancelling op (e.g. a
+	// budget reserve+reset that launders the spend ceiling, S6). Reject both terminally up-front: rebase can't
+	// fix a malformed op.
+	seen := make(map[contract.ResourceRef]bool, len(op.Writes))
 	for _, w := range op.Writes {
 		if w.Kind != contract.OpCreate && w.Kind != contract.OpUpdate {
 			d.Status, d.NextAction, d.Reason = contract.Rejected, "", "malformed op: unsupported op kind \""+string(w.Kind)+"\""
 			_ = k.store.AppendDecision(d)
 			return d
 		}
+		if seen[w.Ref] {
+			d.Status, d.NextAction, d.Reason = contract.Rejected, "", "malformed op: duplicate write to "+string(w.Ref.Kind)+"/"+string(w.Ref.ID)+" (multi-write must target distinct resources, #5)"
+			_ = k.store.AppendDecision(d)
+			return d
+		}
+		seen[w.Ref] = true
 	}
 
 	err := k.store.WithTx(func(tx *Tx) error {
