@@ -6,6 +6,7 @@ package replay
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -105,15 +106,42 @@ func Shadow(events []contract.Event, subs map[contract.ActorID]contract.Subscrip
 // into durable deny/warn *.diagnostic events, so they are auditable state, not advisory), AND the durable
 // diagnostics — to a stable string for comparison. json.Marshal sorts map keys, so equal payloads compare equal.
 func canonicalRuleResult(d contract.RuleDecision, diags []contract.Diagnostic) string {
-	b, _ := json.Marshal(struct {
+	v := struct {
 		Verdict     contract.RuleVerdict
 		Proposal    *contract.ProposedEvent
 		Job         *contract.JobSpec
 		Actor       contract.ActorID
 		Reasons     []string
 		Diagnostics []contract.Diagnostic
-	}{d.Verdict, d.Proposal, d.Job, d.ProposalActor, d.Reasons, diags})
-	return string(b)
+	}{d.Verdict, d.Proposal, d.Job, d.ProposalActor, d.Reasons, diags}
+	b, err := json.Marshal(v)
+	if err == nil {
+		return string(b)
+	}
+	// A non-finite float (NaN/Inf — legal in JobSpec.EstCostUSD or a Proposal payload, settable by a native
+	// rule) makes json.Marshal fail. Do NOT collapse to "" (the zero value when the error is dropped): two
+	// DIVERGENT decisions would both render "" and compare equal, masking a reason/verdict change as Clean.
+	// Fall back to a Go-syntax rendering — but FLATTEN the Proposal/Job pointers to values first, because %#v
+	// prints a NESTED pointer field as a heap ADDRESS (non-deterministic) rather than its dereferenced value.
+	// On the flattened, pointer-free struct, fmt renders NaN/Inf as "NaN"/"+Inf" and sorts map keys, so the
+	// canonical form handles every float value AND distinguishes every field deterministically.
+	flat := struct {
+		Verdict     contract.RuleVerdict
+		Proposal    contract.ProposedEvent
+		HasProposal bool
+		Job         contract.JobSpec
+		HasJob      bool
+		Actor       contract.ActorID
+		Reasons     []string
+		Diagnostics []contract.Diagnostic
+	}{Verdict: d.Verdict, Actor: d.ProposalActor, Reasons: d.Reasons, Diagnostics: diags}
+	if d.Proposal != nil {
+		flat.Proposal, flat.HasProposal = *d.Proposal, true
+	}
+	if d.Job != nil {
+		flat.Job, flat.HasJob = *d.Job, true
+	}
+	return "nonjson:" + fmt.Sprintf("%#v", flat)
 }
 
 // drive replays the events on a throwaway kernel and returns the reconciler's decisions (event-sourcing
