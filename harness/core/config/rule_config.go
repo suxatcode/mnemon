@@ -45,7 +45,24 @@ func ResolveRules(rc RuleConfig, registry map[string]rule.Rule, actors map[contr
 		if !strings.HasSuffix(r.Emits(), ".proposed") {
 			return rule.RuleSet{}, fmt.Errorf("rule %q emits %q must end in .proposed", b.Rule, r.Emits())
 		}
-		rules = append(rules, r)
+		// SELECT-ONLY scoping: a binding selects ONE event type, but a registry rule may Handle several. Append
+		// a wrapper whose Handles is restricted to exactly b.EventType, so the rule fires only on the bound type
+		// — never on the others it happens to handle (a rule handling memory.observed AND goal.observed, bound
+		// only to memory.observed, must not fire on goal.observed; define≠select).
+		rules = append(rules, boundRule{inner: r, eventType: b.EventType})
 	}
 	return rule.NewRuleSet(rules...), nil
 }
+
+// boundRule restricts a selected rule's Handles to exactly its bound EventType. All other behavior (identity,
+// emit type, evaluation) delegates to the inner rule unchanged.
+type boundRule struct {
+	inner     rule.Rule
+	eventType string
+}
+
+func (b boundRule) ID() string                                            { return b.inner.ID() }
+func (b boundRule) Actor() contract.ActorID                               { return b.inner.Actor() }
+func (b boundRule) Emits() string                                         { return b.inner.Emits() }
+func (b boundRule) Handles(t string) bool                                 { return t == b.eventType }
+func (b boundRule) Evaluate(in rule.RuleInput) (contract.RuleDecision, error) { return b.inner.Evaluate(in) }
