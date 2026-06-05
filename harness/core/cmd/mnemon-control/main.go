@@ -79,7 +79,10 @@ func runDemo() error {
 	now := func() string { return "2026-06-05T00:00:00Z" }
 	modes := contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict}
 	cs := server.New(s, k, rule.NewRuleSet(wr, gatherRule), subs, modes, newID, now).
-		WithLane(runner, "lane", func() int64 { return time.Now().UnixNano() }, 60)
+		// the lane clock is in SECONDS (ttl=60 is 60 seconds), consistent with the outbox sibling's
+		// time.Now().Unix()+ttl claim — a UnixNano clock with the same raw ttl would collapse the fence to a
+		// 60-nanosecond window (~zero exclusion). Seconds also stay within float64's exact-integer range.
+		WithLane(runner, "lane", func() int64 { return time.Now().Unix() }, 60)
 
 	// bootstrap m1 via a trusted *.proposed event so the canonical log fully describes the state.
 	if _, err := s.AppendEvent(contract.Event{ID: "boot", Type: "memory.write.proposed", Actor: "agent",

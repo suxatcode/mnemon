@@ -6,6 +6,7 @@ package job
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/mnemon-dev/mnemon/harness/core/contract"
 	"github.com/mnemon-dev/mnemon/harness/core/kernel"
@@ -70,7 +71,12 @@ func leaseRef(jobID string) contract.ResourceRef {
 	return contract.ResourceRef{Kind: "lease", ID: contract.ResourceID(jobID)}
 }
 func leaseFields(jobID string, owner contract.ActorID, fenceUntil int64) map[string]any {
-	return map[string]any{"job_id": jobID, "owner": string(owner), "fence_until": float64(fenceUntil)}
+	// fence_until is stored as a DECIMAL STRING, not a float64: the resource fields round-trip through
+	// json.Unmarshal into map[string]any, which decodes every JSON number to float64. At UnixNano magnitude
+	// (~1.78e18, where the float64 ULP is 256ns) that silently mis-rounds the integer fence, corrupting the
+	// active/expired boundary S5 rests on (an active lease would become foreign-stealable). A string survives
+	// the round-trip exactly at any magnitude; asInt64 parses it back.
+	return map[string]any{"job_id": jobID, "owner": string(owner), "fence_until": strconv.FormatInt(fenceUntil, 10)}
 }
 
 // Claim acquires a fenced lease on jobID for owner until now+ttl. It is a read-modify-write CAS: an absent
@@ -185,6 +191,9 @@ func asFloat(v any) float64 {
 
 func asInt64(v any) int64 {
 	switch n := v.(type) {
+	case string: // fence_until is stored as a decimal string for exact round-trip (see leaseFields)
+		i, _ := strconv.ParseInt(n, 10, 64)
+		return i
 	case float64:
 		return int64(n)
 	case int64:
