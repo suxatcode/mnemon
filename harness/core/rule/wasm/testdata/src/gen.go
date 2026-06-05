@@ -169,6 +169,15 @@ func main() {
 	loopCodeSec := section(10, vec(2, cat(allocCode, loopEval)))
 	loopMod := cat(header, typeSec, importSec, funcSec, memSec, globalSec, exportSec, loopCodeSec)
 	write("harness/core/rule/wasm/testdata/loop.wasm", loopMod)
+
+	// two_imports.wasm: a minimal module importing env.read_state_view AND env.extra — used to prove the
+	// promotion import-section check rejects anything beyond the single allowed host import.
+	voidType := section(1, vec(1, cat([]byte{0x60}, vec(0, nil), vec(0, nil)))) // type ()->()
+	twoImports := section(2, vec(2, cat(
+		cat(name("env"), name("read_state_view"), []byte{0x00, 0x00}),
+		cat(name("env"), name("extra"), []byte{0x00, 0x00}),
+	)))
+	write("harness/core/rule/wasm/testdata/two_imports.wasm", cat(header, voidType, twoImports))
 }
 
 func write(path string, b []byte) {
