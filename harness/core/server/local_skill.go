@@ -57,6 +57,8 @@ func skillAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) ru
 				return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{err.Error()}}, nil
 			}
 			version, fields := skillResourceFromProjection(in.View, ref)
+			// Skill lifecycle changes are append-only declarations. A later "stale" or
+			// "archived" declaration records the transition without rewriting prior history.
 			declarations := append(skillDeclarationsFromFields(fields), skillDeclaration{
 				ID:         skillDeclarationID(in.Event.Actor, in.Event.IngestSeq),
 				SkillID:    candidate.SkillID,

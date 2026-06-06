@@ -62,3 +62,54 @@ func TestLocalSkillCandidateCreatesSyncPendingDeclaration(t *testing.T) {
 		t.Fatalf("skill declaration must become pending sync commit, got %+v", pending)
 	}
 }
+
+func TestLocalSkillLifecycleChangesAppendDeclarations(t *testing.T) {
+	ref := contract.ResourceRef{Kind: "skill", ID: "project"}
+	binding := HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
+	binding.AllowedObservedTypes = []string{SkillWriteCandidateObserved}
+	rt, err := OpenLocalRuntime(filepath.Join(t.TempDir(), "local.db"), LoadedBindings{Bindings: []ChannelBinding{binding}})
+	if err != nil {
+		t.Fatalf("open local runtime: %v", err)
+	}
+	defer rt.Close()
+	srv := httptest.NewServer(NewRuntimeHandler(rt, HeaderAuthenticator{}))
+	defer srv.Close()
+	client := NewClient(srv.URL, "codex@project")
+
+	for _, item := range []struct {
+		externalID string
+		status     string
+		content    string
+	}{
+		{"skill-release-active", "active", "Initial active declaration."},
+		{"skill-release-stale", "stale", "Approved lifecycle change to stale."},
+	} {
+		if _, err := client.IngestObserve("codex@project", contract.ObservationEnvelope{
+			ExternalID: item.externalID,
+			Event: contract.Event{Type: SkillWriteCandidateObserved, Payload: map[string]any{
+				"skill_id":   "release-checklist",
+				"name":       "release-checklist",
+				"status":     item.status,
+				"content":    item.content,
+				"source":     "test",
+				"confidence": "high",
+			}},
+		}); err != nil {
+			t.Fatalf("observe %s: %v", item.status, err)
+		}
+	}
+
+	proj, err := client.PullProjection("codex@project", contract.Subscription{Actor: "codex@project"})
+	if err != nil {
+		t.Fatalf("pull skill projection: %v", err)
+	}
+	decls, ok := proj.Content[0].Fields["declarations"].([]any)
+	if !ok || len(decls) != 2 {
+		t.Fatalf("skill lifecycle changes must append two declarations, got %+v", proj.Content[0].Fields)
+	}
+	first := decls[0].(map[string]any)
+	second := decls[1].(map[string]any)
+	if first["status"] != "active" || second["status"] != "stale" {
+		t.Fatalf("declarations must preserve lifecycle history, got %+v", decls)
+	}
+}
