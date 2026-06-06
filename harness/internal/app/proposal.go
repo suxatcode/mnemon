@@ -9,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	harnesseval "github.com/mnemon-dev/mnemon/harness/internal/eval"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/auditstore"
+	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/coreengine"
+	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/layout"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/profile"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/proposal"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/proposalstore"
@@ -236,6 +239,15 @@ func (h *Harness) applyMemoryProposal(out io.Writer, store *proposalstore.Store,
 	if err := h.ensureMemoryProfileEntryCanApply(spec); err != nil {
 		return err
 	}
+	// P2.2 (D1): lower the approved entry to a governed kernel write. The canonical memory
+	// resource is created by Kernel.Apply through the channel (ServerAPI.Ingest -> rule
+	// pre-gate -> bridge write-scope -> kernel single-writer); the host profile file below
+	// is materialized only AFTER the kernel accepts, so it is a mirror of the canonical
+	// state, never an independent writer. A kernel denial (duplicate at the gate, malformed,
+	// unauthorized) aborts the apply before any file is touched.
+	if err := h.governMemoryEntry(item.ID, spec); err != nil {
+		return err
+	}
 	now := time.Now().UTC()
 	auditResult, err := h.recordMemoryProfileEntryApplyAudit(item, spec, now)
 	if err != nil {
@@ -284,6 +296,34 @@ func (h *Harness) applyMemoryProposal(out io.Writer, store *proposalstore.Store,
 	fmt.Fprintf(out, "route: %s\n", applied.Route)
 	fmt.Fprintf(out, "profile entry: %s %s\n", spec.ProfileRef, entry.ID)
 	fmt.Fprintf(out, "audit: %s\n", auditURI)
+	return nil
+}
+
+// governMemoryEntry lowers the approved memory entry to a governed kernel write (D1): the
+// kernel is the single writer of the canonical memory resource (keyed profileID/entryID).
+// A non-Accepted decision aborts the apply with the kernel's reason, so no host file is
+// materialized for a write the kernel refused.
+func (h *Harness) governMemoryEntry(applyID string, spec memoryProfileEntrySpec) error {
+	paths, err := layout.Resolve(h.root)
+	if err != nil {
+		return err
+	}
+	engine := coreengine.NewMemoryEngine(paths.HarnessDir,
+		func() string { return uuid.NewString() },
+		func() string { return time.Now().UTC().Format(time.RFC3339) })
+	res, err := engine.AdmitEntry(applyID, spec.ProfileID+"/"+spec.EntryID, map[string]any{
+		"content":    spec.Content,
+		"summary":    spec.Summary,
+		"entry_type": spec.EntryType,
+		"profile_id": spec.ProfileID,
+		"entry_id":   spec.EntryID,
+	})
+	if err != nil {
+		return fmt.Errorf("lower memory entry to kernel: %w", err)
+	}
+	if !res.Accepted {
+		return fmt.Errorf("kernel denied memory entry %q: %s", spec.EntryID, res.Reason)
+	}
 	return nil
 }
 
