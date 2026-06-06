@@ -23,6 +23,13 @@ const modulePrefix = "github.com/mnemon-dev/mnemon/"
 // forces a deliberate ring assignment rather than silent drift.
 func ring(rel string) (int, bool) {
 	switch {
+	case rel == "harness/core" || strings.HasPrefix(rel, "harness/core/"):
+		// Kernel engine — the innermost tier (coarse Ring 1, docs/harness/16-ring-architecture
+		// §2). It shares the numeric floor (0) with the internal trunk so a host-lifecycle
+		// package importing the engine reads as INWARD (legal — the post-P2 channel wiring).
+		// The one direction that must never happen — core importing harness/internal or
+		// harness/cmd — is asserted directly by TestCoreEngineIsolation.
+		return 0, true
 	case rel == "harness/cmd/mnemon-harness":
 		return 7, true // surface
 	case rel == "harness/internal/ui" || strings.HasPrefix(rel, "harness/internal/ui/"):
@@ -198,5 +205,104 @@ func TestRingDependencyLaw(t *testing.T) {
 		if !usedStoreDebt[k] {
 			t.Logf("stale storeCouplingDebt entry (dependency gone, delete it): %s", k)
 		}
+	}
+}
+
+// TestCoreEngineIsolation asserts the kernel engine is the innermost tier: harness/core
+// imports NOTHING from harness/internal/** or harness/cmd/** (§2 import law — the engine
+// never reaches outward into the host-lifecycle layer; that layer feeds it INWARD through
+// the channel). The host -> core direction is legal and grows in P2.
+func TestCoreEngineIsolation(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot resolve caller path")
+	}
+	harnessRoot := filepath.Dir(filepath.Dir(filepath.Dir(thisFile))) // .../harness
+	moduleRoot := filepath.Dir(harnessRoot)
+	coreRoot := filepath.Join(harnessRoot, "core")
+
+	fset := token.NewFileSet()
+	var offending []string
+	walkErr := filepath.WalkDir(coreRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		f, perr := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if perr != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(moduleRoot, path)
+		for _, spec := range f.Imports {
+			to := strings.TrimPrefix(strings.Trim(spec.Path.Value, `"`), modulePrefix)
+			if strings.HasPrefix(to, "harness/internal/") || strings.HasPrefix(to, "harness/cmd/") {
+				offending = append(offending, filepath.ToSlash(rel)+" -> "+to)
+			}
+		}
+		return nil
+	})
+	if walkErr != nil {
+		t.Fatalf("walk core tree: %v", walkErr)
+	}
+	if len(offending) > 0 {
+		sort.Strings(offending)
+		t.Errorf("kernel engine must not import the host-lifecycle layer (core ↛ harness/internal|cmd):\n  %s", strings.Join(offending, "\n  "))
+	}
+}
+
+// TestReleaseDoesNotImportHarness asserts the RELEASE product (module root: ./, cmd/,
+// internal/ — everything OUTSIDE harness/) imports nothing under harness/ (decoupling D5,
+// "zero imports either way"). The harness is an additive experiment; the shipping CLI must
+// never depend on it.
+func TestReleaseDoesNotImportHarness(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot resolve caller path")
+	}
+	moduleRoot := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(thisFile))))
+	harnessImport := modulePrefix + "harness/"
+
+	fset := token.NewFileSet()
+	var offending []string
+	walkErr := filepath.WalkDir(moduleRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if path == moduleRoot {
+				return nil
+			}
+			base := d.Name()
+			// Skip the harness subtree (this guard is RELEASE -> harness) and every dot-dir
+			// (.git, .claude worktrees, .testdata, .insight, ... are not RELEASE Go sources).
+			if (base == "harness" && filepath.Dir(path) == moduleRoot) || strings.HasPrefix(base, ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		f, perr := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if perr != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(moduleRoot, path)
+		for _, spec := range f.Imports {
+			imp := strings.Trim(spec.Path.Value, `"`)
+			if strings.HasPrefix(imp, harnessImport) {
+				offending = append(offending, filepath.ToSlash(rel)+" -> "+strings.TrimPrefix(imp, modulePrefix))
+			}
+		}
+		return nil
+	})
+	if walkErr != nil {
+		t.Fatalf("walk module root: %v", walkErr)
+	}
+	if len(offending) > 0 {
+		sort.Strings(offending)
+		t.Errorf("RELEASE must not import the harness (RELEASE ↛ harness, D5):\n  %s", strings.Join(offending, "\n  "))
 	}
 }
