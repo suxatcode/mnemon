@@ -34,6 +34,13 @@ var syncCmd = &cobra.Command{
 	Short: "Sync Local Mnemon with Remote Workspace",
 }
 
+var syncConnectCmd = &cobra.Command{
+	Use:   "connect <workspace>",
+	Short: "Connect Remote Workspace",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runSyncConnect,
+}
+
 var syncPushCmd = &cobra.Command{
 	Use:   "push --once",
 	Short: "Push local accepted changes to Remote Workspace",
@@ -60,13 +67,39 @@ func init() {
 	syncCmd.PersistentFlags().StringVar(&syncRemoteURL, "remote-url", "", "Remote Workspace sync endpoint")
 	syncCmd.PersistentFlags().StringVar(&syncRemoteToken, "token", "", "Remote Workspace sync token")
 	syncCmd.PersistentFlags().StringVar(&syncRemoteTokenFile, "token-file", "", "Remote Workspace sync token file")
+	_ = syncCmd.PersistentFlags().MarkHidden("store")
+	_ = syncCmd.PersistentFlags().MarkHidden("remotes")
+	_ = syncCmd.PersistentFlags().MarkHidden("token-file")
 	syncPushCmd.Flags().BoolVar(&syncOnce, "once", false, "push one batch and exit")
 	syncPullCmd.Flags().BoolVar(&syncOnce, "once", false, "pull one batch and exit")
 	syncRunCmd.Flags().BoolVar(&syncBackground, "background", false, "run until interrupted")
 	syncRunCmd.Flags().DurationVar(&syncInterval, "interval", 30*time.Second, "background sync interval")
-	syncCmd.AddCommand(syncPushCmd, syncPullCmd, syncRunCmd)
+	syncCmd.AddCommand(syncConnectCmd, syncPushCmd, syncPullCmd, syncRunCmd)
 	syncCmd.GroupID = groupSpine
 	rootCmd.AddCommand(syncCmd)
+}
+
+func runSyncConnect(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("sync connect requires a workspace name")
+	}
+	workspace := strings.TrimSpace(args[0])
+	if !validRemoteWorkspaceID(workspace) {
+		return fmt.Errorf("Remote Workspace name must use letters, numbers, dot, dash, or underscore")
+	}
+	endpoint := strings.TrimSpace(syncRemoteURL)
+	if endpoint == "" {
+		return fmt.Errorf("--remote-url is required")
+	}
+	if strings.TrimSpace(syncRemoteToken) == "" && strings.TrimSpace(syncRemoteTokenFile) == "" {
+		return fmt.Errorf("--token or --token-file is required")
+	}
+	if err := upsertSyncRemote(resolvedSyncRemotesPath(), syncProjectRoot(), workspace, endpoint, syncRemoteToken, syncRemoteTokenFile); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Remote Workspace: connected %s\n", workspace)
+	fmt.Fprintln(cmd.OutOrStdout(), "Sync: ready")
+	return nil
 }
 
 func runSyncPush(cmd *cobra.Command, args []string) error {
@@ -184,6 +217,7 @@ type syncRemoteConfig struct {
 
 type syncRemotesDoc struct {
 	SchemaVersion int               `json:"schema_version"`
+	Current       string            `json:"current,omitempty"`
 	Remotes       []syncRemoteEntry `json:"remotes"`
 }
 
@@ -228,6 +262,9 @@ func loadSyncRemoteEntry(path, id string) (syncRemoteEntry, error) {
 	if doc.SchemaVersion != 1 {
 		return syncRemoteEntry{}, fmt.Errorf("Remote Workspace config schema_version %d unsupported (want 1)", doc.SchemaVersion)
 	}
+	if id == "default" && strings.TrimSpace(doc.Current) != "" {
+		id = strings.TrimSpace(doc.Current)
+	}
 	for _, remote := range doc.Remotes {
 		if remote.ID == id {
 			if strings.TrimSpace(remote.Endpoint) == "" {
@@ -240,6 +277,81 @@ func loadSyncRemoteEntry(path, id string) (syncRemoteEntry, error) {
 		}
 	}
 	return syncRemoteEntry{}, fmt.Errorf("Remote Workspace %q not found in %s", id, path)
+}
+
+func upsertSyncRemote(path, root, id, endpoint, token, tokenFile string) error {
+	doc := syncRemotesDoc{SchemaVersion: 1}
+	if raw, err := os.ReadFile(path); err == nil && len(strings.TrimSpace(string(raw))) > 0 {
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			return fmt.Errorf("parse Remote Workspace config: %w", err)
+		}
+		if doc.SchemaVersion != 1 {
+			return fmt.Errorf("Remote Workspace config schema_version %d unsupported (want 1)", doc.SchemaVersion)
+		}
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read Remote Workspace config: %w", err)
+	}
+	credentialRef, err := syncCredentialRef(root, id, token, tokenFile)
+	if err != nil {
+		return err
+	}
+	entry := syncRemoteEntry{ID: id, Endpoint: endpoint, CredentialRef: credentialRef}
+	replaced := false
+	for i := range doc.Remotes {
+		if doc.Remotes[i].ID == id {
+			doc.Remotes[i] = entry
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		doc.Remotes = append(doc.Remotes, entry)
+	}
+	doc.Current = id
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+func syncCredentialRef(root, id, token, tokenFile string) (string, error) {
+	token = strings.TrimSpace(token)
+	tokenFile = strings.TrimSpace(tokenFile)
+	if token != "" {
+		credentialRef := filepath.ToSlash(filepath.Join(".mnemon", "harness", "sync", "credentials", id+".token"))
+		path := filepath.Join(root, filepath.FromSlash(credentialRef))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+			return "", err
+		}
+		return credentialRef, nil
+	}
+	if tokenFile == "" {
+		return "", fmt.Errorf("--token or --token-file is required")
+	}
+	if filepath.IsAbs(tokenFile) {
+		return tokenFile, nil
+	}
+	return filepath.ToSlash(filepath.Clean(tokenFile)), nil
+}
+
+func validRemoteWorkspaceID(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, r := range id {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func resolveSyncToken(token, tokenFile string) (string, error) {

@@ -39,9 +39,11 @@ func TestProductHelpDoesNotExposeInternalVocabulary(t *testing.T) {
 		{"setup", "--help"},
 		{"local", "run", "--help"},
 		{"status", "--help"},
+		{"sync", "--help"},
+		{"sync", "connect", "--help"},
 	} {
 		got := executeRootForHelp(t, args...)
-		for _, blocked := range []string{"binding", "channel", "projection", "kernel", "runtime", "sync cursor", "wasm abi", "control-agent"} {
+		for _, blocked := range []string{"binding", "channel", "projection", "kernel", "runtime", "sync cursor", "token file", "wasm abi", "control-agent"} {
 			if strings.Contains(strings.ToLower(got), blocked) {
 				t.Fatalf("%q help leaked internal term %q:\n%s", strings.Join(args, " "), blocked, got)
 			}

@@ -102,9 +102,9 @@ func SyncImportRuntimeConfig(refs []contract.ResourceRef) RuntimeConfig {
 		Subs: map[contract.ActorID]contract.Subscription{
 			SyncImportActor: {Actor: SyncImportActor, Refs: refs},
 		},
-		Rules: rule.NewRuleSet(remoteMemoryImportRule(SyncImportActor)),
+		Rules: rule.NewRuleSet(remoteMemoryImportRule(SyncImportActor), remoteSkillImportRule(SyncImportActor)),
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{
-			SyncImportActor: {"memory"},
+			SyncImportActor: {"memory", "skill"},
 		}},
 	}
 }

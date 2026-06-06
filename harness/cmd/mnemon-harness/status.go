@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,7 +48,7 @@ func runProductStatus(cmd *cobra.Command, args []string) error {
 			principal = cfg.Principal
 		}
 		if st, ok := localServiceStatus(projectRoot, cfg, principal); ok {
-			printProductStatus(cmd, true, true, st.SyncPending, st.SyncSynced, st.SyncConflicts)
+			printProductStatus(cmd, true, true, remoteWorkspaceStatus(projectRoot), st.SyncPending, st.SyncSynced, st.SyncConflicts)
 			return nil
 		}
 	}
@@ -56,9 +57,14 @@ func runProductStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	remote := remoteWorkspaceStatus(projectRoot)
 	for _, l := range lines {
+		if strings.HasPrefix(l, "Remote Workspace:") {
+			continue
+		}
 		fmt.Fprintln(cmd.OutOrStdout(), l)
 	}
+	fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: "+remote)
 	counts := syncCounts(projectRoot)
 	fmt.Fprintf(cmd.OutOrStdout(), "Sync: %d pending, %d synced, %d conflicts\n", counts.Pending, counts.Synced, counts.Conflicts)
 	return nil
@@ -87,7 +93,7 @@ func localServiceStatus(projectRoot string, cfg localConfig, principal string) (
 	return st, true
 }
 
-func printProductStatus(cmd *cobra.Command, installed, ready bool, pending, synced, conflicts int) {
+func printProductStatus(cmd *cobra.Command, installed, ready bool, remote string, pending, synced, conflicts int) {
 	if installed {
 		fmt.Fprintln(cmd.OutOrStdout(), "Agent Integration: installed")
 	} else {
@@ -98,8 +104,34 @@ func printProductStatus(cmd *cobra.Command, installed, ready bool, pending, sync
 	} else {
 		fmt.Fprintln(cmd.OutOrStdout(), "Local Mnemon: not configured")
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: not connected")
+	fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: "+remote)
 	fmt.Fprintf(cmd.OutOrStdout(), "Sync: %d pending, %d synced, %d conflicts\n", pending, synced, conflicts)
+}
+
+func remoteWorkspaceStatus(projectRoot string) string {
+	remote, ok := currentRemoteWorkspace(projectRoot)
+	if !ok {
+		return "not connected"
+	}
+	return "connected " + remote
+}
+
+func currentRemoteWorkspace(projectRoot string) (string, bool) {
+	raw, err := os.ReadFile(filepath.Join(projectRoot, ".mnemon", "harness", "sync", "remotes.json"))
+	if err != nil {
+		return "", false
+	}
+	var doc syncRemotesDoc
+	if err := json.Unmarshal(raw, &doc); err != nil || doc.SchemaVersion != 1 {
+		return "", false
+	}
+	if strings.TrimSpace(doc.Current) != "" {
+		return strings.TrimSpace(doc.Current), true
+	}
+	if len(doc.Remotes) == 1 && strings.TrimSpace(doc.Remotes[0].ID) != "" {
+		return strings.TrimSpace(doc.Remotes[0].ID), true
+	}
+	return "", false
 }
 
 func tokenForPrincipal(tokens map[string]contract.ActorID, principal contract.ActorID) string {

@@ -110,6 +110,34 @@ func TestProductStatusUsesReachableLocalMnemon(t *testing.T) {
 	}
 }
 
+func TestProductStatusReportsConnectedRemoteWorkspace(t *testing.T) {
+	projectRoot := t.TempDir()
+	setupProductIntegration(t, projectRoot)
+	restoreSyncFlags(t)
+	syncRoot = projectRoot
+	syncRemoteURL = "http://remote.example.test"
+	syncRemoteToken = "secret-status-token"
+	connectCmd, _ := testCommand()
+	if err := runSyncConnect(connectCmd, []string{"team"}); err != nil {
+		t.Fatalf("sync connect for status: %v", err)
+	}
+
+	restoreStatusFlags(t)
+	statusRoot = cmdRepoRoot(t)
+	statusProjectRoot = projectRoot
+	cmd, output := testCommand()
+	if err := runProductStatus(cmd, nil); err != nil {
+		t.Fatalf("status with remote connected: %v", err)
+	}
+	got := output.String()
+	if !strings.Contains(got, "Remote Workspace: connected team") {
+		t.Fatalf("status must show connected remote:\n%s", got)
+	}
+	if strings.Contains(got, "secret-status-token") {
+		t.Fatalf("status must not expose remote token:\n%s", got)
+	}
+}
+
 func restoreStatusFlags(t *testing.T) {
 	t.Helper()
 	oldRoot := statusRoot

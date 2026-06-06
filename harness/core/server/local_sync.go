@@ -90,13 +90,14 @@ func ImportLocalSyncPull(storePath, remoteID, nextCursor string, commits []contr
 		}
 		pulledAt := time.Now().UTC().Format(time.RFC3339)
 		for _, commit := range commits {
-			if commit.ResourceRef.Kind != "memory" {
+			eventType, ok := remoteImportEventType(commit.ResourceRef.Kind)
+			if !ok {
 				continue
 			}
 			_, dup, err := rt.API().Ingest(SyncImportActor, contract.ObservationEnvelope{
 				ExternalID: syncPullExternalID(remoteID, commit),
 				Event: contract.Event{
-					Type: RemoteMemoryCommitObserved,
+					Type: eventType,
 					Payload: map[string]any{
 						"commit":    commit,
 						"remote_id": remoteID,
@@ -120,6 +121,17 @@ func ImportLocalSyncPull(storePath, remoteID, nextCursor string, commits []contr
 		}
 	}
 	return setSyncPullCursor(storePath, remoteID, nextCursor)
+}
+
+func remoteImportEventType(kind contract.ResourceKind) (string, bool) {
+	switch kind {
+	case "memory":
+		return RemoteMemoryCommitObserved, true
+	case "skill":
+		return RemoteSkillCommitObserved, true
+	default:
+		return "", false
+	}
 }
 
 func setSyncPullCursor(storePath, remoteID, cursor string) error {

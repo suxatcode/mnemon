@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -12,6 +14,7 @@ import (
 
 const (
 	SkillWriteCandidateObserved = "skill.write_candidate_observed"
+	RemoteSkillCommitObserved   = "remote.skill.commit_observed"
 	SkillWriteProposed          = "skill.write.proposed"
 )
 
@@ -87,6 +90,65 @@ func skillAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) ru
 		})
 }
 
+func remoteSkillImportRule(principal contract.ActorID) rule.Rule {
+	return rule.NewNativeRule("remote-skill-import:"+string(principal), principal, SkillWriteProposed, []string{RemoteSkillCommitObserved},
+		func(in rule.RuleInput) (contract.RuleDecision, error) {
+			if in.Event.Actor != principal {
+				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+			}
+			commit, err := decodeRemoteSkillCommit(in.Event.Payload)
+			if err != nil {
+				return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{err.Error()}}, nil
+			}
+			if commit.ResourceRef.Kind != "skill" {
+				return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{"remote skill import denied: non-skill resource"}}, nil
+			}
+			incoming := skillDeclarationsFromFields(commit.Fields)
+			if len(incoming) == 0 {
+				return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{"remote skill import denied: no skill declarations"}}, nil
+			}
+			for _, decl := range incoming {
+				if reason := validateRemoteSkillDeclaration(decl); reason != "" {
+					return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{reason}}, nil
+				}
+			}
+			version, fields := skillResourceFromProjection(in.View, commit.ResourceRef)
+			existing := skillDeclarationsFromFields(fields)
+			byID := make(map[string]skillDeclaration, len(existing))
+			for _, decl := range existing {
+				byID[decl.ID] = decl
+			}
+			var additions []skillDeclaration
+			for _, decl := range incoming {
+				if current, ok := byID[decl.ID]; ok {
+					if !sameSkillDeclaration(current, decl) {
+						return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{"remote skill conflict: declaration " + decl.ID + " already exists with different content"}}, nil
+					}
+					continue
+				}
+				additions = append(additions, decl)
+			}
+			if len(additions) == 0 {
+				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+			}
+			declarations := append(append([]skillDeclaration(nil), existing...), additions...)
+			newFields := map[string]any{
+				"name":         "project",
+				"declarations": declarations,
+				"updated_by":   string(in.Event.Actor),
+			}
+			write := contract.ResourceWrite{Ref: commit.ResourceRef, Kind: contract.OpCreate, Fields: newFields}
+			if version > 0 {
+				write.Kind = contract.OpUpdate
+				write.BasedOn = version
+			}
+			return contract.RuleDecision{Verdict: contract.VerdictPropose, Proposal: &contract.ProposedEvent{
+				Type:    SkillWriteProposed,
+				Payload: map[string]any{"writes": []contract.ResourceWrite{write}},
+			}}, nil
+		})
+}
+
 type skillCandidate struct {
 	SkillID    string
 	Name       string
@@ -140,6 +202,42 @@ func decodeSkillCandidate(payload map[string]any) (skillCandidate, error) {
 		return skillCandidate{}, fmt.Errorf("skill candidate denied: unsafe content")
 	}
 	return skillCandidate{SkillID: skillID, Name: name, Status: status, Content: content, Source: source, Confidence: confidence}, nil
+}
+
+func decodeRemoteSkillCommit(payload map[string]any) (contract.LocalCommit, error) {
+	raw, ok := payload["commit"]
+	if !ok {
+		return contract.LocalCommit{}, fmt.Errorf("remote skill import denied: missing commit")
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return contract.LocalCommit{}, fmt.Errorf("remote skill import denied: encode commit: %w", err)
+	}
+	var commit contract.LocalCommit
+	if err := json.Unmarshal(data, &commit); err != nil {
+		return contract.LocalCommit{}, fmt.Errorf("remote skill import denied: decode commit: %w", err)
+	}
+	if strings.TrimSpace(commit.OriginReplicaID) == "" || strings.TrimSpace(commit.LocalDecisionID) == "" {
+		return contract.LocalCommit{}, fmt.Errorf("remote skill import denied: missing provenance")
+	}
+	return commit, nil
+}
+
+func validateRemoteSkillDeclaration(decl skillDeclaration) string {
+	if !validSkillID(decl.SkillID) {
+		return "remote skill import denied: invalid skill_id"
+	}
+	if decl.Status != "active" && decl.Status != "stale" && decl.Status != "archived" {
+		return "remote skill import denied: invalid status"
+	}
+	if containsSecretLikeContent(decl.Content) || containsPromptInjectionShape(decl.Content) {
+		return "remote skill import denied: unsafe content"
+	}
+	return ""
+}
+
+func sameSkillDeclaration(a, b skillDeclaration) bool {
+	return reflect.DeepEqual(a, b)
 }
 
 func validSkillID(s string) bool {
