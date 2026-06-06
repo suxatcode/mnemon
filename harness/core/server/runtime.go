@@ -26,8 +26,11 @@ import (
 // the runtime holds the kernel store's single-writer lock for its lifetime, so an embedded opener and
 // a live server can never own the same store at once.
 type Runtime struct {
-	store *kernel.Store
-	cs    *ControlServer
+	store     *kernel.Store
+	cs        *ControlServer
+	api       ServerAPI // cs, or an authorizedAPI wrapping cs when Bindings are configured
+	storePath string
+	bindings  *BindingSet // nil when unbound (embedded/trusted owner)
 }
 
 // RuntimeConfig selects the runtime's policy: the rule pre-gate set, the kernel authority, the
@@ -42,6 +45,11 @@ type RuntimeConfig struct {
 	Modes     contract.Modes
 	NewID     func() string
 	Now       func() string
+
+	// Bindings, when non-empty, gates the runtime's channel API with a BindingSet authorizer (P2.1):
+	// every principal must have a binding granting the verb / observed type / pull scope it uses. The
+	// zero (nil) leaves the API unbound — correct for a trusted in-process owner (embedded coreengine).
+	Bindings []ChannelBinding
 }
 
 func (cfg RuntimeConfig) withDefaults() RuntimeConfig {
@@ -80,12 +88,38 @@ func OpenRuntime(storePath string, cfg RuntimeConfig) (*Runtime, error) {
 	cfg = cfg.withDefaults()
 	k := kernel.NewKernel(store, kernel.DefaultSchemaGuard(), cfg.Authority)
 	cs := New(store, k, cfg.Rules, cfg.Subs, cfg.Modes, cfg.NewID, cfg.Now)
-	return &Runtime{store: store, cs: cs}, nil
+	rt := &Runtime{store: store, cs: cs, api: cs, storePath: storePath}
+	if len(cfg.Bindings) > 0 {
+		bindings, err := NewBindingSet(cfg.Bindings...)
+		if err != nil {
+			_ = store.Close()
+			return nil, fmt.Errorf("channel bindings: %w", err)
+		}
+		rt.bindings = bindings
+		rt.api = NewAuthorizedAPI(cs, bindings)
+	}
+	return rt, nil
 }
 
 // API returns the channel boundary (ServerAPI: observe via Ingest, pull via PullProjection) every
-// surface speaks to. It is the one ControlServer behind this runtime.
-func (r *Runtime) API() ServerAPI { return r.cs }
+// surface speaks to: the bare ControlServer, or — when bindings are configured — a BindingSet
+// authorizer wrapping it (P2.1). The Tick driver and read helpers stay on the unwrapped runtime.
+func (r *Runtime) API() ServerAPI { return r.api }
+
+// StorePath is the canonical store path this runtime owns (status/diagnostic evidence).
+func (r *Runtime) StorePath() string { return r.storePath }
+
+// BindingKind reports the principal's bound actor kind, when a binding is configured.
+func (r *Runtime) BindingKind(principal contract.ActorID) (ActorKind, bool) {
+	if r.bindings == nil {
+		return "", false
+	}
+	b, ok := r.bindings.Binding(principal)
+	if !ok {
+		return "", false
+	}
+	return b.ActorKind, true
+}
 
 // Tick drives one governed cycle. The runtime owns the SINGLE dispatch-cursor driver — no surface
 // drives Tick independently against the store.
