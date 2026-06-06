@@ -38,7 +38,7 @@ func Load(root string, opts Options) (Catalog, error) {
 	}
 	root = filepath.Clean(root)
 	catalog := Catalog{}
-	global, warnings, err := loadGlobal(filepath.Join(root, "harness", "daemon-jobs", "_global.yaml"))
+	global, warnings, err := loadGlobal(filepath.Join(root, "harness", "control", "daemon.yaml"))
 	if err != nil {
 		return Catalog{}, err
 	}
@@ -88,7 +88,7 @@ func loadGlobal(path string) (GlobalBudget, []string, error) {
 }
 
 func loadExplicit(root string, opts Options, global GlobalBudget) ([]Definition, []string, error) {
-	dir := filepath.Join(root, "harness", "daemon-jobs")
+	dir := filepath.Join(root, "harness", "control", "jobs")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -100,7 +100,7 @@ func loadExplicit(root string, opts Options, global GlobalBudget) ([]Definition,
 	var defs []Definition
 	var warnings []string
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yaml" || entry.Name() == "_global.yaml" {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yaml" {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())

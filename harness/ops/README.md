@@ -7,20 +7,17 @@ Mnemon harness loops into host runtimes.
 harness/ops/
 ├── install.sh
 ├── status.sh
-├── uninstall.sh
-└── lib/
+└── uninstall.sh
 ```
 
-Use the shared entrypoints for new integrations:
+Use the shared entrypoints only for the supported memory and skill loops:
 
 ```bash
 bash harness/ops/install.sh --host claude-code --loop memory
 bash harness/ops/status.sh --host claude-code
 bash harness/ops/uninstall.sh --host claude-code --loop memory
 bash harness/ops/install.sh --host codex --loop memory
-bash harness/ops/install.sh --host codex --loop eval
-bash harness/ops/install.sh --host codex --loop goal
-bash harness/ops/install.sh --host claude-code --loop goal
+bash harness/ops/install.sh --host codex --loop skill
 ```
 
 Host-specific projection logic lives under `harness/hosts/<host>/`. Loop assets

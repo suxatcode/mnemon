@@ -173,9 +173,9 @@ func restoreDaemonFlags(t *testing.T) {
 
 func writeCommandDaemonJob(t *testing.T, root, id, eventType, command string) {
 	t.Helper()
-	path := filepath.Join(root, "harness", "daemon-jobs", id+".yaml")
+	path := filepath.Join(root, "harness", "control", "jobs", id+".yaml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir daemon-jobs: %v", err)
+		t.Fatalf("mkdir control jobs: %v", err)
 	}
 	body := "id: " + id + "\nwhen:\n  event: " + eventType + "\ndo:\n  cli: " + strconvQuote(command) + "\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {

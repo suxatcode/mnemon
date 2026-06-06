@@ -8,8 +8,8 @@ import (
 
 func TestLoadReadsExplicitJobsAndGlobalBudget(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "_global.yaml"), "global_budget:\n  daily_cost_usd: 1.00\n  daily_real_turns: 10\n  enabled: true\n")
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "echo.yaml"), "id: test.echo\nwhen:\n  event: test.observed\ndo:\n  cli: \"echo hello\"\nbudget:\n  cost_usd: 0\n  max_sec: 5\n")
+	writeFile(t, filepath.Join(root, "harness", "control", "daemon.yaml"), "global_budget:\n  daily_cost_usd: 1.00\n  daily_real_turns: 10\n  enabled: true\n")
+	writeFile(t, filepath.Join(root, "harness", "control", "jobs", "echo.yaml"), "id: test.echo\nwhen:\n  event: test.observed\ndo:\n  cli: \"echo hello\"\nbudget:\n  cost_usd: 0\n  max_sec: 5\n")
 
 	catalog, err := Load(root, Options{})
 	if err != nil {
@@ -28,7 +28,7 @@ func TestLoadReadsExplicitJobsAndGlobalBudget(t *testing.T) {
 
 func TestLoadDisablesSpawnRunnerWithoutCostAcknowledgement(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "spawn.yaml"), "id: test.spawn\nwhen:\n  event: signal.observed\ndo:\n  spawn_runner: codex\n  prompt: hi\n")
+	writeFile(t, filepath.Join(root, "harness", "control", "jobs", "spawn.yaml"), "id: test.spawn\nwhen:\n  event: signal.observed\ndo:\n  spawn_runner: codex\n  prompt: hi\n")
 
 	catalog, err := Load(root, Options{})
 	if err != nil {
@@ -77,7 +77,7 @@ func TestLoadLiftsLoopControllers(t *testing.T) {
 
 func TestLoadValidatesTriggerAndActionRules(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "bad.yaml"), "id: bad job\nwhen:\n  threshold: {metric: missing.metric, op: \">\", value: 1}\ndo:\n  cli: echo\n")
+	writeFile(t, filepath.Join(root, "harness", "control", "jobs", "bad.yaml"), "id: bad job\nwhen:\n  threshold: {metric: missing.metric, op: \">\", value: 1}\ndo:\n  cli: echo\n")
 
 	if _, err := Load(root, Options{}); err == nil {
 		t.Fatalf("expected invalid job to fail")
@@ -117,7 +117,7 @@ func TestLoadValidationCoversSchemaRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
-			writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "bad.yaml"), tt.body)
+			writeFile(t, filepath.Join(root, "harness", "control", "jobs", "bad.yaml"), tt.body)
 			if _, err := Load(root, Options{}); err == nil {
 				t.Fatalf("expected invalid job to fail")
 			}
@@ -128,8 +128,8 @@ func TestLoadValidationCoversSchemaRules(t *testing.T) {
 func TestLoadRejectsDuplicateExplicitIDs(t *testing.T) {
 	root := t.TempDir()
 	body := "id: duplicate.id\nwhen:\n  event: test\ndo:\n  cli: echo\n"
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "one.yaml"), body)
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "two.yaml"), body)
+	writeFile(t, filepath.Join(root, "harness", "control", "jobs", "one.yaml"), body)
+	writeFile(t, filepath.Join(root, "harness", "control", "jobs", "two.yaml"), body)
 	if _, err := Load(root, Options{}); err == nil {
 		t.Fatalf("expected duplicate id to fail")
 	}
@@ -137,8 +137,8 @@ func TestLoadRejectsDuplicateExplicitIDs(t *testing.T) {
 
 func TestLoadWarnsWhenJobBudgetExceedsGlobalBudget(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "_global.yaml"), "global_budget:\n  daily_cost_usd: 0.10\n  enabled: true\n")
-	writeFile(t, filepath.Join(root, "harness", "daemon-jobs", "cost.yaml"), "id: cost.warn\nwhen:\n  event: test\ndo:\n  cli: echo\nbudget:\n  cost_usd: 0.25\n")
+	writeFile(t, filepath.Join(root, "harness", "control", "daemon.yaml"), "global_budget:\n  daily_cost_usd: 0.10\n  enabled: true\n")
+	writeFile(t, filepath.Join(root, "harness", "control", "jobs", "cost.yaml"), "id: cost.warn\nwhen:\n  event: test\ndo:\n  cli: echo\nbudget:\n  cost_usd: 0.25\n")
 	catalog, err := Load(root, Options{})
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)

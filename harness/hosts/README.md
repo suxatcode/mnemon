@@ -16,6 +16,5 @@ keeps canonical loop state under `.mnemon/harness/<loop>`. This shape lets the
 real Codex app-server load the projected skills from an isolated verification
 workspace.
 
-The normal Agent Integration surface projects memory and skill only. Older
-non-product host assets and shell projectors are archived under
-`harness/experimental/archived/` for proof-only reference.
+The normal Agent Integration surface projects memory and skill only.
+Non-product host assets and shell projectors are not kept in this runtime tree.

@@ -478,13 +478,13 @@ func TestTickPausedBlocksNewEnqueueButProcessesQueuedJobs(t *testing.T) {
 
 func TestTickAutoPausesWhenGlobalBudgetExhausted(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "harness", "daemon-jobs"), 0o755); err != nil {
-		t.Fatalf("mkdir daemon jobs: %v", err)
+	if err := os.MkdirAll(filepath.Join(root, "harness", "control", "jobs"), 0o755); err != nil {
+		t.Fatalf("mkdir control jobs: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "harness", "daemon-jobs", "_global.yaml"), []byte("global_budget:\n  daily_cost_usd: 0.01\n  daily_real_turns: 20\n  enabled: true\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "harness", "control", "daemon.yaml"), []byte("global_budget:\n  daily_cost_usd: 0.01\n  daily_real_turns: 20\n  enabled: true\n"), 0o644); err != nil {
 		t.Fatalf("write global budget: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "harness", "daemon-jobs", "runaway.yaml"), []byte("id: runaway.echo\nwhen:\n  event: runaway.tick\ndo:\n  cli: \"printf runaway\"\nbudget:\n  cost_usd: 0.01\n  max_sec: 5\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "harness", "control", "jobs", "runaway.yaml"), []byte("id: runaway.echo\nwhen:\n  event: runaway.tick\ndo:\n  cli: \"printf runaway\"\nbudget:\n  cost_usd: 0.01\n  max_sec: 5\n"), 0o644); err != nil {
 		t.Fatalf("write runaway job: %v", err)
 	}
 	store, err := eventlog.New(root)
@@ -788,9 +788,9 @@ func writeDaemonCodexProjectionFixture(t *testing.T, root string) {
 func writeDaemonJobFixture(t *testing.T, root, id, eventType, command string) {
 	t.Helper()
 	body := fmt.Sprintf("id: %s\nwhen:\n  event: %s\ndo:\n  cli: %q\nbudget:\n  cost_usd: 0\n  max_sec: 5\n", id, eventType, command)
-	path := filepath.Join(root, "harness", "daemon-jobs", id+".yaml")
+	path := filepath.Join(root, "harness", "control", "jobs", id+".yaml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir daemon-jobs: %v", err)
+		t.Fatalf("mkdir control jobs: %v", err)
 	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write daemon job fixture: %v", err)
