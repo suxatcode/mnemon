@@ -1,3 +1,8 @@
+// Package status is the projection fold: it folds the append-only event log into
+// the materialized project status document (ProjectStatus) plus the per-host
+// readback — a read model exposed read-only through the app facade, never a writer
+// of canonical state. "kernel" is reserved for core/kernel; this package is a
+// fold/projection over events.
 package status
 
 import (

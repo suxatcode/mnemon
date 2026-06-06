@@ -1,6 +1,6 @@
 // Package coordination is the read model for multi-agent collaboration topology.
 //
-// It rides the existing kernel: collaboration is modeled as governed events on
+// It rides the existing event ledger: collaboration is modeled as governed events on
 // schema.Event (no new event struct, no DB), and the topology is a materialized
 // fold over the append-only log — exactly the pattern status uses for
 // ProjectStatus. These are teamwork *semantics* (claim/fork/merge/...), not
@@ -18,7 +18,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/schema"
 )
 
-// Coordination event types — the minimal vocabulary on the kernel. Each is a
+// Coordination event types — the minimal vocabulary on the event ledger. Each is a
 // teamwork operator, not a message.
 const (
 	EventTaskClaimed      = "task.claimed"
