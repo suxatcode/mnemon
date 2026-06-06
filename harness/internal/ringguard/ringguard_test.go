@@ -60,8 +60,9 @@ func ring(rel string) (int, bool) {
 		return 1, true // substrate: event log + materialized status/coordination + audit/lineage records
 	case rel == "harness/internal/lifecycle/schema",
 		rel == "harness/internal/lifecycle/layout",
+		rel == "harness/internal/lifecycle/corebridge",
 		rel == "harness/internal/declaration":
-		return 0, true // trunk / contracts
+		return 0, true // trunk / contracts (corebridge: the schema.Event <-> contract.Event seam to the kernel)
 	}
 	return -1, false
 }
