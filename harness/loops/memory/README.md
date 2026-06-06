@@ -32,8 +32,8 @@ harness/loops/memory/
 | Part | Role |
 | --- | --- |
 | HostAgent | The host agent runtime. It owns task execution, model judgment, and native hook/skill/subagent mechanisms. |
-| `MEMORY.md` | Prompt-facing working memory. It is loaded at Prime and kept compact. |
-| Mnemon | Long-term memory binary and store. It is installed separately and accessed through skill/subagent protocols. |
+| `MEMORY.md` | Prompt-facing mirror generated from scoped Local Mnemon memory. |
+| Local Mnemon | Local memory source. It accepts local candidates and serves scoped reads without a Remote Workspace. |
 
 ## Support Assets
 
@@ -43,9 +43,9 @@ harness/loops/memory/
 | `env.sh` | Runtime config: memory directory, env path, and dreaming threshold. |
 | `GUIDE.md` | Policy: when to read memory, when to write memory, and what is worth keeping. |
 | `hook-prompts/*.md` | Four lifecycle reminders: Prime, Remind, Nudge, and Compact. |
-| `skills/memory-get/SKILL.md` | Online long-term recall skill backed by `mnemon recall`. |
-| `skills/memory-set/SKILL.md` | Online working-memory update skill backed by `MEMORY.md` edits. |
-| `subagents/dreaming.md` | Offline consolidation worker backed by Mnemon writes and `MEMORY.md` compaction. |
+| `skills/memory-get/SKILL.md` | Scoped memory read skill backed by `mnemon-harness control pull`. |
+| `skills/memory-set/SKILL.md` | Local memory candidate write skill backed by `mnemon-harness control observe`. |
+| `subagents/dreaming.md` | Experimental consolidation worker retained inside the memory loop, not the canonical write path. |
 | Host adapter | Host-specific projection lives outside the loop under `harness/hosts/<host>/`. |
 
 ## Runtime Directory Protocol
@@ -63,18 +63,19 @@ $MNEMON_MEMORY_LOOP_DIR/
 `env.sh` defines:
 
 ```bash
-MNEMON_MEMORY_LOOP_ENV=<canonical-state>/harness/memory/env.sh
-MNEMON_MEMORY_LOOP_DIR=<canonical-state>/harness/memory
+MNEMON_MEMORY_LOOP_ENV=<project>/.mnemon/harness/memory/env.sh
+MNEMON_MEMORY_LOOP_DIR=<project>/.mnemon/harness/memory
 MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES=200
 ```
 
-`memory-set`, `memory-get`, and `dreaming.md` should never hard-code a
-Claude Code path. They should use `$MNEMON_MEMORY_LOOP_DIR` when it is available.
-If the host runtime cannot pass environment variables to skills, the Prime hook
-must inject the resolved path into the HostAgent context.
+`memory-set`, `memory-get`, and hooks should never hard-code a host path. They
+should source `.mnemon/harness/local/env.sh` when it is available and use
+`$MNEMON_MEMORY_LOOP_DIR` only as the mirror/guide location. If the host runtime
+cannot pass environment variables to skills, the Prime hook must inject the
+resolved path into the HostAgent context.
 
-`MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES` controls when hook prompts should suggest
-`mnemon-dreaming` for an oversized `MEMORY.md`.
+`MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES` controls when hook prompts should note
+that the mirror is becoming large.
 
 ## Boundary
 
@@ -86,9 +87,9 @@ The key split is:
 
 ```text
 GUIDE.md decides when memory behavior is useful.
-memory-get maps read-memory behavior to Mnemon recall.
-memory-set maps write-memory behavior to MEMORY.md edits.
-dreaming.md maps maintenance behavior to Mnemon write + MEMORY.md compaction.
+memory-get maps read-memory behavior to Local Mnemon pull.
+memory-set maps write-memory behavior to Local Mnemon observe.
+MEMORY.md is a generated mirror, not a write target.
 ```
 
 ## Claude Code Install

@@ -46,10 +46,11 @@ echo "[mnemon-memory] Prime"
 echo
 echo "MNEMON_MEMORY_LOOP_DIR=${ASSET_DIR}"
 echo
-echo "Load the following working memory and guide. Do not pull Local Mnemon during Prime."
+echo "Load the following Local Mnemon memory mirror and guide."
 echo
 
-# Best-effort: announce this session to Local Mnemon and check reachability. Failures are non-fatal.
+# Best-effort: announce this session to Local Mnemon, check reachability, and refresh the mirror.
+# Failures are non-fatal.
 if command -v "${HARNESS_BIN}" >/dev/null 2>&1; then
   "${HARNESS_BIN}" control observe \
     --type session.observed \
@@ -63,6 +64,14 @@ if command -v "${HARNESS_BIN}" >/dev/null 2>&1; then
     --addr "${CONTROL_ADDR}" \
     --principal "${CONTROL_PRINCIPAL}" \
     ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>/dev/null || echo "Warning: Local Mnemon status unavailable."
+  if [[ -n "${CONTROL_PRINCIPAL}" ]]; then
+    "${HARNESS_BIN}" control pull \
+      --addr "${CONTROL_ADDR}" \
+      --principal "${CONTROL_PRINCIPAL}" \
+      ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} \
+      --mirror "${ASSET_DIR}/MEMORY.md" \
+      >/dev/null 2>&1 || true
+  fi
 else
   echo "Warning: ${HARNESS_BIN} binary is not available in PATH."
 fi

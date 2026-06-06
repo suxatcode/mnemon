@@ -1,3 +1,3 @@
 # MEMORY.md
 
-<!-- Prompt-facing working memory. Keep this file compact and let the agent organize it. -->
+<!-- Non-authoritative mirror generated from Local Mnemon scoped memory. Do not edit directly; use memory-set. -->

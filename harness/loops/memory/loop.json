@@ -2,11 +2,11 @@
   "schema_version": 2,
   "name": "memory",
   "version": "0.1.0",
-  "description": "Connects prompt-facing working memory, Mnemon long-term memory, and dreaming consolidation.",
+  "description": "Connects a prompt-facing memory mirror to Local Mnemon scoped memory reads and local memory candidates.",
   "control_model": {
     "state": [
       "MEMORY.md",
-      ".mnemon stores",
+      "Local Mnemon store",
       "reports",
       "manifests",
       "memory status"
@@ -15,8 +15,8 @@
     "reality": [
       "host prompt",
       "current task",
-      "working-memory contents",
-      "recall results",
+      "memory mirror contents",
+      "scoped pull results",
       "context pressure",
       "consolidation state"
     ],
@@ -24,7 +24,6 @@
       "read",
       "write",
       "compact",
-      "consolidate",
       "no-op"
     ]
   },
@@ -35,7 +34,7 @@
     ],
     "surface": [
       "MEMORY.md",
-      "Mnemon recall/write",
+      "Local Mnemon pull/observe",
       "host hooks",
       "protocol skills"
     ],
@@ -62,7 +61,7 @@
     "observation": [
       "hook output",
       "MEMORY.md length",
-      "recall results",
+      "scoped pull results",
       "write outcomes",
       "dreaming reports"
     ]
@@ -89,9 +88,7 @@
       "skills/memory-get/SKILL.md",
       "skills/memory-set/SKILL.md"
     ],
-    "subagents": [
-      "subagents/dreaming.md"
-    ]
+    "subagents": []
   },
   "state": {
     "canonical": [
@@ -104,27 +101,8 @@
       "MEMORY.md"
     ]
   },
-  "controllers": [
-    {
-      "name": "memory.dreaming.on_hot_write",
-      "watches": [
-        "memory.hot_write_observed"
-      ],
-      "enqueue": "memory.dreaming",
-      "reason": "Working memory changed and may need consolidation."
-    }
-  ],
-  "jobs": {
-    "memory.dreaming": {
-      "type": "semantic",
-      "spec": "subagents/dreaming.md",
-      "preferred_runner": "host-subagent",
-      "fallback_runner": "codex-app-server",
-      "governance": "report-or-proposal",
-      "prompt": "Run the memory dreaming job from subagents/dreaming.md and return structured evidence for any proposed memory consolidation.",
-      "max_turns": 3
-    }
-  },
+  "controllers": [],
+  "jobs": {},
   "host_adapters": {
     "claude-code": "../../hosts/claude-code",
     "codex": "../../hosts/codex"

@@ -10,12 +10,12 @@ session context may be lost.
 Apply `GUIDE.md` and decide whether any critical continuity should survive the
 context boundary.
 
-If so, load `skills/memory-set/SKILL.md` and write only the minimal necessary update
-to `MEMORY.md`. Preserve decisions, constraints, unresolved continuity, and
-state that would otherwise be lost.
+If so, load `skills/memory-set/SKILL.md` and submit only the minimal necessary
+Local Mnemon memory candidate. Preserve decisions, constraints, unresolved
+continuity, and state that would otherwise be lost.
 
-Do not save the whole conversation. Do not perform full working-memory cleanup
-from this hook. Full cleanup belongs to the dreaming subagent.
+Do not save the whole conversation. Do not perform mirror cleanup from this
+hook.
 
 ## Expected Effect
 

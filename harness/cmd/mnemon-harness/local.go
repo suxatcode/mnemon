@@ -34,7 +34,7 @@ var localRunCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			return server.RunHTTPServerWithBindings(cmd.Context(), localAddr, storePath, loaded, io.Discard)
+			return server.RunLocalHTTPServerWithBindings(cmd.Context(), localAddr, storePath, loaded, io.Discard)
 		}
 		return server.RunHTTPServer(cmd.Context(), localAddr, storePath, io.Discard)
 	},

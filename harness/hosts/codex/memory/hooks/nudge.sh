@@ -33,9 +33,9 @@ else
 fi
 
 if [[ "${NON_EMPTY_LINES}" -gt "${MAX_NON_EMPTY_LINES}" ]]; then
-  MESSAGE="[mnemon-memory] MEMORY.md is long (${NON_EMPTY_LINES} lines); consider mnemon-dreaming."
+  MESSAGE="[mnemon-memory] MEMORY.md mirror is long (${NON_EMPTY_LINES} lines); consider refreshing the Local Mnemon mirror."
 else
-  MESSAGE="[mnemon-memory] Consider: does this exchange warrant memory-set?"
+  MESSAGE="[mnemon-memory] Consider: does this exchange warrant a memory-set candidate?"
 fi
 
 cat <<JSON

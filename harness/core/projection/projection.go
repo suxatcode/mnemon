@@ -15,7 +15,16 @@ type Projection struct {
 	Ref       string
 	Digest    string
 	Resources []contract.ResourceVersion
+	Content   []ResourceContent
 	Feedback  []contract.Decision // pull channel (Invariant #8)
+}
+
+// ResourceContent carries the scoped fields for a materialized resource. It is populated from the
+// same refs used for Resources, so content and versions share one server-enforced scope.
+type ResourceContent struct {
+	Ref     contract.ResourceRef `json:"ref"`
+	Version contract.Version     `json:"version"`
+	Fields  map[string]any       `json:"fields"`
 }
 
 // Build materializes a read-only view over refs for forActor. The context digest folds, per resource in a
@@ -35,15 +44,19 @@ func Build(s *kernel.Store, refs []contract.ResourceRef, forActor contract.Actor
 		return string(items[i].rv.Ref.Kind)+string(items[i].rv.Ref.ID) < string(items[j].rv.Ref.Kind)+string(items[j].rv.Ref.ID)
 	})
 	rv := make([]contract.ResourceVersion, 0, len(items))
+	content := make([]ResourceContent, 0, len(items))
 	h := sha256.New()
 	for _, it := range items {
 		rv = append(rv, it.rv)
+		if it.rv.Version > 0 {
+			content = append(content, ResourceContent{Ref: it.rv.Ref, Version: it.rv.Version, Fields: it.fields})
+		}
 		b, _ := json.Marshal(it.fields) // json.Marshal sorts map keys -> canonical, deterministic bytes
 		fmt.Fprintf(h, "%s:%s:%d:%s;", it.rv.Ref.Kind, it.rv.Ref.ID, it.rv.Version, b)
 	}
 	dig := hex.EncodeToString(h.Sum(nil))
 	fb, _ := s.DecisionsForActor(forActor)
-	return Projection{Ref: "proj_" + dig[:12], Digest: dig, Resources: rv, Feedback: fb}
+	return Projection{Ref: "proj_" + dig[:12], Digest: dig, Resources: rv, Content: content, Feedback: fb}
 }
 
 // ScopedView builds the server-enforced, scoped projection for a subscription (S9): ONLY sub.Refs are
