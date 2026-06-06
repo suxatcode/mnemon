@@ -38,7 +38,7 @@ func ring(rel string) (int, bool) {
 		return 4, true // orchestrator
 	case rel == "harness/internal/lifecycle/runner",
 		strings.HasPrefix(rel, "harness/internal/lifecycle/runner/"),
-		rel == "harness/internal/projection":
+		rel == "harness/internal/hostsurface":
 		return 3, true // execution / host-io
 	case rel == "harness/internal/lifecycle/goal",
 		rel == "harness/internal/lifecycle/goalstore",

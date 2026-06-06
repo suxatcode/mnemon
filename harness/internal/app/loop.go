@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/declaration"
-	"github.com/mnemon-dev/mnemon/harness/internal/projection"
+	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
 )
 
 // LoopValidate validates the harness loop/host/binding declarations under the
@@ -22,7 +22,7 @@ func (h *Harness) LoopValidate() ([]string, error) {
 // LoopPlan builds the projection plan for a host and writes it to out in the
 // requested format ("text"/"" or "json").
 func (h *Harness) LoopPlan(out io.Writer, projectRoot, host string, loops []string, format string) error {
-	plan, err := projection.BuildPlan(projection.PlanOptions{
+	plan, err := hostsurface.BuildPlan(hostsurface.PlanOptions{
 		DeclarationRoot: h.root,
 		ProjectRoot:     projectRoot,
 		Host:            host,
@@ -33,9 +33,9 @@ func (h *Harness) LoopPlan(out io.Writer, projectRoot, host string, loops []stri
 	}
 	switch format {
 	case "text", "":
-		return projection.WritePlanText(out, plan)
+		return hostsurface.WritePlanText(out, plan)
 	case "json":
-		return projection.WritePlanJSON(out, plan)
+		return hostsurface.WritePlanJSON(out, plan)
 	default:
 		return fmt.Errorf("unsupported --format %q", format)
 	}
@@ -51,7 +51,7 @@ func (h *Harness) LoopProject(ctx context.Context, out, errw io.Writer, action, 
 	switch host {
 	case "codex":
 		if action == "reconcile" {
-			result, err := projection.RunCodexReconcile(ctx, projection.CodexOptions{
+			result, err := hostsurface.RunCodexReconcile(ctx, hostsurface.CodexOptions{
 				DeclarationRoot: h.root,
 				ProjectRoot:     projectRoot,
 				Loops:           loops,
@@ -65,7 +65,7 @@ func (h *Harness) LoopProject(ctx context.Context, out, errw io.Writer, action, 
 			writeReconcileText(out, result)
 			return nil
 		}
-		return projection.RunCodexProjector(ctx, action, projection.CodexOptions{
+		return hostsurface.RunCodexProjector(ctx, action, hostsurface.CodexOptions{
 			DeclarationRoot: h.root,
 			ProjectRoot:     projectRoot,
 			Loops:           loops,
@@ -77,7 +77,7 @@ func (h *Harness) LoopProject(ctx context.Context, out, errw io.Writer, action, 
 		if action == "reconcile" {
 			return fmt.Errorf("reconcile is not supported for host %q", host)
 		}
-		return projection.RunClaudeProjector(ctx, action, projection.ClaudeOptions{
+		return hostsurface.RunClaudeProjector(ctx, action, hostsurface.ClaudeOptions{
 			DeclarationRoot: h.root,
 			ProjectRoot:     projectRoot,
 			Loops:           loops,
@@ -89,7 +89,7 @@ func (h *Harness) LoopProject(ctx context.Context, out, errw io.Writer, action, 
 		if action == "reconcile" {
 			return fmt.Errorf("reconcile is not supported for host %q", host)
 		}
-		return projection.RunLegacyProjector(ctx, action, projection.LegacyOptions{
+		return hostsurface.RunLegacyProjector(ctx, action, hostsurface.LegacyOptions{
 			DeclarationRoot: h.root,
 			ProjectRoot:     projectRoot,
 			Host:            host,
@@ -101,7 +101,7 @@ func (h *Harness) LoopProject(ctx context.Context, out, errw io.Writer, action, 
 	}
 }
 
-func writeReconcileText(out io.Writer, result projection.ReconcileResult) {
+func writeReconcileText(out io.Writer, result hostsurface.ReconcileResult) {
 	if len(result.Items) == 0 {
 		fmt.Fprintf(out, "Codex reconcile: no drift\n")
 		fmt.Fprintf(out, "event: %s\n", result.EventID)

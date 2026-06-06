@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/auditstore"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/eventlog"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/layout"
 	lifecyclerunner "github.com/mnemon-dev/mnemon/harness/internal/lifecycle/runner"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/schema"
-	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 )
 
 const defaultMaxTurns = 3
@@ -130,7 +130,7 @@ func Run(ctx context.Context, root string, opts RunOptions) (RunResult, error) {
 		if declarationRoot == "" {
 			declarationRoot = root
 		}
-		if err := projection.RunCodexProjector(ctx, "install", projection.CodexOptions{
+		if err := hostsurface.RunCodexProjector(ctx, "install", hostsurface.CodexOptions{
 			DeclarationRoot: declarationRoot,
 			ProjectRoot:     workspace,
 			Loops:           opts.ProjectLoops,

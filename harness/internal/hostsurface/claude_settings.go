@@ -1,10 +1,9 @@
-package projection
+package hostsurface
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -197,9 +196,4 @@ func stripJSON5(text string) string {
 		out.WriteByte(ch)
 	}
 	return out.String()
-}
-
-func pathJoin(base string, elems ...string) string {
-	parts := append([]string{base}, elems...)
-	return path.Join(parts...)
 }

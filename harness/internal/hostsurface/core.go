@@ -1,10 +1,11 @@
-package projection
+package hostsurface
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -32,6 +33,15 @@ type projectorCore struct {
 
 func (c projectorCore) displayJoin(base string, elems ...string) string {
 	return pathJoin(base, elems...)
+}
+
+// pathJoin is the package's display-path primitive: forward-slash joins for the host
+// surface (.codex/.claude) regardless of OS, so projected refs read identically on
+// every platform. It lives with projectorCore (the host-io core) rather than a
+// backend file because every backend joins paths through it.
+func pathJoin(base string, elems ...string) string {
+	parts := append([]string{base}, elems...)
+	return path.Join(parts...)
 }
 
 func (c projectorCore) resolve(displayPath string) string {
