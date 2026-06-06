@@ -1,0 +1,31 @@
+{
+  "id": "memory.admission.v1",
+  "kind": "rule",
+  "version": "0.1.0",
+  "abi_version": "mnemon-wasm-rule-v0",
+  "wasm_path": "../../../core/rule/wasm/testdata/rule_allow_if_evidence.wasm",
+  "wasm_sha256": "207a6da006b5c5bba1414f8ee5164f07f2230cf510b5d340186a3cc60037aacf",
+  "handles": [
+    "memory.write_candidate_observed"
+  ],
+  "emits": [
+    "memory.write.proposed"
+  ],
+  "resources": {
+    "reads": [
+      "memory/project"
+    ],
+    "proposes": [
+      "memory/project"
+    ]
+  },
+  "capabilities": [
+    "read_state_view"
+  ],
+  "limits": {
+    "timeout_ms": 50,
+    "memory_pages": 16,
+    "max_input_bytes": 65536,
+    "max_output_bytes": 65536
+  }
+}

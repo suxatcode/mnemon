@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "abi_version": "mnemon-wasm-rule-v0",
+  "kind": "rule",
+  "required_exports": [
+    "memory",
+    "alloc",
+    "evaluate"
+  ],
+  "allowed_imports_by_capability": {
+    "read_state_view": [
+      "env.read_state_view"
+    ]
+  },
+  "input": {
+    "encoding": "json",
+    "type": "rule.RuleInput"
+  },
+  "output": {
+    "encoding": "json",
+    "type": "contract.RuleDecision"
+  },
+  "authority": {
+    "direct_store_writes": false,
+    "network": false,
+    "filesystem": false,
+    "clock": false,
+    "random": false
+  }
+}

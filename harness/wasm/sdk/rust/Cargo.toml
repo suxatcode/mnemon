@@ -1,0 +1,11 @@
+[package]
+name = "mnemon-wasm-sdk"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []

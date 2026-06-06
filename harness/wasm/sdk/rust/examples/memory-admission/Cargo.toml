@@ -1,0 +1,11 @@
+[package]
+name = "mnemon-memory-admission-example"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mnemon-wasm-sdk = { path = "../.." }
