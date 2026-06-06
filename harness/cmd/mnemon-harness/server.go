@@ -34,7 +34,7 @@ var demoCmd = &cobra.Command{
 
 func init() {
 	serverCmd.Flags().StringVar(&serverAddr, "addr", "127.0.0.1:8787", "listen address")
-	serverCmd.Flags().StringVar(&serverStorePath, "store", ".mnemon/control/server.db", "kernel store path")
+	serverCmd.Flags().StringVar(&serverStorePath, "store", server.DefaultStorePath, "kernel store path")
 	serverCmd.GroupID = groupSpine
 	demoCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(serverCmd, demoCmd)
