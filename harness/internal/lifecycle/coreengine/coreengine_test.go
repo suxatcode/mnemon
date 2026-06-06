@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func seqGen() func() string  { n := 0; return func() string { n++; return "id-" + strconv.Itoa(n) } }
+func seqGen() func() string   { n := 0; return func() string { n++; return "id-" + strconv.Itoa(n) } }
 func fixedNow() func() string { return func() string { return "2026-06-06T00:00:00Z" } }
 
 // TestMemoryEngineGovernsEntryWrites proves the kernel is the admission authority for a
