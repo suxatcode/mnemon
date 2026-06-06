@@ -166,6 +166,7 @@ func init() {
 	lifecycleRunnerCodexCmd.AddCommand(lifecycleRunnerCodexCheckCmd, lifecycleRunnerCodexRunCmd)
 	lifecycleRunnerCmd.AddCommand(lifecycleRunnerCodexCmd)
 	lifecycleCmd.AddCommand(lifecycleInitCmd, lifecycleEventCmd, lifecycleStatusCmd, lifecycleAntipatternCmd, lifecycleDaemonCmd, lifecycleRunnerCmd)
+	lifecycleCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(lifecycleCmd)
 }
 

@@ -91,6 +91,7 @@ func init() {
 	addLoopProjectionHelpFlags(loopStatusCmd)
 	addLoopProjectionHelpFlags(loopUninstallCmd)
 	loopCmd.AddCommand(loopValidateCmd, loopPlanCmd, loopInstallCmd, loopDiffCmd, loopReconcileCmd, loopStatusCmd, loopUninstallCmd)
+	loopCmd.GroupID = groupSpine
 	rootCmd.AddCommand(loopCmd)
 }
 

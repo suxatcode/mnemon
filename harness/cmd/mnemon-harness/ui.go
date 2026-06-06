@@ -22,6 +22,7 @@ var uiCmd = &cobra.Command{
 
 func init() {
 	uiCmd.Flags().StringVar(&uiRoot, "root", ".", "project root for the harness console")
+	uiCmd.GroupID = groupSpine
 	rootCmd.AddCommand(uiCmd)
 }
 

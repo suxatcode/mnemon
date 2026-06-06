@@ -86,6 +86,7 @@ func init() {
 	auditVerifyCmd.Flags().StringVar(&auditFormat, "format", "text", "output format: text or json")
 
 	auditCmd.AddCommand(auditAppendCmd, auditListCmd, auditShowCmd, auditVerifyCmd)
+	auditCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(auditCmd)
 }
 

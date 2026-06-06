@@ -38,6 +38,7 @@ func init() {
 	supervisorProposeCmd.Flags().StringVar(&supervisorKind, "kind", "rule-standin", "supervisor kind (swappable by config); host-agent kinds run externally via the runner")
 	supervisorCmd.AddCommand(supervisorContextCmd)
 	supervisorCmd.AddCommand(supervisorProposeCmd)
+	supervisorCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(supervisorCmd)
 }
 

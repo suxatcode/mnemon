@@ -170,6 +170,7 @@ func init() {
 		proposalWithdrawCmd,
 		proposalExpireCmd,
 	)
+	proposalCmd.GroupID = groupSpine
 	rootCmd.AddCommand(proposalCmd)
 }
 

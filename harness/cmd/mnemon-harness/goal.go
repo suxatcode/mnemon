@@ -210,6 +210,7 @@ func init() {
 		goalLinkCmd,
 		goalCodexCmd,
 	)
+	goalCmd.GroupID = groupSpine
 	rootCmd.AddCommand(goalCmd)
 }
 

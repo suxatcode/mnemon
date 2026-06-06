@@ -143,6 +143,7 @@ func init() {
 	evalReplayCmd.Flags().StringVar(&evalReplayTier, "tier", "1", "comma-separated regression tiers to replay, such as 1 or 1,2")
 	evalReplayCmd.Flags().StringVar(&evalReplayFormat, "format", "text", "output format: text or json")
 	evalCmd.AddCommand(evalPlanCmd, evalRunCmd, evalAssertCmd, evalABTestCmd, evalPromoteCmd, evalReportCmd, evalReplayCmd)
+	evalCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(evalCmd)
 }
 

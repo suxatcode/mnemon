@@ -62,6 +62,7 @@ func init() {
 
 	profileEntryCmd.AddCommand(profileEntryAddCmd)
 	profileCmd.AddCommand(profileEntryCmd, profileShowCmd)
+	profileCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(profileCmd)
 }
 

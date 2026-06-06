@@ -77,6 +77,7 @@ func init() {
 	daemonStatusCmd.Flags().IntVar(&daemonStatusLimit, "limit", 10, "number of recent ticks to show")
 	daemonPauseCmd.Flags().StringVar(&daemonPauseReason, "reason", "manual", "pause reason")
 	daemonCmd.AddCommand(daemonRunCmd, daemonTriggerCmd, daemonStatusCmd, daemonPauseCmd, daemonResumeCmd)
+	daemonCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(daemonCmd)
 }
 
