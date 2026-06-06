@@ -119,7 +119,7 @@ func (h *Harness) DaemonTrigger(out io.Writer, jobID string, force, dryRun bool,
 		return err
 	}
 	for _, runtime := range runtimes {
-		if err := runner.Enqueue(runtimeToDaemonJob(runtime)); err != nil {
+		if err := runner.Enqueue(runtime); err != nil {
 			return err
 		}
 		fmt.Fprintf(out, "triggered %s\n", runtime.ID)
@@ -224,25 +224,6 @@ func (h *Harness) readDaemonEvents() ([]schema.Event, error) {
 func printDaemonWarnings(errw io.Writer, warnings []string) {
 	for _, w := range warnings {
 		fmt.Fprintf(errw, "warning: %s\n", w)
-	}
-}
-
-func runtimeToDaemonJob(runtime daemonjob.Runtime) daemon.Job {
-	return daemon.Job{
-		SchemaVersion: daemon.JobSchemaVersion,
-		ID:            runtime.ID,
-		Type:          runtime.Type,
-		ReactorID:     runtime.ReactorID,
-		JobSpecRef:    runtime.JobSpecRef,
-		Target:        runtime.Target,
-		Priority:      runtime.Priority,
-		Status:        runtime.Status,
-		DueAt:         runtime.DueAt,
-		MaxAttempts:   runtime.MaxAttempts,
-		Budget:        runtime.Budget,
-		EvidenceRefs:  runtime.EvidenceRefs,
-		CorrelationID: runtime.CorrelationID,
-		UpdatedAt:     runtime.UpdatedAt,
 	}
 }
 

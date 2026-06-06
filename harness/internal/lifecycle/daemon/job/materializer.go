@@ -10,23 +10,44 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/schema"
 )
 
-type Runtime struct {
-	ID            string
-	Type          string
-	ReactorID     string
-	JobSpecRef    string
-	Target        map[string]any
-	Priority      string
-	Status        string
-	DueAt         string
-	MaxAttempts   int
-	Budget        map[string]any
-	EvidenceRefs  []string
-	CorrelationID string
-	UpdatedAt     string
+// SchemaVersion is the persisted job-document version stamped on every materialized
+// job. The daemon package re-exports it as daemon.JobSchemaVersion.
+const SchemaVersion = "mnemon.job.v1"
+
+// Job is the one canonical daemon job. The materializer produces it with the
+// lifecycle fields (Attempts/Lease/Error/Result) zero-valued; the daemon queue then
+// persists and advances the same struct. The daemon package aliases it as daemon.Job
+// (and daemon.Lease) so the queue's persistence/lease logic and the materializer
+// share ONE struct instead of a Runtime/Job/jobFromRuntime triple.
+type Job struct {
+	SchemaVersion string         `json:"schema_version"`
+	ID            string         `json:"id"`
+	Type          string         `json:"type"`
+	ReactorID     string         `json:"reactor_id"`
+	JobSpecRef    string         `json:"job_spec_ref,omitempty"`
+	Target        map[string]any `json:"target"`
+	Priority      string         `json:"priority"`
+	Status        string         `json:"status"`
+	DueAt         string         `json:"due_at"`
+	Attempts      int            `json:"attempts"`
+	MaxAttempts   int            `json:"max_attempts"`
+	Lease         *Lease         `json:"lease,omitempty"`
+	Budget        map[string]any `json:"budget,omitempty"`
+	EvidenceRefs  []string       `json:"evidence_refs,omitempty"`
+	CorrelationID string         `json:"correlation_id"`
+	Error         map[string]any `json:"error,omitempty"`
+	Result        map[string]any `json:"result,omitempty"`
+	UpdatedAt     string         `json:"updated_at,omitempty"`
 }
 
-func Materialize(def loader.Definition, decision trigger.Decision, now time.Time) ([]Runtime, error) {
+type Lease struct {
+	OwnerID    string `json:"owner_id"`
+	AcquiredAt string `json:"acquired_at"`
+	ExpiresAt  string `json:"expires_at"`
+	Renewals   int    `json:"renewals"`
+}
+
+func Materialize(def loader.Definition, decision trigger.Decision, now time.Time) ([]Job, error) {
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
@@ -35,9 +56,9 @@ func Materialize(def loader.Definition, decision trigger.Decision, now time.Time
 		if err != nil {
 			return nil, err
 		}
-		return []Runtime{runtime}, nil
+		return []Job{runtime}, nil
 	}
-	runtimes := make([]Runtime, 0, len(decision.Events))
+	runtimes := make([]Job, 0, len(decision.Events))
 	for i := range decision.Events {
 		runtime, err := materializeOne(def, &decision.Events[i], now)
 		if err != nil {
@@ -48,10 +69,10 @@ func Materialize(def loader.Definition, decision trigger.Decision, now time.Time
 	return runtimes, nil
 }
 
-func materializeOne(def loader.Definition, event *schema.Event, now time.Time) (Runtime, error) {
+func materializeOne(def loader.Definition, event *schema.Event, now time.Time) (Job, error) {
 	jobType, reactorID, jobSpecRef, target, err := actionTarget(def)
 	if err != nil {
-		return Runtime{}, err
+		return Job{}, err
 	}
 	evidenceRefs := []string{}
 	correlationID := "daemon:" + def.ID
@@ -67,7 +88,8 @@ func materializeOne(def loader.Definition, event *schema.Event, now time.Time) (
 		target["source_event_id"] = event.ID
 		target["event_type"] = event.Type
 	}
-	return Runtime{
+	return Job{
+		SchemaVersion: SchemaVersion,
 		ID:            runtimeID(def.ID, suffix),
 		Type:          jobType,
 		ReactorID:     reactorID,

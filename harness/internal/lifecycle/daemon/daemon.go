@@ -23,7 +23,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/schema"
 )
 
-const JobSchemaVersion = "mnemon.job.v1"
+const JobSchemaVersion = daemonjob.SchemaVersion
 
 var ErrLeaseHeld = errors.New("job lease is held")
 
@@ -82,33 +82,12 @@ type TickLogRecord struct {
 	Message              string `json:"message,omitempty"`
 }
 
-type Job struct {
-	SchemaVersion string         `json:"schema_version"`
-	ID            string         `json:"id"`
-	Type          string         `json:"type"`
-	ReactorID     string         `json:"reactor_id"`
-	JobSpecRef    string         `json:"job_spec_ref,omitempty"`
-	Target        map[string]any `json:"target"`
-	Priority      string         `json:"priority"`
-	Status        string         `json:"status"`
-	DueAt         string         `json:"due_at"`
-	Attempts      int            `json:"attempts"`
-	MaxAttempts   int            `json:"max_attempts"`
-	Lease         *Lease         `json:"lease,omitempty"`
-	Budget        map[string]any `json:"budget,omitempty"`
-	EvidenceRefs  []string       `json:"evidence_refs,omitempty"`
-	CorrelationID string         `json:"correlation_id"`
-	Error         map[string]any `json:"error,omitempty"`
-	Result        map[string]any `json:"result,omitempty"`
-	UpdatedAt     string         `json:"updated_at,omitempty"`
-}
+// Job is the canonical daemon job, defined once in the daemon/job leaf package and
+// aliased here so the queue's persistence/lease logic and the materializer share ONE
+// struct (no Runtime/Job/jobFromRuntime triple). Lease is likewise the job lease.
+type Job = daemonjob.Job
 
-type Lease struct {
-	OwnerID    string `json:"owner_id"`
-	AcquiredAt string `json:"acquired_at"`
-	ExpiresAt  string `json:"expires_at"`
-	Renewals   int    `json:"renewals"`
-}
+type Lease = daemonjob.Lease
 
 type QueueDepth struct {
 	Queued    int `json:"queued"`
@@ -346,12 +325,11 @@ func (d *Daemon) enqueueDeclarativeJobs(ctx context.Context, events []schema.Eve
 		if !decision.Matched {
 			continue
 		}
-		runtimes, err := daemonjob.Materialize(def, decision, now)
+		jobs, err := daemonjob.Materialize(def, decision, now)
 		if err != nil {
 			return enqueued, err
 		}
-		for _, runtime := range runtimes {
-			job := jobFromRuntime(runtime)
+		for _, job := range jobs {
 			exists, err := d.jobExistsAnyStatus(job.ID)
 			if err != nil {
 				return enqueued, err
@@ -672,25 +650,6 @@ func (d *Daemon) finishJob(job Job, statusValue string, now time.Time, result ma
 		return fmt.Errorf("remove queued job: %w", err)
 	}
 	return d.writeJobStatus(job, now)
-}
-
-func jobFromRuntime(runtime daemonjob.Runtime) Job {
-	return Job{
-		SchemaVersion: JobSchemaVersion,
-		ID:            runtime.ID,
-		Type:          runtime.Type,
-		ReactorID:     runtime.ReactorID,
-		JobSpecRef:    runtime.JobSpecRef,
-		Target:        runtime.Target,
-		Priority:      runtime.Priority,
-		Status:        runtime.Status,
-		DueAt:         runtime.DueAt,
-		MaxAttempts:   runtime.MaxAttempts,
-		Budget:        runtime.Budget,
-		EvidenceRefs:  runtime.EvidenceRefs,
-		CorrelationID: runtime.CorrelationID,
-		UpdatedAt:     runtime.UpdatedAt,
-	}
 }
 
 func (d *Daemon) writeCheckpoint(now time.Time, lastEventID string) error {
