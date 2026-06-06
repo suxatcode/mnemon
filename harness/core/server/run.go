@@ -19,17 +19,25 @@ import (
 // running the server detached from the project tree must pass an explicit --store. OpenRuntime
 // absolutizes the result, so the boot log + status report the canonical path.
 func DiscoverProjectStore() string {
+	return filepath.Join(DiscoverProjectRoot(), DefaultStorePath)
+}
+
+// DiscoverProjectRoot walks up from the current working directory for an existing `.mnemon` directory
+// and returns the project root that contains it (the dir, not `.mnemon` itself), or the CWD when no
+// `.mnemon` ancestor exists. It is the base for resolving DefaultStorePath and project-relative
+// binding/credential refs, so every harness surface resolves them against the same root.
+func DiscoverProjectRoot() string {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return DefaultStorePath
+		return "."
 	}
 	for dir := cwd; ; {
 		if fi, err := os.Stat(filepath.Join(dir, ".mnemon")); err == nil && fi.IsDir() {
-			return filepath.Join(dir, DefaultStorePath)
+			return dir
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return filepath.Join(cwd, DefaultStorePath)
+			return cwd
 		}
 		dir = parent
 	}

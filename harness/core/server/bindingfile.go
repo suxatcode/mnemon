@@ -1,0 +1,186 @@
+package server
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/mnemon-dev/mnemon/harness/core/contract"
+)
+
+// DefaultBindingFile is the canonical channel-binding manifest path under the project root (P3.1).
+const DefaultBindingFile = ".mnemon/harness/channel/bindings.json"
+
+// LoadedBindings is the result of parsing a binding file: the channel bindings plus the bearer
+// token -> principal map assembled from the bindings' credential_ref token files (for a
+// TokenAuthenticator). The bindings feed RuntimeConfig.Bindings + SubsFromBindings; the tokens feed
+// the server's authenticator.
+type LoadedBindings struct {
+	Bindings []ChannelBinding
+	Tokens   map[string]contract.ActorID
+}
+
+// bindingFileDoc is the on-disk schema (snake_case JSON). It is the SERIALIZED form of ChannelBinding
+// + a credential ref; the loader maps it to the engine types so the file format is a thin adapter,
+// not a second binding model.
+type bindingFileDoc struct {
+	SchemaVersion int                `json:"schema_version"`
+	Bindings      []bindingFileEntry `json:"bindings"`
+}
+
+type bindingFileEntry struct {
+	Principal            string       `json:"principal"`
+	ActorKind            string       `json:"actor_kind"`
+	Transport            string       `json:"transport"`
+	Endpoint             string       `json:"endpoint"`
+	AllowedVerbs         []string     `json:"allowed_verbs"`
+	AllowedObservedTypes []string     `json:"allowed_observed_types"`
+	SubscriptionScope    []bindingRef `json:"subscription_scope"`
+	IdempotencyNamespace string       `json:"idempotency_namespace"`
+	CredentialRef        string       `json:"credential_ref"`
+}
+
+type bindingRef struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+// LoadBindingFile reads + validates the channel-binding manifest at path and assembles the bindings
+// and bearer-token map. Relative credential_ref token paths resolve against root (the project root,
+// e.g. server.DiscoverProjectRoot()); absolute ones are used verbatim. It validates each entry
+// (principal, known actor kind / verbs / transport, http endpoint non-empty), the schema version,
+// and cross-entry uniqueness (principal, idempotency namespace, bearer token).
+func LoadBindingFile(root, path string) (LoadedBindings, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return LoadedBindings{}, fmt.Errorf("read binding file: %w", err)
+	}
+	var doc bindingFileDoc
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return LoadedBindings{}, fmt.Errorf("parse binding file %s: %w", path, err)
+	}
+	if doc.SchemaVersion != 1 {
+		return LoadedBindings{}, fmt.Errorf("binding file schema_version %d unsupported (want 1)", doc.SchemaVersion)
+	}
+	bindings := make([]ChannelBinding, 0, len(doc.Bindings))
+	tokens := map[string]contract.ActorID{}
+	for i, e := range doc.Bindings {
+		b, err := e.toBinding()
+		if err != nil {
+			return LoadedBindings{}, fmt.Errorf("binding[%d] (%s): %w", i, e.Principal, err)
+		}
+		bindings = append(bindings, b)
+		if ref := strings.TrimSpace(e.CredentialRef); ref != "" {
+			tokPath := ref
+			if !filepath.IsAbs(tokPath) {
+				tokPath = filepath.Join(root, tokPath)
+			}
+			tokRaw, err := os.ReadFile(tokPath)
+			if err != nil {
+				return LoadedBindings{}, fmt.Errorf("binding[%d] (%s): read credential_ref %s: %w", i, e.Principal, ref, err)
+			}
+			tok := strings.TrimSpace(string(tokRaw))
+			if tok == "" {
+				return LoadedBindings{}, fmt.Errorf("binding[%d] (%s): credential_ref %s is empty", i, e.Principal, ref)
+			}
+			if owner, clash := tokens[tok]; clash {
+				return LoadedBindings{}, fmt.Errorf("binding[%d] (%s): bearer token also bound to %q", i, e.Principal, owner)
+			}
+			tokens[tok] = b.Principal
+		}
+	}
+	// NewBindingSet enforces principal + idempotency-namespace uniqueness (and re-validates each).
+	if _, err := NewBindingSet(bindings...); err != nil {
+		return LoadedBindings{}, err
+	}
+	return LoadedBindings{Bindings: bindings, Tokens: tokens}, nil
+}
+
+func (e bindingFileEntry) toBinding() (ChannelBinding, error) {
+	kind, err := parseActorKind(e.ActorKind)
+	if err != nil {
+		return ChannelBinding{}, err
+	}
+	transport, err := parseTransport(e.Transport)
+	if err != nil {
+		return ChannelBinding{}, err
+	}
+	if transport == TransportHTTP && strings.TrimSpace(e.Endpoint) == "" {
+		return ChannelBinding{}, fmt.Errorf("http transport requires a non-empty endpoint")
+	}
+	verbs := make([]Verb, 0, len(e.AllowedVerbs))
+	for _, v := range e.AllowedVerbs {
+		pv, err := parseVerb(v)
+		if err != nil {
+			return ChannelBinding{}, err
+		}
+		verbs = append(verbs, pv)
+	}
+	scope := make([]contract.ResourceRef, 0, len(e.SubscriptionScope))
+	for _, r := range e.SubscriptionScope {
+		scope = append(scope, contract.ResourceRef{Kind: contract.ResourceKind(r.Kind), ID: contract.ResourceID(r.ID)})
+	}
+	b := ChannelBinding{
+		Principal:            contract.ActorID(e.Principal),
+		ActorKind:            kind,
+		Transport:            transport,
+		Endpoint:             e.Endpoint,
+		AllowedVerbs:         verbs,
+		AllowedObservedTypes: e.AllowedObservedTypes,
+		SubscriptionScope:    scope,
+		IdempotencyNamespace: e.IdempotencyNamespace,
+	}
+	if err := b.Validate(); err != nil {
+		return ChannelBinding{}, err
+	}
+	return b, nil
+}
+
+func parseActorKind(s string) (ActorKind, error) {
+	switch ActorKind(s) {
+	case KindHostAgent:
+		return KindHostAgent, nil
+	case KindControlAgent:
+		return KindControlAgent, nil
+	default:
+		return "", fmt.Errorf("unknown actor_kind %q", s)
+	}
+}
+
+func parseTransport(s string) (Transport, error) {
+	switch Transport(s) {
+	case TransportLocal:
+		return TransportLocal, nil
+	case TransportHTTP:
+		return TransportHTTP, nil
+	case TransportMTLS:
+		return TransportMTLS, nil
+	default:
+		return "", fmt.Errorf("unknown transport %q", s)
+	}
+}
+
+func parseVerb(s string) (Verb, error) {
+	switch Verb(s) {
+	case VerbObserve:
+		return VerbObserve, nil
+	case VerbPull:
+		return VerbPull, nil
+	case VerbStatus:
+		return VerbStatus, nil
+	default:
+		return "", fmt.Errorf("unknown verb %q", s)
+	}
+}
+
+// SubsFromBindings derives the per-principal subscription scopes from the bindings, so the runtime's
+// served scope and the binding manifest come from ONE source (the binding file).
+func SubsFromBindings(bindings []ChannelBinding) map[contract.ActorID]contract.Subscription {
+	subs := make(map[contract.ActorID]contract.Subscription, len(bindings))
+	for _, b := range bindings {
+		subs[b.Principal] = contract.Subscription{Actor: b.Principal, Refs: b.SubscriptionScope}
+	}
+	return subs
+}
