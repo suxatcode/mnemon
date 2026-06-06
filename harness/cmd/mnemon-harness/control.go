@@ -16,13 +16,14 @@ import (
 // same channel a HostAgent and a ControlAgent both speak, differing only by binding/credential.
 
 var (
-	controlAddr      string
-	controlPrincipal string
-	controlToken     string
-	controlType      string
-	controlPayload   string
-	controlExtID     string
-	controlActor     string
+	controlAddr       string
+	controlPrincipal  string
+	controlToken      string
+	controlType       string
+	controlPayload    string
+	controlExtID      string
+	controlActor      string
+	controlStatusJSON bool
 )
 
 func controlClient() *server.Client {
@@ -81,13 +82,19 @@ var controlPullCmd = &cobra.Command{
 
 var controlStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check the channel is reachable and report the principal's projection digest",
+	Short: "Report channel status evidence for the principal (digest, actor kind, store ref, mode)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		proj, err := controlClient().PullProjection(contract.ActorID(controlPrincipal), contract.Subscription{Actor: contract.ActorID(controlPrincipal)})
+		st, err := controlClient().Status(contract.ActorID(controlPrincipal))
 		if err != nil {
 			return fmt.Errorf("channel unreachable or unauthorized: %w", err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "channel OK: principal=%s digest=%s\n", controlPrincipal, proj.Digest)
+		if controlStatusJSON {
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			enc.SetIndent("", "  ")
+			return enc.Encode(st)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "channel OK: principal=%s kind=%s digest=%s resources=%d store=%s mode=%s\n",
+			st.Principal, st.ActorKind, st.Digest, st.Resources, st.StoreRef, st.Mode)
 		return nil
 	},
 }
@@ -102,6 +109,7 @@ func init() {
 	controlObserveCmd.Flags().StringVar(&controlPayload, "payload", "", "observation payload as JSON")
 	controlObserveCmd.Flags().StringVar(&controlExtID, "external-id", "", "idempotency external id")
 	controlPullCmd.Flags().StringVar(&controlActor, "actor", "", "subscription actor (defaults to principal)")
+	controlStatusCmd.Flags().BoolVar(&controlStatusJSON, "json", false, "emit channel status as JSON")
 	controlCmd.AddCommand(controlObserveCmd, controlPullCmd, controlStatusCmd)
 	controlCmd.GroupID = groupSpine
 	rootCmd.AddCommand(controlCmd)

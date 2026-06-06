@@ -143,6 +143,49 @@ func (r *Runtime) PendingEvents(afterSeq int64) ([]contract.Event, error) {
 	return r.store.PendingEvents(afterSeq)
 }
 
+// ChannelStatus is the channel's status evidence for one principal (P2.3): the scoped projection
+// digest + resource count, the binding actor kind, the runtime store ref, and the server mode. It is
+// richer than a pull (which carries only the digest) — real path evidence a host can check before
+// trusting projected state.
+type ChannelStatus struct {
+	Principal contract.ActorID `json:"principal"`
+	Digest    string           `json:"digest"`
+	Resources int              `json:"resources"`
+	ActorKind ActorKind        `json:"actor_kind,omitempty"`
+	StoreRef  string           `json:"store_ref"`
+	Mode      string           `json:"mode"`
+}
+
+// Status builds the principal's channel status. When bindings are configured it is gated on the
+// binding's VerbStatus (a grant distinct from pull). The digest is the principal's server-configured
+// scope, read through the kernel store directly (the server owns the runtime), so status does not
+// require the pull verb.
+func (r *Runtime) Status(principal contract.ActorID) (ChannelStatus, error) {
+	var kind ActorKind
+	if r.bindings != nil {
+		b, ok := r.bindings.Binding(principal)
+		if !ok {
+			return ChannelStatus{}, fmt.Errorf("no channel binding for principal %q", principal)
+		}
+		if !b.Allows(VerbStatus) {
+			return ChannelStatus{}, fmt.Errorf("principal %q is not bound to status", principal)
+		}
+		kind = b.ActorKind
+	}
+	proj, err := r.cs.PullProjection(principal, contract.Subscription{Actor: principal})
+	if err != nil {
+		return ChannelStatus{}, err
+	}
+	return ChannelStatus{
+		Principal: principal,
+		Digest:    proj.Digest,
+		Resources: len(proj.Resources),
+		ActorKind: kind,
+		StoreRef:  r.storePath,
+		Mode:      "service",
+	}, nil
+}
+
 // Close releases the store and its single-writer lock. After Close the runtime no longer owns the
 // store, so another owner (embedded or service) may take it (S11).
 func (r *Runtime) Close() error { return r.store.Close() }

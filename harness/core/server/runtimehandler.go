@@ -67,5 +67,19 @@ func NewRuntimeHandler(rt *Runtime, auth Authenticator) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(proj)
 	})
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		principal, err := auth.Authenticate(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		st, err := rt.Status(principal)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(st)
+	})
 	return mux
 }

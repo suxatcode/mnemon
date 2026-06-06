@@ -184,6 +184,30 @@ func (c *Client) Ingest(principal contract.ActorID, env contract.ObservationEnve
 	return r.Seq, r.Dup, err
 }
 
+// Status fetches the channel status evidence for the client's bound principal (P2.3). The principal
+// argument is ignored: identity is the bound credential, sent as the trusted header / bearer token.
+func (c *Client) Status(_ contract.ActorID) (ChannelStatus, error) {
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/status", nil)
+	if err != nil {
+		return ChannelStatus{}, err
+	}
+	c.setAuth(req)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return ChannelStatus{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return ChannelStatus{}, fmt.Errorf("status failed: %s: %s", resp.Status, string(b))
+	}
+	var st ChannelStatus
+	if err := json.NewDecoder(resp.Body).Decode(&st); err != nil {
+		return ChannelStatus{}, err
+	}
+	return st, nil
+}
+
 // PullProjection fetches the actor's scoped view from the server. The principal argument is ignored: the
 // subscription's actor is sent in the body and the server cross-checks it against the bound credential header,
 // so an edge cannot pull another actor's scope (D7/S9).
