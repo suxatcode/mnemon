@@ -6,14 +6,16 @@
 // file only AFTER the kernel accepts, so the file is a mirror of the canonical state, never an
 // independent writer (P2.2 lowering; the file is the P2.1 transitional mirror shim).
 //
-// A persistent kernel store under the harness dir holds the canonical resources across
-// invocations. The store is opened per operation (the kernel's single-writer lock makes that
-// safe for the sequential CLI) so no long-lived handle leaks across facade calls.
+// The canonical resources live in the ONE harness control store (server.DefaultStorePath under the
+// project root). Embedded mode: each AdmitCreate opens a server.Runtime over that store, ingests +
+// ticks one operation through the channel, and closes it — so the runtime (not coreengine) owns the
+// store/kernel/ControlServer/Tick, and the kernel's single-writer lock keeps a per-op opener and a
+// live `mnemon-harness server` from owning the store at once (S11). coreengine is a thin lowering
+// client over the runtime's ServerAPI, never a second writer.
 package coreengine
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/mnemon-dev/mnemon/harness/core/contract"
@@ -56,29 +58,28 @@ type Result struct {
 // inbox dedup (idempotent), while a DIFFERENT proposal targeting an already-canonical id is
 // denied by the rule pre-gate.
 func (e *Engine) AdmitCreate(applyID string, kind contract.ResourceKind, id string, fields map[string]any) (Result, error) {
-	if err := os.MkdirAll(filepath.Dir(e.storePath), 0o755); err != nil {
-		return Result{}, fmt.Errorf("coreengine: create store dir: %w", err)
-	}
-	store, err := kernel.OpenStore(e.storePath)
-	if err != nil {
-		return Result{}, fmt.Errorf("coreengine: open kernel store: %w", err)
-	}
-	defer store.Close()
-
 	actor := contract.ActorID("host-" + string(kind))
 	observed := string(kind) + ".governed.observed"
 	ref := contract.ResourceRef{Kind: kind, ID: contract.ResourceID(id)}
-	k := kernel.NewKernel(store, kernel.DefaultSchemaGuard(), kernel.AuthorityRules{
-		Allow: map[contract.ActorID][]contract.ResourceKind{actor: {kind}},
+
+	// Embedded mode: open the one server-owned runtime over the canonical store, lower this create
+	// through its channel, then close it (S11 single-writer — no long-lived server owns the store
+	// concurrently). The runtime owns the store/kernel/ControlServer/Tick; coreengine only drives it.
+	rt, err := server.OpenRuntime(e.storePath, server.RuntimeConfig{
+		Rules:     rule.NewRuleSet(governedCreateRule(kind, actor, observed)),
+		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{actor: {kind}}},
+		Subs:      map[contract.ActorID]contract.Subscription{actor: {Actor: actor, Refs: []contract.ResourceRef{ref}}},
+		Modes:     contract.Modes{Conflict: contract.ConflictReject, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict},
+		NewID:     e.newID,
+		Now:       e.now,
 	})
-	subs := map[contract.ActorID]contract.Subscription{
-		actor: {Actor: actor, Refs: []contract.ResourceRef{ref}},
+	if err != nil {
+		return Result{}, fmt.Errorf("coreengine: open runtime: %w", err)
 	}
-	modes := contract.Modes{Conflict: contract.ConflictReject, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict}
-	cs := server.New(store, k, rule.NewRuleSet(governedCreateRule(kind, actor, observed)), subs, modes, e.newID, e.now)
+	defer rt.Close()
 
 	correlation := string(kind) + ":" + applyID
-	_, dup, err := cs.Ingest(actor, contract.ObservationEnvelope{
+	_, dup, err := rt.API().Ingest(actor, contract.ObservationEnvelope{
 		ExternalID: applyID,
 		Event: contract.Event{
 			Type:          observed,
@@ -92,7 +93,7 @@ func (e *Engine) AdmitCreate(applyID string, kind contract.ResourceKind, id stri
 	if dup {
 		// Idempotent re-apply: the observation was already recorded (and applied) on a prior
 		// call. Report the resource's current canonical version rather than re-deciding.
-		v, _, gerr := store.GetResource(ref)
+		v, _, gerr := rt.Resource(ref)
 		if gerr != nil {
 			return Result{}, fmt.Errorf("coreengine: read deduped resource: %w", gerr)
 		}
@@ -102,17 +103,17 @@ func (e *Engine) AdmitCreate(applyID string, kind contract.ResourceKind, id stri
 		return Result{Reason: "idempotent re-apply produced no canonical write"}, nil
 	}
 
-	decisions, err := cs.Tick()
+	decisions, err := rt.Tick()
 	if err != nil {
 		return Result{}, fmt.Errorf("coreengine: tick: %w", err)
 	}
 	for _, d := range decisions {
 		if d.Status == contract.Accepted {
-			v, _, _ := store.GetResource(ref)
+			v, _, _ := rt.Resource(ref)
 			return Result{Accepted: true, Version: int64(v)}, nil
 		}
 	}
-	return Result{Reason: denialReason(store, string(kind)+".diagnostic", correlation)}, nil
+	return Result{Reason: denialReason(rt, string(kind)+".diagnostic", correlation)}, nil
 }
 
 // governedCreateRule admits a <kind>.governed.observed into a <kind>.write.proposed create, or
@@ -148,9 +149,10 @@ func governedCreateRule(kind contract.ResourceKind, actor contract.ActorID, obse
 }
 
 // denialReason recovers the rule/bridge refusal reason from the durable diagnostic the server
-// emitted for this correlation (S7: every refusal is a diagnostic).
-func denialReason(store *kernel.Store, diagnosticType, correlation string) string {
-	events, err := store.PendingEvents(0)
+// emitted for this correlation (S7: every refusal is a diagnostic). It reads the runtime's event
+// log (read-only — coreengine is never a second writer).
+func denialReason(rt *server.Runtime, diagnosticType, correlation string) string {
+	events, err := rt.PendingEvents(0)
 	if err != nil {
 		return "kernel refused the write"
 	}

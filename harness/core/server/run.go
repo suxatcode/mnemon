@@ -6,11 +6,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/google/uuid"
-	"github.com/mnemon-dev/mnemon/harness/core/contract"
-	"github.com/mnemon-dev/mnemon/harness/core/kernel"
-	"github.com/mnemon-dev/mnemon/harness/core/rule"
 )
 
 // DefaultStorePath is the ONE canonical kernel-store path the harness control plane defaults to.
@@ -30,23 +25,18 @@ const DefaultStorePath = ".mnemon/harness/control/governed.db"
 // server package so the CLI reaches the engine only through this factory + ServerAPI, never by
 // importing kernel/reconcile directly (the P2.3 boundary).
 //
-// The server boots with an empty rule set and no preconfigured actors: it is a bare channel
-// endpoint (records observations, serves scoped projections). Policy (rules/actors/subs) is a
-// configuration seam a richer boot path supplies via NewFromConfig.
+// The server boots the one server-owned Runtime over the store (service mode, S11 single-writer) with
+// a BARE config — an empty rule set and no preconfigured actors: a bare channel endpoint (records
+// observations, serves scoped projections). Policy (rules/actors/subs) is a configuration seam a
+// richer boot path supplies via RuntimeConfig / NewFromConfig.
 func RunHTTPServer(ctx context.Context, addr, storePath string, out io.Writer) error {
-	store, err := kernel.OpenStore(storePath)
+	rt, err := OpenRuntime(storePath, RuntimeConfig{})
 	if err != nil {
-		return fmt.Errorf("open kernel store: %w", err)
+		return err
 	}
-	defer store.Close()
+	defer rt.Close()
 
-	k := kernel.NewKernel(store, kernel.DefaultSchemaGuard(), kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{}})
-	cs := New(store, k, rule.NewRuleSet(), map[contract.ActorID]contract.Subscription{},
-		contract.Modes{Conflict: contract.ConflictReject, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict},
-		func() string { return uuid.NewString() },
-		func() string { return time.Now().UTC().Format(time.RFC3339) })
-
-	srv := &http.Server{Addr: addr, Handler: NewHTTPHandler(cs)}
+	srv := &http.Server{Addr: addr, Handler: NewHTTPHandler(rt.API())}
 	errc := make(chan error, 1)
 	go func() {
 		fmt.Fprintf(out, "mnemon-harness server: listening on %s (store %s)\n", addr, storePath)
