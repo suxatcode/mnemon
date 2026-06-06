@@ -58,6 +58,7 @@ func init() {
 	localCmd.PersistentFlags().StringVar(&localStorePath, "store", "", "store path; defaults to the project Local Mnemon store")
 	localRunCmd.Flags().StringVar(&localAddr, "addr", "127.0.0.1:8787", "listen address")
 	localRunCmd.Flags().StringVar(&localBindingsPath, "bindings", "", "Agent Integration binding file")
+	_ = localRunCmd.Flags().MarkHidden("bindings")
 	localCmd.AddCommand(localRunCmd, localStatusCmd, localStopCmd)
 	localCmd.GroupID = groupSpine
 	rootCmd.AddCommand(localCmd)

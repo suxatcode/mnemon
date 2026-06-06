@@ -33,3 +33,35 @@ func TestRootHelpUsesLocalFirstProductSurface(t *testing.T) {
 		}
 	}
 }
+
+func TestProductHelpDoesNotExposeInternalVocabulary(t *testing.T) {
+	for _, args := range [][]string{
+		{"setup", "--help"},
+		{"local", "run", "--help"},
+		{"status", "--help"},
+	} {
+		got := executeRootForHelp(t, args...)
+		for _, blocked := range []string{"binding", "channel", "projection", "kernel", "runtime", "sync cursor", "wasm abi", "control-agent"} {
+			if strings.Contains(strings.ToLower(got), blocked) {
+				t.Fatalf("%q help leaked internal term %q:\n%s", strings.Join(args, " "), blocked, got)
+			}
+		}
+	}
+}
+
+func executeRootForHelp(t *testing.T, args ...string) string {
+	t.Helper()
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+	rootCmd.SetErr(&out)
+	rootCmd.SetArgs(args)
+	t.Cleanup(func() {
+		rootCmd.SetOut(os.Stdout)
+		rootCmd.SetErr(os.Stderr)
+		rootCmd.SetArgs(nil)
+	})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("root %v returned error: %v", args, err)
+	}
+	return out.String()
+}

@@ -83,6 +83,7 @@ func init() {
 
 	setupCmd.Flags().StringVar(&setupControlURL, "control-url", "", "Local Mnemon endpoint URL")
 	setupCmd.Flags().StringVar(&setupActorKind, "actor-kind", "host-agent", "agent kind: host-agent or control-agent")
+	_ = setupCmd.Flags().MarkHidden("actor-kind")
 	setupCmd.Flags().BoolVar(&setupUseToken, "token", true, "generate a local access token")
 	setupCmd.Flags().BoolVar(&setupDryRun, "dry-run", false, "print changes without writing")
 
