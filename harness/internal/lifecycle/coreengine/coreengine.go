@@ -29,11 +29,14 @@ type Engine struct {
 	now       func() string
 }
 
-// New binds an engine to a persistent kernel store under harnessDir. newID/now feed the
-// bridge's id/clock; pass deterministic generators in tests, uuid/time in prod.
-func New(harnessDir string, newID, now func() string) *Engine {
+// New binds an engine to the ONE canonical harness control store, resolved as
+// server.DefaultStorePath under the project root — the same path-resolution `mnemon-harness server`
+// uses, so a governed lifecycle write is readable by a host-agent pull through the channel (no store
+// split). newID/now feed the bridge's id/clock; pass deterministic generators in tests, uuid/time in
+// prod.
+func New(root string, newID, now func() string) *Engine {
 	return &Engine{
-		storePath: filepath.Join(harnessDir, "control", "governed.db"),
+		storePath: filepath.Join(root, server.DefaultStorePath),
 		newID:     newID,
 		now:       now,
 	}

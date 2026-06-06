@@ -310,7 +310,7 @@ func (h *Harness) coreEngine() (*coreengine.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return coreengine.New(paths.HarnessDir,
+	return coreengine.New(paths.Root,
 		func() string { return uuid.NewString() },
 		func() string { return time.Now().UTC().Format(time.RFC3339) }), nil
 }

@@ -11,24 +11,20 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/core/server"
 )
 
-// TestLifecycleApplyVisibleViaServerStore is the RED for P1: a governed memory entry applied
-// through the lifecycle/app Agent Surface (coreengine.AdmitCreate) MUST be visible when a
-// host-agent surface pulls the scoped projection from the canonical harness control store
-// (server.DefaultStorePath).
+// TestLifecycleApplyVisibleViaServerStore is the P1 unification guard (the former P0 RED): a
+// governed memory entry applied through the lifecycle/app Agent Surface (coreengine.AdmitCreate)
+// MUST be visible when a host-agent surface pulls the scoped projection from the canonical harness
+// control store (server.DefaultStorePath).
 //
-// It fails today because the two surfaces own DISJOINT kernel stores: coreengine writes
-// <harnessDir>/control/governed.db while the server defaults to server.DefaultStorePath
-// (.mnemon/control/server.db). P1.1 unifies that default onto the harness control store and P1
-// makes both surfaces share one runtime/store — at which point this turns green. It is pinned
-// (t.Skip) until then so the tree never commits red; remove the skip in P1.1.
+// Before P1.1 it failed because the two surfaces owned DISJOINT kernel stores (coreengine's
+// governed.db vs the server's .mnemon/control/server.db). P1.1 unified the default onto the harness
+// control store, resolved from the SAME server.DefaultStorePath source of truth by both surfaces,
+// so this is now green.
 func TestLifecycleApplyVisibleViaServerStore(t *testing.T) {
-	t.Skip("RED for P1.1: unifies the split control store onto server.DefaultStorePath; remove this skip when the default points at the harness control store")
-
 	root := t.TempDir()
-	harnessDir := filepath.Join(root, ".mnemon", "harness")
 
 	// lifecycle/app Agent Surface applies a governed memory entry.
-	eng := New(harnessDir, seqGen(), fixedNow())
+	eng := New(root, seqGen(), fixedNow())
 	res, err := eng.AdmitCreate("apply-1", "memory", "m1", map[string]any{"summary": "s", "content": "governed"})
 	if err != nil {
 		t.Fatalf("AdmitCreate: %v", err)

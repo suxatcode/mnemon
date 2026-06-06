@@ -17,10 +17,11 @@ import (
 // It is the single source of truth shared by `mnemon-harness server` and the lifecycle/app apply
 // surface, so a write through one surface is readable by a pull through the other (no store split).
 //
-// P0 names it at its historical value (the former standalone server default); P1.1 flips it onto
-// the harness control store so both surfaces resolve to the same file. Tests and dev may override
-// it with an explicit path.
-const DefaultStorePath = ".mnemon/control/server.db"
+// It is the harness control store under the project's `.mnemon/harness` tree, so the lifecycle/app
+// apply surface (coreengine, which resolves it under the project root) and `mnemon-harness server`
+// (which resolves it under the CWD the operator boots from) land on the same file. Tests and dev
+// may override it with an explicit path.
+const DefaultStorePath = ".mnemon/harness/control/governed.db"
 
 // RunHTTPServer boots a ControlServer over a persistent kernel store and serves the channel
 // (ServerAPI: observe via Ingest, pull via PullProjection) over httpapi on addr until ctx is
