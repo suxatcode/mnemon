@@ -74,7 +74,7 @@ var setupUninstallCmd = &cobra.Command{
 func init() {
 	setupCmd.PersistentFlags().StringVar(&setupRoot, "root", ".", "repository root containing harness declarations")
 	setupCmd.PersistentFlags().StringVar(&setupProjectRoot, "project-root", "", "project root for Agent Integration artifacts (defaults to root)")
-	setupCmd.PersistentFlags().StringVar(&setupHost, "host", "", "host runtime id")
+	setupCmd.PersistentFlags().StringVar(&setupHost, "host", "", "Agent Integration host id")
 	setupCmd.PersistentFlags().StringArrayVar(&setupLoops, "loop", nil, "integration id; may be repeated")
 	setupCmd.PersistentFlags().BoolVar(&setupMemory, "memory", false, "install memory Agent Integration")
 	setupCmd.PersistentFlags().BoolVar(&setupSkills, "skills", false, "install skill Agent Integration")

@@ -8,12 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mnemon-dev/mnemon/harness/core/contract"
-	"github.com/mnemon-dev/mnemon/harness/core/kernel"
 	"github.com/mnemon-dev/mnemon/harness/core/server"
 	"github.com/spf13/cobra"
 )
@@ -129,26 +127,12 @@ type syncPullResult struct {
 
 func syncPushOnce() (syncPushResult, error) {
 	storePath := resolvedSyncStorePath()
-	store, err := openSyncStore(storePath)
+	batch, err := server.ReadLocalSyncPushBatch(storePath)
 	if err != nil {
-		return syncPushResult{}, fmt.Errorf("open Local Mnemon store: %w", err)
-	}
-	pending, err := store.PendingSyncCommits()
-	if err != nil {
-		_ = store.Close()
-		return syncPushResult{}, fmt.Errorf("read pending sync commits: %w", err)
-	}
-	if len(pending) == 0 {
-		_ = store.Close()
-		return syncPushResult{}, nil
-	}
-	replicaID, err := store.ReplicaID()
-	if err != nil {
-		_ = store.Close()
-		return syncPushResult{}, fmt.Errorf("read local replica id: %w", err)
-	}
-	if err := store.Close(); err != nil {
 		return syncPushResult{}, err
+	}
+	if len(batch.Commits) == 0 {
+		return syncPushResult{}, nil
 	}
 	remote, err := resolveSyncRemote()
 	if err != nil {
@@ -156,42 +140,17 @@ func syncPushOnce() (syncPushResult, error) {
 	}
 	client := server.NewClientWithToken(remote.Endpoint, remote.Token)
 	resp, err := client.SyncPush(server.SyncPushRequest{
-		ReplicaID: replicaID,
-		BatchID:   syncBatchID(replicaID, pending),
-		Commits:   pending,
+		ReplicaID: batch.ReplicaID,
+		BatchID:   syncBatchID(batch.ReplicaID, batch.Commits),
+		Commits:   batch.Commits,
 	})
 	if err != nil {
 		return syncPushResult{}, fmt.Errorf("sync push failed: %w", err)
 	}
-	store, err = openSyncStore(storePath)
-	if err != nil {
-		return syncPushResult{}, fmt.Errorf("open Local Mnemon store for sync ack: %w", err)
-	}
-	defer store.Close()
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := markSyncResults(store, remote.ID, now, resp); err != nil {
+	if err := server.ApplyLocalSyncPushResponse(storePath, remote.ID, resp); err != nil {
 		return syncPushResult{}, err
 	}
 	return syncPushResult{accepted: len(resp.Accepted), rejected: len(resp.Rejected), conflicts: len(resp.Conflicts)}, nil
-}
-
-func markSyncResults(store *kernel.Store, remoteID, at string, resp server.SyncPushResponse) error {
-	for _, item := range resp.Accepted {
-		if err := store.MarkSyncCommitStatus(item.OriginReplicaID, item.LocalDecisionID, item.ResourceRef, "synced", remoteID, at, ""); err != nil {
-			return err
-		}
-	}
-	for _, item := range resp.Rejected {
-		if err := store.MarkSyncCommitStatus(item.OriginReplicaID, item.LocalDecisionID, item.ResourceRef, "rejected", remoteID, at, item.Diagnostic); err != nil {
-			return err
-		}
-	}
-	for _, item := range resp.Conflicts {
-		if err := store.MarkSyncCommitStatus(item.OriginReplicaID, item.LocalDecisionID, item.ResourceRef, "conflict", remoteID, at, item.Diagnostic); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func syncPullOnce() (syncPullResult, error) {
@@ -200,114 +159,21 @@ func syncPullOnce() (syncPullResult, error) {
 		return syncPullResult{}, err
 	}
 	storePath := resolvedSyncStorePath()
-	store, err := openSyncStore(storePath)
+	state, err := server.ReadLocalSyncPullState(storePath, remote.ID)
 	if err != nil {
-		return syncPullResult{}, fmt.Errorf("open Local Mnemon store: %w", err)
-	}
-	replicaID, err := store.ReplicaID()
-	if err != nil {
-		_ = store.Close()
-		return syncPullResult{}, fmt.Errorf("read local replica id: %w", err)
-	}
-	cursor := store.GetCursor(syncPullCursorName(remote.ID))
-	if err := store.Close(); err != nil {
 		return syncPullResult{}, err
 	}
 	resp, err := server.NewClientWithToken(remote.Endpoint, remote.Token).SyncPull(server.SyncPullRequest{
-		ReplicaID:    replicaID,
-		RemoteCursor: fmt.Sprintf("%d", cursor),
+		ReplicaID:    state.ReplicaID,
+		RemoteCursor: state.RemoteCursor,
 	})
 	if err != nil {
 		return syncPullResult{}, fmt.Errorf("sync pull failed: %w", err)
 	}
-	if len(resp.Commits) == 0 {
-		if err := setSyncPullCursor(storePath, remote.ID, resp.NextCursor); err != nil {
-			return syncPullResult{}, err
-		}
-		return syncPullResult{}, nil
-	}
-	refs := refsFromCommits(resp.Commits)
-	rt, err := server.OpenSyncImportRuntime(storePath, refs)
-	if err != nil {
-		return syncPullResult{}, fmt.Errorf("open Local Mnemon import runtime: %w", err)
-	}
-	pulledAt := time.Now().UTC().Format(time.RFC3339)
-	for _, commit := range resp.Commits {
-		if commit.ResourceRef.Kind != "memory" {
-			continue
-		}
-		_, dup, err := rt.API().Ingest(server.SyncImportActor, contract.ObservationEnvelope{
-			ExternalID: syncPullExternalID(remote.ID, commit),
-			Event: contract.Event{
-				Type: server.RemoteMemoryCommitObserved,
-				Payload: map[string]any{
-					"commit":    commit,
-					"remote_id": remote.ID,
-					"pulled_at": pulledAt,
-				},
-			},
-		})
-		if err != nil {
-			_ = rt.Close()
-			return syncPullResult{}, fmt.Errorf("ingest remote commit: %w", err)
-		}
-		if !dup {
-			if _, err := rt.Tick(); err != nil {
-				_ = rt.Close()
-				return syncPullResult{}, fmt.Errorf("apply remote commit: %w", err)
-			}
-		}
-	}
-	if err := rt.Close(); err != nil {
-		return syncPullResult{}, err
-	}
-	if err := setSyncPullCursor(storePath, remote.ID, resp.NextCursor); err != nil {
+	if err := server.ImportLocalSyncPull(storePath, remote.ID, resp.NextCursor, resp.Commits); err != nil {
 		return syncPullResult{}, err
 	}
 	return syncPullResult{commits: len(resp.Commits)}, nil
-}
-
-func setSyncPullCursor(storePath, remoteID, cursor string) error {
-	if strings.TrimSpace(cursor) == "" {
-		return nil
-	}
-	seq, err := strconv.ParseInt(cursor, 10, 64)
-	if err != nil {
-		return fmt.Errorf("parse sync pull cursor: %w", err)
-	}
-	store, err := openSyncStore(storePath)
-	if err != nil {
-		return fmt.Errorf("open Local Mnemon store for sync cursor: %w", err)
-	}
-	defer store.Close()
-	return store.SetCursor(syncPullCursorName(remoteID), seq)
-}
-
-func syncPullCursorName(remoteID string) string {
-	return "sync_pull:" + remoteID
-}
-
-func refsFromCommits(commits []contract.LocalCommit) []contract.ResourceRef {
-	seen := map[contract.ResourceRef]bool{}
-	var refs []contract.ResourceRef
-	for _, commit := range commits {
-		if !seen[commit.ResourceRef] {
-			seen[commit.ResourceRef] = true
-			refs = append(refs, commit.ResourceRef)
-		}
-	}
-	return refs
-}
-
-func syncPullExternalID(remoteID string, commit contract.LocalCommit) string {
-	return strings.Join([]string{
-		"pull",
-		remoteID,
-		commit.OriginReplicaID,
-		commit.LocalDecisionID,
-		string(commit.ResourceRef.Kind),
-		string(commit.ResourceRef.ID),
-	}, ":")
 }
 
 type syncRemoteConfig struct {
@@ -412,15 +278,6 @@ func resolvedSyncStorePath() string {
 		return resolveSyncPath(syncStorePath)
 	}
 	return filepath.Join(syncProjectRoot(), server.DefaultStorePath)
-}
-
-func openSyncStore(path string) (*kernel.Store, error) {
-	if dir := filepath.Dir(path); dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, err
-		}
-	}
-	return kernel.OpenStore(path)
 }
 
 func resolvedSyncRemotesPath() string {

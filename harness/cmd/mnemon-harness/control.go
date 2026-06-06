@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/core/contract"
-	"github.com/mnemon-dev/mnemon/harness/core/projection"
 	"github.com/mnemon-dev/mnemon/harness/core/server"
 	"github.com/spf13/cobra"
 )
@@ -102,7 +100,7 @@ var controlPullCmd = &cobra.Command{
 			return fmt.Errorf("channel pull failed (service unreachable or unauthorized): %w", err)
 		}
 		if controlMirrorPath != "" {
-			if err := writeMemoryMirror(controlMirrorPath, proj); err != nil {
+			if err := server.WriteMemoryMirror(controlMirrorPath, proj); err != nil {
 				return fmt.Errorf("write memory mirror: %w", err)
 			}
 			if !controlPullJSON {
@@ -161,30 +159,4 @@ func init() {
 	controlCmd.AddCommand(controlObserveCmd, controlPullCmd, controlStatusCmd)
 	controlCmd.GroupID = groupSpine
 	rootCmd.AddCommand(controlCmd)
-}
-
-func writeMemoryMirror(path string, proj projection.Projection) error {
-	content := strings.TrimSpace(scopedMemoryContent(proj))
-	if content == "" {
-		content = "# Local Memory\n\n_No scoped memory entries._"
-	}
-	body := "# MEMORY.md\n\n" +
-		"<!-- Non-authoritative mirror generated from Local Mnemon scoped memory. Do not edit directly; use memory-set. -->\n\n" +
-		content + "\n"
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(body), 0o644)
-}
-
-func scopedMemoryContent(proj projection.Projection) string {
-	for _, item := range proj.Content {
-		if item.Ref.Kind != "memory" {
-			continue
-		}
-		if content, ok := item.Fields["content"].(string); ok {
-			return content
-		}
-	}
-	return ""
 }
