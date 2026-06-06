@@ -56,8 +56,9 @@ func ring(rel string) (int, bool) {
 	case rel == "harness/internal/lifecycle/eventlog",
 		rel == "harness/internal/lifecycle/status",
 		rel == "harness/internal/lifecycle/coordination",
-		rel == "harness/internal/lifecycle/auditstore":
-		return 1, true // substrate: event log + materialized status/coordination + audit/lineage records
+		rel == "harness/internal/lifecycle/auditstore",
+		rel == "harness/internal/lifecycle/coreengine":
+		return 1, true // substrate: event log + materialized status/coordination + audit/lineage + the kernel-channel seam (coreengine feeds core, Ring 3->1)
 	case rel == "harness/internal/lifecycle/schema",
 		rel == "harness/internal/lifecycle/layout",
 		rel == "harness/internal/lifecycle/corebridge",
