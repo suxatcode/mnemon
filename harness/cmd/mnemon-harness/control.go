@@ -52,7 +52,7 @@ var controlObserveCmd = &cobra.Command{
 			Event:      contract.Event{Type: controlType, Payload: payload},
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("channel observe failed (service unreachable or rejected): %w", err)
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "observed seq=%d dup=%v\n", seq, dup)
 		return nil
@@ -69,7 +69,7 @@ var controlPullCmd = &cobra.Command{
 		}
 		proj, err := controlClient().PullProjection(contract.ActorID(controlPrincipal), contract.Subscription{Actor: contract.ActorID(actor)})
 		if err != nil {
-			return err
+			return fmt.Errorf("channel pull failed (service unreachable or unauthorized): %w", err)
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "projection ref=%s digest=%s resources=%d\n", proj.Ref, proj.Digest, len(proj.Resources))
 		return nil
