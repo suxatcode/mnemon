@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	harnesseval "github.com/mnemon-dev/mnemon/harness/internal/eval"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/proposal"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/proposalstore"
@@ -473,6 +474,16 @@ func parseABSetupJSON(arm, raw string) (map[string]any, error) {
 func (h *Harness) EvalPromote(out io.Writer, in EvalPromoteInput) error {
 	kind, id, err := selectedEvalPromotionAsset(in)
 	if err != nil {
+		return err
+	}
+	// Govern the direct CLI promotion through the kernel BEFORE the host PromoteAsset, so
+	// `eval promote` is not a second canonical writer that bypasses the rule pre-gate (P2
+	// adversarial fix). The approving proposal ref is the idempotency key when present.
+	applyID := in.ProposalRef
+	if applyID == "" {
+		applyID = uuid.NewString()
+	}
+	if err := h.governEvalPromotion(applyID, evalProposalTarget{Kind: kind, ID: id}); err != nil {
 		return err
 	}
 	result, err := harnesseval.PromoteAsset(h.root, harnesseval.PromotionOptions{

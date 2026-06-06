@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/mnemon-dev/mnemon/harness/internal/lifecycle/profile"
 )
 
@@ -31,14 +33,40 @@ func (h *Harness) ProfileEntryAdd(out io.Writer, in ProfileEntryInput) error {
 	if err != nil {
 		return err
 	}
+	// Govern the direct CLI write through the kernel BEFORE the host AddEntry, so `profile
+	// entry add` is NOT a second canonical writer that bypasses the rule pre-gate (P2
+	// adversarial fix — D1 single writer). Resolve the canonical entry id ONCE and feed it to
+	// BOTH the kernel write and AddEntry; a fresh applyID (not deduped) lets the kernel rule
+	// pre-gate deny a duplicate entry id rather than silently dedup it.
+	now := time.Now().UTC()
+	entryID := profile.ResolveEntryID(in.EntryID, in.Type, in.Summary, now)
+	profileID := profile.NormalizeProfileID(in.ProfileID)
+	engine, err := h.coreEngine()
+	if err != nil {
+		return err
+	}
+	res, err := engine.AdmitCreate(uuid.NewString(), "memory", profileID+"/"+entryID, map[string]any{
+		"content":    in.Content,
+		"summary":    in.Summary,
+		"entry_type": in.Type,
+		"profile_id": profileID,
+		"entry_id":   entryID,
+	})
+	if err != nil {
+		return fmt.Errorf("lower profile entry to kernel: %w", err)
+	}
+	if !res.Accepted {
+		return fmt.Errorf("kernel denied profile entry %q: %s", entryID, res.Reason)
+	}
 	prof, entry, err := store.AddEntry(profile.AddEntryOptions{
 		ProfileID:         in.ProfileID,
-		EntryID:           in.EntryID,
+		EntryID:           entryID,
 		Type:              in.Type,
 		Summary:           in.Summary,
 		Content:           in.Content,
 		Evidence:          evidence,
 		ProjectionTargets: targets,
+		Now:               now,
 	})
 	if err != nil {
 		return err

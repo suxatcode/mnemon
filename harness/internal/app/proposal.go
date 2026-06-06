@@ -320,11 +320,11 @@ func (h *Harness) governMemoryEntry(applyID string, spec memoryProfileEntrySpec)
 	if err != nil {
 		return err
 	}
-	res, err := engine.AdmitCreate(applyID, "memory", spec.ProfileID+"/"+spec.EntryID, map[string]any{
+	res, err := engine.AdmitCreate(applyID, "memory", profile.NormalizeProfileID(spec.ProfileID)+"/"+spec.EntryID, map[string]any{
 		"content":    spec.Content,
 		"summary":    spec.Summary,
 		"entry_type": spec.EntryType,
-		"profile_id": spec.ProfileID,
+		"profile_id": profile.NormalizeProfileID(spec.ProfileID),
 		"entry_id":   spec.EntryID,
 	})
 	if err != nil {
@@ -341,12 +341,18 @@ func (h *Harness) governMemoryEntry(applyID string, spec memoryProfileEntrySpec)
 // the kernel's skill schema requires a name). Only on kernel acceptance does the caller run
 // the host-side PromoteAsset, so the promoted-asset files are a mirror of the canonical
 // promotion record, not an independent writer.
+//
+// The resource is keyed by the APPLY id (the approving proposal), NOT the asset id: eval
+// promotion is a repeatable host transition (PromoteAsset re-stamps an already-promoted asset),
+// so an asset-keyed kernel resource would FALSE-DENY a legitimate second proposal on the same
+// asset. Per-proposal keying records each governed promotion distinctly while staying idempotent
+// for a re-apply of the same proposal (kernel inbox dedup).
 func (h *Harness) governEvalPromotion(applyID string, target evalProposalTarget) error {
 	engine, err := h.coreEngine()
 	if err != nil {
 		return err
 	}
-	res, err := engine.AdmitCreate(applyID, "skill", string(target.Kind)+"/"+target.ID, map[string]any{
+	res, err := engine.AdmitCreate(applyID, "skill", "eval-promotion:"+applyID, map[string]any{
 		"name":       target.ID,
 		"asset_kind": string(target.Kind),
 		"promoted":   true,
@@ -528,6 +534,13 @@ func memoryProfileEntrySpecFromProposal(item proposal.Proposal) (memoryProfileEn
 	content := payloadString(operation.Payload, "content")
 	if entryID == "" || entryType == "" || summary == "" || content == "" {
 		return memoryProfileEntrySpec{}, errors.New("profile.entry.add payload requires entry_id, entry_type, summary, and content")
+	}
+	// Canonicalize the entry id ONCE so the kernel write and the host AddEntry key on the
+	// SAME id (the host stores CleanEntryID(entry_id)); otherwise the two duplicate gates can
+	// disagree and the kernel canonical id is unfindable in the host file (P2 adversarial fix).
+	entryID = profile.CleanEntryID(entryID)
+	if entryID == "" {
+		return memoryProfileEntrySpec{}, fmt.Errorf("profile.entry.add entry_id %q has no canonical form", payloadString(operation.Payload, "entry_id"))
 	}
 	targetsFromPayload, err := profileProjectionTargetsFromPayload(operation.Payload)
 	if err != nil {

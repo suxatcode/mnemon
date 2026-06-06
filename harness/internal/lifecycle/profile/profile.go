@@ -386,6 +386,26 @@ func profileID(id string) string {
 	return id
 }
 
+// NormalizeProfileID is the exported profile-id canonicalizer: callers that key a governed
+// kernel resource on the profile must use the SAME id the store persists.
+func NormalizeProfileID(id string) string { return profileID(id) }
+
+// CleanEntryID is the exported entry-id canonicalizer (lower-case, punctuation→'-', trimmed).
+// It returns "" when nothing canonical remains, so a governed caller can reject rather than
+// silently diverge from what AddEntry would store.
+func CleanEntryID(value string) string { return cleanID(value) }
+
+// ResolveEntryID returns the id AddEntry would persist for these options: the cleaned entry id,
+// or a generated timestamped id when the cleaned id is empty. A governed caller resolves the id
+// ONCE and feeds it to BOTH the kernel write and AddEntry so the two never disagree.
+func ResolveEntryID(entryID, entryType, summary string, now time.Time) string {
+	id := cleanID(entryID)
+	if id == "" {
+		id = generatedEntryID(entryType, summary, now)
+	}
+	return id
+}
+
 func cleanID(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	value = idCleaner.ReplaceAllString(value, "-")
