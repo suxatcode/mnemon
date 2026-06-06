@@ -591,6 +591,52 @@ func (s *Store) PendingSyncCommits() ([]contract.LocalCommit, error) {
 	return s.syncCommitsByStatus("pending")
 }
 
+type SyncCommitCounts struct {
+	Pending   int
+	Synced    int
+	Conflicts int
+}
+
+func (s *Store) MarkSyncCommitStatus(originReplicaID, localDecisionID string, ref contract.ResourceRef, status, remotePeerID, at, diagnostic string) error {
+	res, err := s.db.Exec(`
+UPDATE sync_commits
+SET status=?, remote_peer_id=?, acked_at=?, diagnostic=?
+WHERE origin_replica_id=? AND local_decision_id=? AND resource_kind=? AND resource_id=?`,
+		status, remotePeerID, at, diagnostic, originReplicaID, localDecisionID, string(ref.Kind), string(ref.ID))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("sync commit %s/%s %s/%s not found", originReplicaID, localDecisionID, ref.Kind, ref.ID)
+	}
+	return nil
+}
+
+func (s *Store) SyncCommitCounts() (SyncCommitCounts, error) {
+	rows, err := s.db.Query(`SELECT status, COUNT(*) FROM sync_commits GROUP BY status`)
+	if err != nil {
+		return SyncCommitCounts{}, err
+	}
+	defer rows.Close()
+	var counts SyncCommitCounts
+	for rows.Next() {
+		var status string
+		var n int
+		if err := rows.Scan(&status, &n); err != nil {
+			return SyncCommitCounts{}, err
+		}
+		switch status {
+		case "pending":
+			counts.Pending += n
+		case "synced":
+			counts.Synced += n
+		case "conflict", "rejected":
+			counts.Conflicts += n
+		}
+	}
+	return counts, rows.Err()
+}
+
 type RemoteSyncCommitRecord struct {
 	RemoteSeq  int64
 	RemotePeer string

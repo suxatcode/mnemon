@@ -192,18 +192,20 @@ func (r *Runtime) Status(principal contract.ActorID) (ChannelStatus, error) {
 	if err != nil {
 		return ChannelStatus{}, err
 	}
-	pending, err := r.store.PendingSyncCommits()
+	syncCounts, err := r.store.SyncCommitCounts()
 	if err != nil {
 		return ChannelStatus{}, err
 	}
 	return ChannelStatus{
-		Principal:   principal,
-		Digest:      proj.Digest,
-		Resources:   len(proj.Resources),
-		ActorKind:   kind,
-		StoreRef:    r.storePath,
-		Mode:        "service",
-		SyncPending: len(pending),
+		Principal:     principal,
+		Digest:        proj.Digest,
+		Resources:     len(proj.Resources),
+		ActorKind:     kind,
+		StoreRef:      r.storePath,
+		Mode:          "service",
+		SyncPending:   syncCounts.Pending,
+		SyncSynced:    syncCounts.Synced,
+		SyncConflicts: syncCounts.Conflicts,
 	}, nil
 }
 
