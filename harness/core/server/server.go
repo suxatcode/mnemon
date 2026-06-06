@@ -70,6 +70,28 @@ func New(s *kernel.Store, k *kernel.Kernel, rules rule.RuleSet, subs map[contrac
 	}
 }
 
+// NewFromConfig is the documented boot front door over the select-only resolvers: it
+// composes config.ResolveRules (rule pre-gate selection, validated against the declared
+// actors) + reconcile.ResolveModes (mode selection) and wires the result into New. The
+// caller still owns the kernel (built with the matching AuthorityRules) — NewFromConfig
+// selects policy, it does not introduce engine wiring New lacks.
+//
+// newID/now are REQUIRED, not optional: New feeds them to runtime.NewBridge and the
+// exactly-once id/clock, so a caller (and the server tests) can inject deterministic
+// generators. A resolver error (unknown rule key, undeclared actor, bad mode) is
+// returned, never panicked.
+func NewFromConfig(s *kernel.Store, k *kernel.Kernel, rc config.RuleConfig, registry map[string]rule.Rule, actors map[contract.ActorID][]contract.ResourceKind, subs map[contract.ActorID]contract.Subscription, modes reconcile.Config, newID, now func() string) (*ControlServer, error) {
+	rules, err := config.ResolveRules(rc, registry, actors)
+	if err != nil {
+		return nil, err
+	}
+	resolvedModes, err := reconcile.ResolveModes(modes)
+	if err != nil {
+		return nil, err
+	}
+	return New(s, k, rules, subs, resolvedModes, newID, now), nil
+}
+
 // WithLane enables the effectful job lane: jobs the rule pre-gate enqueues are run by runner under leases
 // owned by owner (fenced for ttl seconds; nowUnix is the injectable clock). Returns the server for chaining.
 func (cs *ControlServer) WithLane(runner job.Runner, owner contract.ActorID, nowUnix func() int64, ttl int64) *ControlServer {
