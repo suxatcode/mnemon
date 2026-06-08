@@ -26,11 +26,11 @@ func TestChannelBindingAuthorizer(t *testing.T) {
 			"reader":   {Actor: "reader", Refs: []contract.ResourceRef{ref}},
 		},
 		Bindings: []ChannelBinding{
-			{Principal: "codex", ActorKind: KindHostAgent, AllowedVerbs: []Verb{VerbObserve, VerbPull},
+			{Principal: "codex", ActorKind: contract.KindHostAgent, AllowedVerbs: []Verb{VerbObserve, VerbPull},
 				AllowedObservedTypes: []string{"session.observed"}, SubscriptionScope: []contract.ResourceRef{ref}},
-			{Principal: "operator", ActorKind: KindControlAgent, AllowedVerbs: []Verb{VerbObserve, VerbPull},
+			{Principal: "operator", ActorKind: contract.KindControlAgent, AllowedVerbs: []Verb{VerbObserve, VerbPull},
 				SubscriptionScope: []contract.ResourceRef{ref}}, // empty AllowedObservedTypes => any
-			{Principal: "reader", ActorKind: KindHostAgent, AllowedVerbs: []Verb{VerbPull},
+			{Principal: "reader", ActorKind: contract.KindHostAgent, AllowedVerbs: []Verb{VerbPull},
 				SubscriptionScope: []contract.ResourceRef{ref}},
 		},
 	})

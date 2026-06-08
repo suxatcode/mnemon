@@ -113,7 +113,7 @@ func (r *Runtime) API() ServerAPI { return r.api }
 func (r *Runtime) StorePath() string { return r.storePath }
 
 // BindingKind reports the principal's bound actor kind, when a binding is configured.
-func (r *Runtime) BindingKind(principal contract.ActorID) (ActorKind, bool) {
+func (r *Runtime) BindingKind(principal contract.ActorID) (contract.ActorKind, bool) {
 	if r.bindings == nil {
 		return "", false
 	}
@@ -146,36 +146,20 @@ func (r *Runtime) PendingEvents(afterSeq int64) ([]contract.Event, error) {
 	return r.store.PendingEvents(afterSeq)
 }
 
-// ChannelStatus is the channel's status evidence for one principal (P2.3): the scoped projection
-// digest + resource count, the binding actor kind, the runtime store ref, and the server mode. It is
-// richer than a pull (which carries only the digest) — real path evidence a host can check before
-// trusting projected state.
-type ChannelStatus struct {
-	Principal     contract.ActorID `json:"principal"`
-	Digest        string           `json:"digest"`
-	Resources     int              `json:"resources"`
-	ActorKind     ActorKind        `json:"actor_kind,omitempty"`
-	StoreRef      string           `json:"store_ref"`
-	Mode          string           `json:"mode"`
-	SyncPending   int              `json:"sync_pending"`
-	SyncSynced    int              `json:"sync_synced"`
-	SyncConflicts int              `json:"sync_conflicts"`
-}
-
 // Status builds the principal's channel status. When bindings are configured it is gated on the
 // binding's VerbStatus (a grant distinct from pull). The digest is the principal's server-configured
 // scope, read through the kernel store directly (the server owns the runtime), so status does not
 // require the pull verb.
-func (r *Runtime) Status(principal contract.ActorID) (ChannelStatus, error) {
-	var kind ActorKind
+func (r *Runtime) Status(principal contract.ActorID) (contract.ChannelStatus, error) {
+	var kind contract.ActorKind
 	sub := contract.Subscription{Actor: principal}
 	if r.bindings != nil {
 		b, ok := r.bindings.Binding(principal)
 		if !ok {
-			return ChannelStatus{}, fmt.Errorf("no channel binding for principal %q", principal)
+			return contract.ChannelStatus{}, fmt.Errorf("no channel binding for principal %q", principal)
 		}
 		if !b.Allows(VerbStatus) {
-			return ChannelStatus{}, fmt.Errorf("principal %q is not bound to status", principal)
+			return contract.ChannelStatus{}, fmt.Errorf("principal %q is not bound to status", principal)
 		}
 		kind = b.ActorKind
 		// Clamp the status digest/count to the binding scope (the auditable ceiling), not the broader
@@ -186,13 +170,13 @@ func (r *Runtime) Status(principal contract.ActorID) (ChannelStatus, error) {
 	}
 	proj, err := r.cs.PullProjection(principal, sub)
 	if err != nil {
-		return ChannelStatus{}, err
+		return contract.ChannelStatus{}, err
 	}
 	syncCounts, err := r.store.SyncCommitCounts()
 	if err != nil {
-		return ChannelStatus{}, err
+		return contract.ChannelStatus{}, err
 	}
-	return ChannelStatus{
+	return contract.ChannelStatus{
 		Principal:     principal,
 		Digest:        proj.Digest,
 		Resources:     len(proj.Resources),

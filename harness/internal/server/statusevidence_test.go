@@ -33,7 +33,7 @@ func TestChannelStatusEvidence(t *testing.T) {
 	if st.Principal != "codex" {
 		t.Fatalf("status principal = %q", st.Principal)
 	}
-	if st.ActorKind != KindHostAgent {
+	if st.ActorKind != contract.KindHostAgent {
 		t.Fatalf("status must carry the binding actor kind (a pull alias cannot); got %q", st.ActorKind)
 	}
 	if st.StoreRef == "" {

@@ -66,7 +66,7 @@ func TestBindingFileChannelTokenAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("token-authed status: %v", err)
 	}
-	if st.Principal != "codex@project" || st.ActorKind != KindHostAgent {
+	if st.Principal != "codex@project" || st.ActorKind != contract.KindHostAgent {
 		t.Fatalf("token must resolve to the bound principal/kind; got %+v", st)
 	}
 	if _, err := good.PullProjection("", contract.Subscription{Actor: "codex@project", Refs: []contract.ResourceRef{{Kind: "memory", ID: "m1"}}}); err != nil {
@@ -104,7 +104,7 @@ func TestRunHTTPServerWithBindingsBoots(t *testing.T) {
 	}()
 
 	c := NewClientWithToken("http://"+addr, "tok-codex")
-	var st ChannelStatus
+	var st contract.ChannelStatus
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		st, err = c.Status("")

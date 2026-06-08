@@ -30,7 +30,7 @@ func TestP2ChannelEndToEnd(t *testing.T) {
 			}}, nil
 		})
 	binding := ChannelBinding{
-		Principal: "codex", ActorKind: KindHostAgent,
+		Principal: "codex", ActorKind: contract.KindHostAgent,
 		AllowedVerbs: []Verb{VerbObserve, VerbPull, VerbStatus}, AllowedObservedTypes: []string{"session.observed"},
 		SubscriptionScope: []contract.ResourceRef{ref}, IdempotencyNamespace: "host:codex",
 	}
@@ -64,7 +64,7 @@ func TestP2ChannelEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
-	if st.Digest != proj.Digest || st.StoreRef != storePath || st.ActorKind != KindHostAgent {
+	if st.Digest != proj.Digest || st.StoreRef != storePath || st.ActorKind != contract.KindHostAgent {
 		t.Fatalf("status must agree with the same store/principal; st=%+v projDigest=%s", st, proj.Digest)
 	}
 }
@@ -77,7 +77,7 @@ func TestP2ChannelNegatives(t *testing.T) {
 	rt, err := OpenRuntime(filepath.Join(t.TempDir(), "s.db"), RuntimeConfig{
 		Subs: map[contract.ActorID]contract.Subscription{"codex": {Actor: "codex", Refs: []contract.ResourceRef{ref}}},
 		Bindings: []ChannelBinding{{
-			Principal: "codex", ActorKind: KindHostAgent,
+			Principal: "codex", ActorKind: contract.KindHostAgent,
 			AllowedVerbs: []Verb{VerbObserve, VerbPull, VerbStatus}, AllowedObservedTypes: []string{"session.observed"},
 			SubscriptionScope: []contract.ResourceRef{ref}, IdempotencyNamespace: "host:codex",
 		}},

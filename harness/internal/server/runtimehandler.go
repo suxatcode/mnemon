@@ -87,7 +87,7 @@ func NewRuntimeHandler(rt *Runtime, auth Authenticator) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		var req SyncPushRequest
+		var req contract.SyncPushRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -106,7 +106,7 @@ func NewRuntimeHandler(rt *Runtime, auth Authenticator) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		var req SyncPullRequest
+		var req contract.SyncPullRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

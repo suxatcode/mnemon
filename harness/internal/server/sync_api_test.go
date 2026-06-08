@@ -33,7 +33,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 
 	commit := syncAPITestCommit("local-a", "dec-1", ref, map[string]any{"content": "remote accepted memory"})
 	replicaClient := NewClientWithToken(srv.URL, "replica-token")
-	first, err := replicaClient.SyncPush(SyncPushRequest{
+	first, err := replicaClient.SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "batch-1",
 		Commits:   []contract.LocalCommit{commit},
@@ -45,7 +45,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 		t.Fatalf("first push must accept the commit, got %+v", first)
 	}
 
-	duplicate, err := replicaClient.SyncPush(SyncPushRequest{
+	duplicate, err := replicaClient.SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "batch-1",
 		Commits:   []contract.LocalCommit{commit},
@@ -58,7 +58,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 	}
 
 	mutated := syncAPITestCommit("local-a", "dec-1", ref, map[string]any{"content": "same idempotency key, different body"})
-	conflicted, err := replicaClient.SyncPush(SyncPushRequest{
+	conflicted, err := replicaClient.SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "batch-2",
 		Commits:   []contract.LocalCommit{mutated},
@@ -70,7 +70,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 		t.Fatalf("changed duplicate must be a protocol conflict, got %+v", conflicted)
 	}
 
-	if _, err := replicaClient.SyncPush(SyncPushRequest{
+	if _, err := replicaClient.SyncPush(contract.SyncPushRequest{
 		ReplicaID: "forged-local-id",
 		BatchID:   "batch-forged",
 		Commits:   []contract.LocalCommit{commit},
@@ -79,7 +79,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 	}
 
 	hostClient := NewClientWithToken(srv.URL, "host-token")
-	if _, err := hostClient.SyncPush(SyncPushRequest{
+	if _, err := hostClient.SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "host-batch",
 		Commits:   []contract.LocalCommit{commit},
@@ -117,7 +117,7 @@ func TestRemoteSyncPushRejectsBadCommitsWithDiagnostics(t *testing.T) {
 
 	bad := syncAPITestCommit("local-a", "dec-bad", ref, map[string]any{"content": "bad digest"})
 	bad.FieldsDigest = "wrong"
-	resp, err := NewClientWithToken(srv.URL, "replica-token").SyncPush(SyncPushRequest{
+	resp, err := NewClientWithToken(srv.URL, "replica-token").SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "batch-bad",
 		Commits:   []contract.LocalCommit{bad},

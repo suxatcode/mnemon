@@ -18,7 +18,7 @@ func TestEmptyRefPullClampedToBindingScope(t *testing.T) {
 		// engine scope is BROADER than the binding scope.
 		Subs: map[contract.ActorID]contract.Subscription{"codex": {Actor: "codex", Refs: []contract.ResourceRef{m1, secret}}},
 		Bindings: []ChannelBinding{{
-			Principal: "codex", ActorKind: KindHostAgent,
+			Principal: "codex", ActorKind: contract.KindHostAgent,
 			AllowedVerbs: []Verb{VerbPull, VerbStatus}, SubscriptionScope: []contract.ResourceRef{m1},
 		}},
 	})

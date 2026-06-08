@@ -48,7 +48,7 @@ func ReadLocalSyncPushBatch(storePath string) (LocalSyncPushBatch, error) {
 	return LocalSyncPushBatch{ReplicaID: replicaID, Commits: pending}, nil
 }
 
-func ApplyLocalSyncPushResponse(storePath, remoteID string, resp SyncPushResponse) error {
+func ApplyLocalSyncPushResponse(storePath, remoteID string, resp contract.SyncPushResponse) error {
 	store, err := openLocalSyncStore(storePath)
 	if err != nil {
 		return fmt.Errorf("open Local Mnemon store for sync ack: %w", err)

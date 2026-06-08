@@ -172,7 +172,7 @@ func syncPushOnce() (syncPushResult, error) {
 		return syncPushResult{}, err
 	}
 	client := server.NewClientWithToken(remote.Endpoint, remote.Token)
-	resp, err := client.SyncPush(server.SyncPushRequest{
+	resp, err := client.SyncPush(contract.SyncPushRequest{
 		ReplicaID: batch.ReplicaID,
 		BatchID:   syncBatchID(batch.ReplicaID, batch.Commits),
 		Commits:   batch.Commits,
@@ -196,7 +196,7 @@ func syncPullOnce() (syncPullResult, error) {
 	if err != nil {
 		return syncPullResult{}, err
 	}
-	resp, err := server.NewClientWithToken(remote.Endpoint, remote.Token).SyncPull(server.SyncPullRequest{
+	resp, err := server.NewClientWithToken(remote.Endpoint, remote.Token).SyncPull(contract.SyncPullRequest{
 		ReplicaID:    state.ReplicaID,
 		RemoteCursor: state.RemoteCursor,
 	})

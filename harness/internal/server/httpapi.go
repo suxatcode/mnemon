@@ -186,24 +186,24 @@ func (c *Client) Ingest(principal contract.ActorID, env contract.ObservationEnve
 
 // Status fetches the channel status evidence for the client's bound principal (P2.3). The principal
 // argument is ignored: identity is the bound credential, sent as the trusted header / bearer token.
-func (c *Client) Status(_ contract.ActorID) (ChannelStatus, error) {
+func (c *Client) Status(_ contract.ActorID) (contract.ChannelStatus, error) {
 	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/status", nil)
 	if err != nil {
-		return ChannelStatus{}, err
+		return contract.ChannelStatus{}, err
 	}
 	c.setAuth(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return ChannelStatus{}, err
+		return contract.ChannelStatus{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return ChannelStatus{}, fmt.Errorf("status failed: %s: %s", resp.Status, string(b))
+		return contract.ChannelStatus{}, fmt.Errorf("status failed: %s: %s", resp.Status, string(b))
 	}
-	var st ChannelStatus
+	var st contract.ChannelStatus
 	if err := json.NewDecoder(resp.Body).Decode(&st); err != nil {
-		return ChannelStatus{}, err
+		return contract.ChannelStatus{}, err
 	}
 	return st, nil
 }
@@ -238,40 +238,40 @@ func (c *Client) PullProjection(_ contract.ActorID, sub contract.Subscription) (
 	return proj, nil
 }
 
-func (c *Client) SyncPush(reqBody SyncPushRequest) (SyncPushResponse, error) {
-	var out SyncPushResponse
+func (c *Client) SyncPush(reqBody contract.SyncPushRequest) (contract.SyncPushResponse, error) {
+	var out contract.SyncPushResponse
 	if err := c.postJSON("/sync/push", reqBody, &out); err != nil {
-		return SyncPushResponse{}, err
+		return contract.SyncPushResponse{}, err
 	}
 	return out, nil
 }
 
-func (c *Client) SyncPull(reqBody SyncPullRequest) (SyncPullResponse, error) {
-	var out SyncPullResponse
+func (c *Client) SyncPull(reqBody contract.SyncPullRequest) (contract.SyncPullResponse, error) {
+	var out contract.SyncPullResponse
 	if err := c.postJSON("/sync/pull", reqBody, &out); err != nil {
-		return SyncPullResponse{}, err
+		return contract.SyncPullResponse{}, err
 	}
 	return out, nil
 }
 
-func (c *Client) SyncStatus() (SyncStatusResponse, error) {
+func (c *Client) SyncStatus() (contract.SyncStatusResponse, error) {
 	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/sync/status", nil)
 	if err != nil {
-		return SyncStatusResponse{}, err
+		return contract.SyncStatusResponse{}, err
 	}
 	c.setAuth(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return SyncStatusResponse{}, err
+		return contract.SyncStatusResponse{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return SyncStatusResponse{}, fmt.Errorf("sync status failed: %s: %s", resp.Status, string(b))
+		return contract.SyncStatusResponse{}, fmt.Errorf("sync status failed: %s: %s", resp.Status, string(b))
 	}
-	var out SyncStatusResponse
+	var out contract.SyncStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return SyncStatusResponse{}, err
+		return contract.SyncStatusResponse{}, err
 	}
 	return out, nil
 }

@@ -11,56 +11,18 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
-type SyncPushRequest struct {
-	ReplicaID string                 `json:"replica_id"`
-	BatchID   string                 `json:"batch_id"`
-	Commits   []contract.LocalCommit `json:"commits"`
-}
-
-type SyncPushResponse struct {
-	Accepted   []SyncCommitResult `json:"accepted"`
-	Rejected   []SyncCommitResult `json:"rejected"`
-	Conflicts  []SyncCommitResult `json:"conflicts"`
-	NextCursor string             `json:"next_cursor,omitempty"`
-}
-
-type SyncPullRequest struct {
-	ReplicaID    string                 `json:"replica_id"`
-	RemoteCursor string                 `json:"remote_cursor"`
-	Scopes       []contract.ResourceRef `json:"scopes"`
-}
-
-type SyncPullResponse struct {
-	Commits     []contract.LocalCommit `json:"commits"`
-	Diagnostics []SyncCommitResult     `json:"diagnostics"`
-	NextCursor  string                 `json:"next_cursor"`
-}
-
-type SyncStatusResponse struct {
-	Principal       contract.ActorID `json:"principal"`
-	RemoteWorkspace string           `json:"remote_workspace"`
-}
-
-type SyncCommitResult struct {
-	OriginReplicaID string               `json:"origin_replica_id"`
-	LocalDecisionID string               `json:"local_decision_id"`
-	ResourceRef     contract.ResourceRef `json:"resource_ref"`
-	Status          string               `json:"status"`
-	Diagnostic      string               `json:"diagnostic,omitempty"`
-}
-
-func (r *Runtime) SyncPush(principal contract.ActorID, req SyncPushRequest) (SyncPushResponse, error) {
+func (r *Runtime) SyncPush(principal contract.ActorID, req contract.SyncPushRequest) (contract.SyncPushResponse, error) {
 	if _, err := r.requireSyncBinding(principal, VerbSyncPush); err != nil {
-		return SyncPushResponse{}, err
+		return contract.SyncPushResponse{}, err
 	}
 	replicaID := strings.TrimSpace(req.ReplicaID)
 	if replicaID == "" {
-		return SyncPushResponse{}, fmt.Errorf("sync push requires replica_id")
+		return contract.SyncPushResponse{}, fmt.Errorf("sync push requires replica_id")
 	}
-	var resp SyncPushResponse
+	var resp contract.SyncPushResponse
 	for _, commit := range req.Commits {
 		if commit.OriginReplicaID != replicaID {
-			return SyncPushResponse{}, fmt.Errorf("sync push replica_id %q does not match commit origin %q", replicaID, commit.OriginReplicaID)
+			return contract.SyncPushResponse{}, fmt.Errorf("sync push replica_id %q does not match commit origin %q", replicaID, commit.OriginReplicaID)
 		}
 		if diagnostic := validateSyncCommit(commit); diagnostic != "" {
 			resp.Rejected = append(resp.Rejected, syncResult(commit, "rejected", diagnostic))
@@ -68,7 +30,7 @@ func (r *Runtime) SyncPush(principal contract.ActorID, req SyncPushRequest) (Syn
 		}
 		rec, err := r.store.RecordRemoteSyncCommit(string(principal), commit, r.cs.now())
 		if err != nil {
-			return SyncPushResponse{}, err
+			return contract.SyncPushResponse{}, err
 		}
 		switch rec.Status {
 		case "accepted":
@@ -83,42 +45,42 @@ func (r *Runtime) SyncPush(principal contract.ActorID, req SyncPushRequest) (Syn
 	return resp, nil
 }
 
-func (r *Runtime) SyncPull(principal contract.ActorID, req SyncPullRequest) (SyncPullResponse, error) {
+func (r *Runtime) SyncPull(principal contract.ActorID, req contract.SyncPullRequest) (contract.SyncPullResponse, error) {
 	b, err := r.requireSyncBinding(principal, VerbSyncPull)
 	if err != nil {
-		return SyncPullResponse{}, err
+		return contract.SyncPullResponse{}, err
 	}
 	replicaID := strings.TrimSpace(req.ReplicaID)
 	if replicaID == "" {
-		return SyncPullResponse{}, fmt.Errorf("sync pull requires replica_id")
+		return contract.SyncPullResponse{}, fmt.Errorf("sync pull requires replica_id")
 	}
 	cursor := int64(0)
 	if strings.TrimSpace(req.RemoteCursor) != "" {
 		cursor, err = strconv.ParseInt(req.RemoteCursor, 10, 64)
 		if err != nil {
-			return SyncPullResponse{}, fmt.Errorf("parse remote_cursor: %w", err)
+			return contract.SyncPullResponse{}, fmt.Errorf("parse remote_cursor: %w", err)
 		}
 	}
 	scopes, err := clampSyncScopes(b, req.Scopes)
 	if err != nil {
-		return SyncPullResponse{}, err
+		return contract.SyncPullResponse{}, err
 	}
 	records, next, err := r.store.RemoteSyncCommitsAfter(cursor, replicaID, scopes, 100)
 	if err != nil {
-		return SyncPullResponse{}, err
+		return contract.SyncPullResponse{}, err
 	}
-	resp := SyncPullResponse{NextCursor: strconv.FormatInt(next, 10)}
+	resp := contract.SyncPullResponse{NextCursor: strconv.FormatInt(next, 10)}
 	for _, rec := range records {
 		resp.Commits = append(resp.Commits, rec.Commit)
 	}
 	return resp, nil
 }
 
-func (r *Runtime) SyncStatus(principal contract.ActorID) (SyncStatusResponse, error) {
+func (r *Runtime) SyncStatus(principal contract.ActorID) (contract.SyncStatusResponse, error) {
 	if _, err := r.requireSyncBinding(principal, VerbSyncStatus); err != nil {
-		return SyncStatusResponse{}, err
+		return contract.SyncStatusResponse{}, err
 	}
-	return SyncStatusResponse{Principal: principal, RemoteWorkspace: "connected"}, nil
+	return contract.SyncStatusResponse{Principal: principal, RemoteWorkspace: "connected"}, nil
 }
 
 func (r *Runtime) requireSyncBinding(principal contract.ActorID, verb Verb) (ChannelBinding, error) {
@@ -129,7 +91,7 @@ func (r *Runtime) requireSyncBinding(principal contract.ActorID, verb Verb) (Cha
 	if !ok {
 		return ChannelBinding{}, fmt.Errorf("no channel binding for principal %q", principal)
 	}
-	if b.ActorKind != KindReplicaAgent {
+	if b.ActorKind != contract.KindReplicaAgent {
 		return ChannelBinding{}, fmt.Errorf("principal %q is not a replica-agent", principal)
 	}
 	if !b.Allows(verb) {
@@ -159,8 +121,8 @@ func validateSyncCommit(commit contract.LocalCommit) string {
 	}
 }
 
-func syncResult(commit contract.LocalCommit, status, diagnostic string) SyncCommitResult {
-	return SyncCommitResult{
+func syncResult(commit contract.LocalCommit, status, diagnostic string) contract.SyncCommitResult {
+	return contract.SyncCommitResult{
 		OriginReplicaID: commit.OriginReplicaID,
 		LocalDecisionID: commit.LocalDecisionID,
 		ResourceRef:     commit.ResourceRef,

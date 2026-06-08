@@ -23,7 +23,7 @@ func TestSyncPushOnceAcksPendingLocalCommits(t *testing.T) {
 
 	localBinding := server.ChannelBinding{
 		Principal:            "codex@project",
-		ActorKind:            server.KindHostAgent,
+		ActorKind:            contract.KindHostAgent,
 		Transport:            server.TransportHTTP,
 		Endpoint:             "http://127.0.0.1:8787",
 		AllowedVerbs:         []server.Verb{server.VerbObserve, server.VerbPull, server.VerbStatus},
@@ -136,7 +136,7 @@ func TestSyncPullOnceImportsRemoteMemoryThroughLocalMnemon(t *testing.T) {
 		DecidedAt:       "2026-06-06T00:00:00Z",
 		Status:          "pending",
 	}
-	if resp, err := server.NewClientWithToken(remoteSrv.URL, "other-token").SyncPush(server.SyncPushRequest{
+	if resp, err := server.NewClientWithToken(remoteSrv.URL, "other-token").SyncPush(contract.SyncPushRequest{
 		ReplicaID: "other-replica",
 		BatchID:   "remote-batch",
 		Commits:   []contract.LocalCommit{remoteCommit},
@@ -219,7 +219,7 @@ func TestSyncPullOnceImportsRemoteSkillThroughLocalMnemon(t *testing.T) {
 		DecidedAt:       "2026-06-06T00:00:00Z",
 		Status:          "pending",
 	}
-	if resp, err := server.NewClientWithToken(remoteSrv.URL, "other-token").SyncPush(server.SyncPushRequest{
+	if resp, err := server.NewClientWithToken(remoteSrv.URL, "other-token").SyncPush(contract.SyncPushRequest{
 		ReplicaID: "other-replica",
 		BatchID:   "remote-skill-batch",
 		Commits:   []contract.LocalCommit{remoteCommit},
@@ -372,10 +372,10 @@ func restoreSyncFlags(t *testing.T) {
 	syncRemoteTokenFile = ""
 }
 
-func syncStatusForTest(storePath string) (server.ChannelStatus, error) {
+func syncStatusForTest(storePath string) (contract.ChannelStatus, error) {
 	rt, err := server.OpenRuntime(storePath, server.RuntimeConfig{})
 	if err != nil {
-		return server.ChannelStatus{}, err
+		return contract.ChannelStatus{}, err
 	}
 	defer rt.Close()
 	return rt.Status("status@test")

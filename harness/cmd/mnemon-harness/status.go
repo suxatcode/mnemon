@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/app"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
 	"github.com/spf13/cobra"
 )
 
@@ -69,9 +69,9 @@ func runProductStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func localServiceStatus(projectRoot string, cfg localConfig, principal string) (server.ChannelStatus, bool) {
+func localServiceStatus(projectRoot string, cfg localConfig, principal string) (contract.ChannelStatus, bool) {
 	if strings.TrimSpace(cfg.Endpoint) == "" || strings.TrimSpace(principal) == "" {
-		return server.ChannelStatus{}, false
+		return contract.ChannelStatus{}, false
 	}
 	bindingFile := cfg.BindingFile
 	if bindingFile == "" {
@@ -79,7 +79,7 @@ func localServiceStatus(projectRoot string, cfg localConfig, principal string) (
 	}
 	loaded, err := server.LoadBindingFile(projectRoot, resolveProjectPath(projectRoot, bindingFile))
 	if err != nil {
-		return server.ChannelStatus{}, false
+		return contract.ChannelStatus{}, false
 	}
 	client := server.NewClient(cfg.Endpoint, contract.ActorID(principal))
 	if tok := tokenForPrincipal(loaded.Tokens, contract.ActorID(principal)); tok != "" {
@@ -87,7 +87,7 @@ func localServiceStatus(projectRoot string, cfg localConfig, principal string) (
 	}
 	st, err := client.Status(contract.ActorID(principal))
 	if err != nil {
-		return server.ChannelStatus{}, false
+		return contract.ChannelStatus{}, false
 	}
 	return st, true
 }

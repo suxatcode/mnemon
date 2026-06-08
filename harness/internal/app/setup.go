@@ -164,7 +164,7 @@ func (h *Harness) defaultSetupOptions(opts SetupOptions) SetupOptions {
 		opts.ControlURL = "http://127.0.0.1:8787"
 	}
 	if opts.ActorKind == "" {
-		opts.ActorKind = string(server.KindHostAgent)
+		opts.ActorKind = string(contract.KindHostAgent)
 	}
 	if !opts.TokenExplicit {
 		opts.UseToken = true
@@ -196,9 +196,9 @@ func displayHost(host string) string {
 }
 
 func (h *Harness) channelBinding(opts SetupOptions) server.ChannelBinding {
-	kind := server.KindHostAgent
-	if opts.ActorKind == string(server.KindControlAgent) {
-		kind = server.KindControlAgent
+	kind := contract.KindHostAgent
+	if opts.ActorKind == string(contract.KindControlAgent) {
+		kind = contract.KindControlAgent
 	}
 	observed := []string{"session.observed"}
 	var scope []contract.ResourceRef

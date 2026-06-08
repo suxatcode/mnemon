@@ -7,18 +7,6 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
-// ActorKind classifies a channel principal by role. It is NOT a privilege path: the channel is
-// the same for every principal; the role differs by binding, never by a privileged code path
-// (D6). HostAgent pushes host observations; ControlAgent is an operator/control client;
-// ReplicaAgent is the background Remote Workspace sync actor.
-type ActorKind string
-
-const (
-	KindHostAgent    ActorKind = "host-agent"
-	KindControlAgent ActorKind = "control-agent"
-	KindReplicaAgent ActorKind = "replica-agent"
-)
-
 // Transport names the wire a binding uses.
 type Transport string
 
@@ -50,7 +38,7 @@ const (
 // the binding makes the grant explicit and auditable.
 type ChannelBinding struct {
 	Principal            contract.ActorID       // the authenticated identity
-	ActorKind            ActorKind              // role classification (not a privilege path)
+	ActorKind            contract.ActorKind     // role classification (not a privilege path)
 	Transport            Transport              // wire
 	Endpoint             string                 // base URL / socket path
 	AllowedVerbs         []Verb                 // observe / pull / status
@@ -64,7 +52,7 @@ func (b ChannelBinding) Validate() error {
 	if strings.TrimSpace(string(b.Principal)) == "" {
 		return fmt.Errorf("channel binding requires a principal")
 	}
-	if b.ActorKind != KindHostAgent && b.ActorKind != KindControlAgent && b.ActorKind != KindReplicaAgent {
+	if b.ActorKind != contract.KindHostAgent && b.ActorKind != contract.KindControlAgent && b.ActorKind != contract.KindReplicaAgent {
 		return fmt.Errorf("channel binding actor_kind %q is not host-agent, control-agent, or replica-agent", b.ActorKind)
 	}
 	if len(b.AllowedVerbs) == 0 {
@@ -101,7 +89,7 @@ func (b ChannelBinding) AllowsObservedType(eventType string) bool {
 // the role differs ONLY by the binding (zero new surface for the control agent, D6).
 func HostAgentBinding(principal contract.ActorID, endpoint string, scope []contract.ResourceRef) ChannelBinding {
 	return ChannelBinding{
-		Principal: principal, ActorKind: KindHostAgent, Transport: TransportHTTP, Endpoint: endpoint,
+		Principal: principal, ActorKind: contract.KindHostAgent, Transport: TransportHTTP, Endpoint: endpoint,
 		AllowedVerbs: []Verb{VerbObserve, VerbPull, VerbStatus}, SubscriptionScope: scope,
 		IdempotencyNamespace: "host:" + string(principal),
 	}
@@ -109,7 +97,7 @@ func HostAgentBinding(principal contract.ActorID, endpoint string, scope []contr
 
 func ControlAgentBinding(principal contract.ActorID, endpoint string, scope []contract.ResourceRef) ChannelBinding {
 	return ChannelBinding{
-		Principal: principal, ActorKind: KindControlAgent, Transport: TransportHTTP, Endpoint: endpoint,
+		Principal: principal, ActorKind: contract.KindControlAgent, Transport: TransportHTTP, Endpoint: endpoint,
 		AllowedVerbs: []Verb{VerbObserve, VerbPull, VerbStatus, VerbEvolutionPropose}, SubscriptionScope: scope,
 		IdempotencyNamespace: "control:" + string(principal),
 	}
@@ -117,7 +105,7 @@ func ControlAgentBinding(principal contract.ActorID, endpoint string, scope []co
 
 func ReplicaAgentBinding(principal contract.ActorID, endpoint string, scope []contract.ResourceRef) ChannelBinding {
 	return ChannelBinding{
-		Principal: principal, ActorKind: KindReplicaAgent, Transport: TransportHTTP, Endpoint: endpoint,
+		Principal: principal, ActorKind: contract.KindReplicaAgent, Transport: TransportHTTP, Endpoint: endpoint,
 		AllowedVerbs: []Verb{VerbSyncPush, VerbSyncPull, VerbSyncStatus}, SubscriptionScope: scope,
 		IdempotencyNamespace: "replica:" + string(principal),
 	}

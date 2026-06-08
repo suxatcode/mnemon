@@ -139,14 +139,14 @@ func (e bindingFileEntry) toBinding() (ChannelBinding, error) {
 	return b, nil
 }
 
-func parseActorKind(s string) (ActorKind, error) {
-	switch ActorKind(s) {
-	case KindHostAgent:
-		return KindHostAgent, nil
-	case KindControlAgent:
-		return KindControlAgent, nil
-	case KindReplicaAgent:
-		return KindReplicaAgent, nil
+func parseActorKind(s string) (contract.ActorKind, error) {
+	switch contract.ActorKind(s) {
+	case contract.KindHostAgent:
+		return contract.KindHostAgent, nil
+	case contract.KindControlAgent:
+		return contract.KindControlAgent, nil
+	case contract.KindReplicaAgent:
+		return contract.KindReplicaAgent, nil
 	default:
 		return "", fmt.Errorf("unknown actor_kind %q", s)
 	}

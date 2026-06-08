@@ -57,7 +57,7 @@ func TestLoadBindingFile(t *testing.T) {
 		t.Fatalf("want 2 bindings; got %d", len(loaded.Bindings))
 	}
 	b := loaded.Bindings[0]
-	if b.Principal != "codex@project" || b.ActorKind != KindHostAgent || b.Transport != TransportHTTP {
+	if b.Principal != "codex@project" || b.ActorKind != contract.KindHostAgent || b.Transport != TransportHTTP {
 		t.Fatalf("mapped binding wrong: %+v", b)
 	}
 	if !b.Allows(VerbObserve) || !b.Allows(VerbPull) || !b.Allows(VerbStatus) {
@@ -73,7 +73,7 @@ func TestLoadBindingFile(t *testing.T) {
 		t.Fatalf("token map wrong: %+v", loaded.Tokens)
 	}
 	replica := loaded.Bindings[1]
-	if replica.Principal != "replica@project" || replica.ActorKind != KindReplicaAgent {
+	if replica.Principal != "replica@project" || replica.ActorKind != contract.KindReplicaAgent {
 		t.Fatalf("replica binding wrong: %+v", replica)
 	}
 	if !replica.Allows(VerbSyncPush) || !replica.Allows(VerbSyncPull) || !replica.Allows(VerbSyncStatus) || replica.Allows(VerbObserve) {

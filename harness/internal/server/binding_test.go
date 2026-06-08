@@ -18,7 +18,7 @@ func TestChannelBindingValidate(t *testing.T) {
 	}
 	// ControlAgent is the SAME channel, different binding (zero new surface).
 	ctrl := ControlAgentBinding("operator", "http://localhost:8787", nil)
-	if ctrl.ActorKind != KindControlAgent {
+	if ctrl.ActorKind != contract.KindControlAgent {
 		t.Fatalf("control binding kind = %q", ctrl.ActorKind)
 	}
 	if ctrl.IdempotencyNamespace == good.IdempotencyNamespace {
@@ -33,9 +33,9 @@ func TestChannelBindingValidate(t *testing.T) {
 	}
 
 	bad := []ChannelBinding{
-		{ActorKind: KindHostAgent, AllowedVerbs: []Verb{VerbObserve}},          // no principal
+		{ActorKind: contract.KindHostAgent, AllowedVerbs: []Verb{VerbObserve}}, // no principal
 		{Principal: "x", ActorKind: "root", AllowedVerbs: []Verb{VerbObserve}}, // unknown kind
-		{Principal: "x", ActorKind: KindHostAgent},                             // no verbs
+		{Principal: "x", ActorKind: contract.KindHostAgent},                    // no verbs
 	}
 	for i, b := range bad {
 		if err := b.Validate(); err == nil {
@@ -49,7 +49,7 @@ func TestChannelBindingAllowsObservedType(t *testing.T) {
 	if !any.AllowsObservedType("memory.observed") {
 		t.Fatalf("empty allow-list must permit any observed type")
 	}
-	scoped := ChannelBinding{Principal: "agent", ActorKind: KindHostAgent, AllowedVerbs: []Verb{VerbObserve}, AllowedObservedTypes: []string{"memory.observed"}}
+	scoped := ChannelBinding{Principal: "agent", ActorKind: contract.KindHostAgent, AllowedVerbs: []Verb{VerbObserve}, AllowedObservedTypes: []string{"memory.observed"}}
 	if !scoped.AllowsObservedType("memory.observed") || scoped.AllowsObservedType("goal.observed") {
 		t.Fatalf("scoped allow-list must permit only its listed types")
 	}
