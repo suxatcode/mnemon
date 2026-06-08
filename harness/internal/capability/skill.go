@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/config"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
@@ -18,46 +19,10 @@ const (
 	SkillWriteProposed          = "skill.write.proposed"
 )
 
-// SkillAdmissionRule admits an append-only skill declaration from one authenticated principal.
+// SkillAdmissionRule admits an append-only skill declaration from one authenticated principal. It is
+// the skill descriptor over the generic kind.
 func SkillAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) rule.Rule {
-	return rule.NewNativeRule("local-skill-admission:"+string(principal), principal, SkillWriteProposed, ObservedTypeAndAliases(SkillWriteCandidateObserved),
-		func(in rule.RuleInput) (contract.RuleDecision, error) {
-			if in.Event.Actor != principal {
-				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
-			}
-			candidate, err := decodeSkillCandidate(in.Event.Payload)
-			if err != nil {
-				return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{err.Error()}}, nil
-			}
-			version, fields := skillResourceFromProjection(in.View, ref)
-			// Skill lifecycle changes are append-only declarations. A later "stale" or
-			// "archived" declaration records the transition without rewriting prior history.
-			declarations := append(skillDeclarationsFromFields(fields), skillDeclaration{
-				ID:         skillDeclarationID(in.Event.Actor, in.Event.IngestSeq),
-				SkillID:    candidate.SkillID,
-				Name:       candidate.Name,
-				Status:     candidate.Status,
-				Content:    candidate.Content,
-				Source:     candidate.Source,
-				Confidence: candidate.Confidence,
-				Actor:      string(in.Event.Actor),
-				IngestSeq:  in.Event.IngestSeq,
-			})
-			newFields := map[string]any{
-				"name":         "project",
-				"declarations": declarations,
-				"updated_by":   string(in.Event.Actor),
-			}
-			write := contract.ResourceWrite{Ref: ref, Kind: contract.OpCreate, Fields: newFields}
-			if version > 0 {
-				write.Kind = contract.OpUpdate
-				write.BasedOn = version
-			}
-			return contract.RuleDecision{Verdict: contract.VerdictPropose, Proposal: &contract.ProposedEvent{
-				Type:    SkillWriteProposed,
-				Payload: map[string]any{"writes": []contract.ResourceWrite{write}},
-			}}, nil
-		})
+	return Builtins["skill"].Rule(principal, ref, config.CapabilityConfig{})
 }
 
 // RemoteSkillImportRule admits a remote skill commit for the sync import actor, merging non-conflicting

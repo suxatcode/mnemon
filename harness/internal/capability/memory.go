@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/config"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
@@ -22,43 +23,9 @@ const (
 )
 
 // MemoryAdmissionRule admits a memory write candidate from one authenticated principal, proposing an
-// append to the principal's memory resource. It only acts on events from its own principal.
+// append to the principal's memory resource. It is the memory descriptor over the generic kind.
 func MemoryAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) rule.Rule {
-	return rule.NewNativeRule("local-memory-admission:"+string(principal), principal, MemoryWriteProposed, ObservedTypeAndAliases(MemoryWriteCandidateObserved),
-		func(in rule.RuleInput) (contract.RuleDecision, error) {
-			if in.Event.Actor != principal {
-				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
-			}
-			candidate, err := decodeMemoryCandidate(in.Event.Payload)
-			if err != nil {
-				return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{err.Error()}}, nil
-			}
-			version, fields := resourceFromProjection(in.View, ref)
-			entry := memoryEntry{
-				ID:         memoryEntryID(in.Event.Actor, in.Event.IngestSeq),
-				Content:    candidate.Content,
-				Source:     candidate.Source,
-				Confidence: candidate.Confidence,
-				Tags:       candidate.Tags,
-				Actor:      string(in.Event.Actor),
-				IngestSeq:  in.Event.IngestSeq,
-			}
-			entries := append(memoryEntriesFromFields(fields), entry)
-			newFields := map[string]any{
-				"content":    renderMemoryContent(entries),
-				"entries":    entries,
-				"updated_by": string(in.Event.Actor),
-			}
-			write := contract.ResourceWrite{Ref: ref, Kind: contract.OpCreate, Fields: newFields}
-			if version > 0 {
-				write.Kind = contract.OpUpdate
-				write.BasedOn = version
-			}
-			return contract.RuleDecision{Verdict: contract.VerdictPropose, Proposal: &contract.ProposedEvent{
-				Type:    MemoryWriteProposed,
-				Payload: map[string]any{"writes": []contract.ResourceWrite{write}},
-			}}, nil
-		})
+	return Builtins["memory"].Rule(principal, ref, config.CapabilityConfig{})
 }
 
 // RemoteMemoryImportRule admits a remote memory commit for the sync import actor, merging non-conflicting
