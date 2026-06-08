@@ -61,8 +61,10 @@ type boundRule struct {
 	eventType string
 }
 
-func (b boundRule) ID() string                                            { return b.inner.ID() }
-func (b boundRule) Actor() contract.ActorID                               { return b.inner.Actor() }
-func (b boundRule) Emits() string                                         { return b.inner.Emits() }
-func (b boundRule) Handles(t string) bool                                 { return t == b.eventType }
-func (b boundRule) Evaluate(in rule.RuleInput) (contract.RuleDecision, error) { return b.inner.Evaluate(in) }
+func (b boundRule) ID() string              { return b.inner.ID() }
+func (b boundRule) Actor() contract.ActorID { return b.inner.Actor() }
+func (b boundRule) Emits() string           { return b.inner.Emits() }
+func (b boundRule) Handles(t string) bool   { return t == b.eventType }
+func (b boundRule) Evaluate(in rule.RuleInput) (contract.RuleDecision, error) {
+	return b.inner.Evaluate(in)
+}

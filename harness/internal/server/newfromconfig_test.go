@@ -9,6 +9,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/reconcile"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // agentActors is the declared actor->kinds catalog used both to build the kernel
@@ -21,9 +22,9 @@ func p0ModesConfig() reconcile.Config {
 	return reconcile.Config{Conflict: "rebase", Isolation: "projection_read_set", Authz: "strict"}
 }
 
-func bootViaConfig(t *testing.T, registry map[string]rule.Rule, bindings []config.RuleBinding) (*kernel.Store, *ControlServer) {
+func bootViaConfig(t *testing.T, registry map[string]rule.Rule, bindings []config.RuleBinding) (*store.Store, *ControlServer) {
 	t.Helper()
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestNewFromConfigBootsEquivalentServer(t *testing.T) {
 	})
 
 	t.Run("unregistered rule key rejected", func(t *testing.T) {
-		s, err := kernel.OpenStore(":memory:")
+		s, err := store.OpenStore(":memory:")
 		if err != nil {
 			t.Fatalf("open: %v", err)
 		}

@@ -11,7 +11,9 @@ import (
 
 func alwaysAllow(id string, actor contract.ActorID) rule.Rule {
 	return rule.NewNativeRule(id, actor, "memory.write.proposed", []string{"memory.observed"},
-		func(rule.RuleInput) (contract.RuleDecision, error) { return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil })
+		func(rule.RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+		})
 }
 
 // proposeAtVersion proposes only when the scoped resource is at wantVer, else allows — a version-sensitive
@@ -54,7 +56,9 @@ func proposeOnObserved(id string, actor contract.ActorID, content string) rule.R
 
 func denyOnObserved(id string, actor contract.ActorID) rule.Rule {
 	return rule.NewNativeRule(id, actor, "memory.write.proposed", []string{"memory.observed"},
-		func(rule.RuleInput) (contract.RuleDecision, error) { return contract.RuleDecision{Verdict: contract.VerdictDeny}, nil })
+		func(rule.RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictDeny}, nil
+		})
 }
 
 // S8: Shadow EXERCISES the candidate's rules over the OBSERVED events (the prior model only re-reconciled the
@@ -128,7 +132,9 @@ func TestShadowComparesDiagnostics(t *testing.T) {
 	events, subs := observedLog()
 	live := rule.NewRuleSet(alwaysAllow("a", "agent"))
 	candidate := rule.NewRuleSet(rule.NewNativeRule("err", "agent", "memory.write.proposed", []string{"memory.observed"},
-		func(rule.RuleInput) (contract.RuleDecision, error) { return contract.RuleDecision{}, errors.New("boom") }))
+		func(rule.RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{}, errors.New("boom")
+		}))
 	rep := Shadow(events, subs, live, candidate)
 	if rep.Clean {
 		t.Fatalf("a candidate that errors (a durable diagnostic) must NOT compare equal to live's clean allow; got %+v", rep)

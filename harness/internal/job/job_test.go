@@ -5,11 +5,12 @@ import (
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 func newJobKernel(t *testing.T, owners ...contract.ActorID) *kernel.Kernel {
 	t.Helper()
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -49,7 +50,7 @@ func TestActiveLeaseNotStealable(t *testing.T) {
 
 func TestExpiredLeaseReclaimable(t *testing.T) {
 	k := newJobKernel(t, "w1", "w2")
-	l1, _ := Claim(k, "job1", "w1", 100, 60) // fence_until = 160
+	l1, _ := Claim(k, "job1", "w1", 100, 60)   // fence_until = 160
 	l2, err := Claim(k, "job1", "w2", 200, 60) // 200 > 160 (expired)
 	if err != nil {
 		t.Fatalf("w2 reclaim after expiry: %v", err)
@@ -61,7 +62,7 @@ func TestExpiredLeaseReclaimable(t *testing.T) {
 
 func TestStaleFinishRejected(t *testing.T) {
 	k := newJobKernel(t, "w1", "w2")
-	l1, _ := Claim(k, "job1", "w1", 100, 60) // fence v1
+	l1, _ := Claim(k, "job1", "w1", 100, 60)                   // fence v1
 	if _, err := Claim(k, "job1", "w2", 200, 60); err != nil { // expired -> fence v2
 		t.Fatalf("w2 reclaim: %v", err)
 	}

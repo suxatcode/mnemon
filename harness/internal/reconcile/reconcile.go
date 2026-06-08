@@ -6,6 +6,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // isProposal reports whether an event is a proposed operation the reconciler should try to apply.
@@ -15,7 +16,7 @@ import (
 func isProposal(ev contract.Event) bool { return strings.HasSuffix(ev.Type, ".proposed") }
 
 type Reconciler struct {
-	store  *kernel.Store
+	store  *store.Store
 	kernel *kernel.Kernel
 	cursor int64
 }
@@ -26,7 +27,7 @@ type Reconciler struct {
 //
 // The liveness-escalation counter (Invariant #10) is NOT kept in memory either — it is derived per event
 // from the durable log (Store.DeferralCount), so escalation survives restart exactly as the cursor does.
-func NewReconciler(s *kernel.Store, k *kernel.Kernel) *Reconciler {
+func NewReconciler(s *store.Store, k *kernel.Kernel) *Reconciler {
 	return &Reconciler{store: s, kernel: k, cursor: s.MaxDecidedSeq()}
 }
 

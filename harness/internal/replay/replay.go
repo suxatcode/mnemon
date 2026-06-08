@@ -15,6 +15,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/reconcile"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // canonicalModes is the fixed policy replay reconciles under; it matches the server's loop modes so a replay
@@ -69,7 +70,7 @@ func Replay(events []contract.Event, candidate rule.RuleSet) []contract.Decision
 // borrowed-emit proposal reduces to Verdict allow but emits one. It reports diffs, never pass/fail (the
 // operator gates promotion on Clean).
 func Shadow(events []contract.Event, subs map[contract.ActorID]contract.Subscription, live, candidate rule.RuleSet) rule.ShadowReport {
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		return rule.ShadowReport{}
 	}
@@ -148,7 +149,7 @@ func canonicalRuleResult(d contract.RuleDecision, diags []contract.Diagnostic) s
 // drive replays the events on a throwaway kernel and returns the reconciler's decisions (event-sourcing
 // reproduce-from-log: the logged proposals are authoritative). It never touches a live store/cursor.
 func drive(events []contract.Event) []contract.Decision {
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		return nil
 	}

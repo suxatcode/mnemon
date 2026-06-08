@@ -9,7 +9,9 @@ import (
 
 func allowRule(id string, actor contract.ActorID, emits string, handles ...string) rule.Rule {
 	return rule.NewNativeRule(id, actor, emits, handles,
-		func(rule.RuleInput) (contract.RuleDecision, error) { return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil })
+		func(rule.RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+		})
 }
 
 func validRuleCfg() (RuleConfig, map[string]rule.Rule, map[contract.ActorID][]contract.ResourceKind) {

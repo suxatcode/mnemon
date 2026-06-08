@@ -5,6 +5,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // ---- shared harness helpers (simulated agents, deterministic fixtures, ZERO paid turns) ----
@@ -17,9 +18,9 @@ func rules() kernel.AuthorityRules {
 		"codex": {"memory", "goal", "skill"},
 	}}
 }
-func newRecon(t *testing.T) (*kernel.Store, *kernel.Kernel) {
+func newRecon(t *testing.T) (*store.Store, *kernel.Kernel) {
 	t.Helper()
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -64,7 +65,7 @@ func updateProposal(id string, actor contract.ActorID, corr string, ref contract
 		},
 	}
 }
-func appendProposal(t *testing.T, s *kernel.Store, ev contract.Event) {
+func appendProposal(t *testing.T, s *store.Store, ev contract.Event) {
 	t.Helper()
 	if _, err := s.AppendEvent(ev); err != nil {
 		t.Fatalf("append: %v", err)
@@ -125,7 +126,7 @@ func TestArmB_ReadStaleVsWriteCAS(t *testing.T) {
 	M := contract.ResourceRef{Kind: "memory", ID: "M"}
 	G := contract.ResourceRef{Kind: "goal", ID: "G"}
 
-	build := func(t *testing.T) (*kernel.Store, *kernel.Kernel) {
+	build := func(t *testing.T) (*store.Store, *kernel.Kernel) {
 		s, k := newRecon(t)
 		seedCreate(t, k, M, map[string]any{"content": "m0"})    // M@1
 		seedUpdate(t, k, M, 1, map[string]any{"content": "m1"}) // M@2 (matches based_on M@2)

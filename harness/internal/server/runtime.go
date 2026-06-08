@@ -11,6 +11,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // Runtime is the server-owned governed runtime: it owns the canonical kernel
@@ -22,7 +23,7 @@ import (
 // the runtime holds the kernel store's single-writer lock for its lifetime, so an embedded opener and
 // a live server can never own the same store at once.
 type Runtime struct {
-	store     *kernel.Store
+	store     *store.Store
 	cs        *ControlServer
 	api       ServerAPI // cs, or an authorizedAPI wrapping cs when Bindings are configured
 	storePath string
@@ -83,7 +84,7 @@ func OpenRuntime(storePath string, cfg RuntimeConfig) (*Runtime, error) {
 			return nil, fmt.Errorf("create control store dir: %w", err)
 		}
 	}
-	store, err := kernel.OpenStore(storePath)
+	store, err := store.OpenStore(storePath)
 	if err != nil {
 		return nil, fmt.Errorf("open kernel store: %w", err)
 	}

@@ -14,7 +14,7 @@ func seqGen() func() string {
 	return func() string { n++; return "id-" + strconv.Itoa(n) }
 }
 func fixedNow() func() string { return func() string { return "2026-06-04T00:00:00Z" } }
-func newBridge() *Bridge { return NewBridge(seqGen(), fixedNow()) }
+func newBridge() *Bridge      { return NewBridge(seqGen(), fixedNow()) }
 
 func TestStampUsesTrustedSourcesNotPayload(t *testing.T) {
 	br := newBridge()

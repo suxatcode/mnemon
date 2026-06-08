@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 type LocalSyncPushBatch struct {
@@ -200,11 +200,11 @@ func syncPullExternalID(remoteID string, commit contract.LocalCommit) string {
 	}, ":")
 }
 
-func openLocalSyncStore(path string) (*kernel.Store, error) {
+func openLocalSyncStore(path string) (*store.Store, error) {
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
 		}
 	}
-	return kernel.OpenStore(path)
+	return store.OpenStore(path)
 }

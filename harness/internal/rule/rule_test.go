@@ -54,9 +54,13 @@ func TestRuleSetDenyBeatsAll(t *testing.T) {
 
 func TestRuleSetRequestEvidenceBeatsAllow(t *testing.T) {
 	allow := NewNativeRule("a", "agent", "x.proposed", []string{"memory.observed"},
-		func(RuleInput) (contract.RuleDecision, error) { return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil })
+		func(RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+		})
 	req := NewNativeRule("r", "agent", "x.proposed", []string{"memory.observed"},
-		func(RuleInput) (contract.RuleDecision, error) { return contract.RuleDecision{Verdict: contract.VerdictRequestEvidence}, nil })
+		func(RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictRequestEvidence}, nil
+		})
 	d, _ := NewRuleSet(allow, req).Evaluate(RuleInput{Event: contract.Event{Type: "memory.observed"}})
 	if d.Verdict != contract.VerdictRequestEvidence {
 		t.Fatalf("request_evidence must beat allow; got %+v", d)

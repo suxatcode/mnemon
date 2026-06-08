@@ -6,6 +6,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // The wire boundary (ServerAPI.Ingest) admits ONLY observations. A *.proposed / *.diagnostic is an INTERNAL
@@ -44,7 +45,7 @@ func TestIngestRejectsForgedDiagnostic(t *testing.T) {
 // kind "memory", so kernel authz alone does not stop it — only the bridge write-scope would, and the forged
 // proposed event bypasses the bridge. Ingest must reject it before it enters the log (D7/S9).
 func TestIngestRejectsCrossPrincipalForgedProposed(t *testing.T) {
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

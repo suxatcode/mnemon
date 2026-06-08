@@ -36,7 +36,7 @@ func TestEmptyCorrelationOptsOutOfEscalation(t *testing.T) {
 	X := contract.ResourceRef{Kind: "memory", ID: "X"}
 	seedCreate(t, k, X, map[string]any{"content": "v0"})    // X@1
 	seedUpdate(t, k, X, 1, map[string]any{"content": "v1"}) // X@2 -> base 1 stale
-	for _, id := range []string{"", "", "", "e4", "e5"} {  // empty AND non-empty ids, all empty correlation
+	for _, id := range []string{"", "", "", "e4", "e5"} {   // empty AND non-empty ids, all empty correlation
 		appendProposal(t, s, updateProposal(id, "codex", "", X, 1, map[string]any{"content": "r"}, nil))
 	}
 	ds := NewReconciler(s, k).RunOnce(casModes())

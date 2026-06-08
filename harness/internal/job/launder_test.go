@@ -5,6 +5,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // Reserve takes a caller-supplied dataWrite. Aliasing it back to the budget ref (a second OpUpdate that
@@ -13,7 +14,7 @@ import (
 // The kernel now rejects an op whose writes alias the same ref, so the launder op is NOT accepted and the
 // budget is left untouched.
 func TestReserveCannotLaunderByAliasingBudgetRef(t *testing.T) {
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -47,7 +48,7 @@ func TestReserveCannotLaunderByAliasingBudgetRef(t *testing.T) {
 
 // A reserve with a genuinely DISTINCT data write still commits atomically (no false positive).
 func TestReserveWithDistinctDataWriteStillCommits(t *testing.T) {
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

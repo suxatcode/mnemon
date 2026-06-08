@@ -1,6 +1,6 @@
 //go:build linux
 
-package kernel
+package store
 
 import (
 	"path/filepath"

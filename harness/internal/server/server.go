@@ -19,6 +19,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/reconcile"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
 	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 const (
@@ -44,7 +45,7 @@ var _ ServerAPI = (*ControlServer)(nil)
 // ControlServer is the one single-writer governed loop. Tick is its deterministic, restart-safe driver.
 type ControlServer struct {
 	tickMu     sync.Mutex // serializes Tick: closes the GetCursor->dispatch TOCTOU + the reconciler-cursor race
-	store      *kernel.Store
+	store      *store.Store
 	kernel     *kernel.Kernel
 	reconciler *reconcile.Reconciler
 	bridge     *runtime.Bridge
@@ -61,7 +62,7 @@ type ControlServer struct {
 	nowUnix   func() int64
 }
 
-func New(s *kernel.Store, k *kernel.Kernel, rules rule.RuleSet, subs map[contract.ActorID]contract.Subscription, modes contract.Modes, newID, now func() string) *ControlServer {
+func New(s *store.Store, k *kernel.Kernel, rules rule.RuleSet, subs map[contract.ActorID]contract.Subscription, modes contract.Modes, newID, now func() string) *ControlServer {
 	return &ControlServer{
 		store:      s,
 		kernel:     k,
@@ -85,7 +86,7 @@ func New(s *kernel.Store, k *kernel.Kernel, rules rule.RuleSet, subs map[contrac
 // exactly-once id/clock, so a caller (and the server tests) can inject deterministic
 // generators. A resolver error (unknown rule key, undeclared actor, bad mode) is
 // returned, never panicked.
-func NewFromConfig(s *kernel.Store, k *kernel.Kernel, rc config.RuleConfig, registry map[string]rule.Rule, actors map[contract.ActorID][]contract.ResourceKind, subs map[contract.ActorID]contract.Subscription, modes reconcile.Config, newID, now func() string) (*ControlServer, error) {
+func NewFromConfig(s *store.Store, k *kernel.Kernel, rc config.RuleConfig, registry map[string]rule.Rule, actors map[contract.ActorID][]contract.ResourceKind, subs map[contract.ActorID]contract.Subscription, modes reconcile.Config, newID, now func() string) (*ControlServer, error) {
 	rules, err := config.ResolveRules(rc, registry, actors)
 	if err != nil {
 		return nil, err
@@ -180,7 +181,7 @@ func (cs *ControlServer) Tick() ([]contract.Decision, error) {
 			return nil, derr
 		}
 		// S2: this observed event's produced events + enqueued jobs + the cursor advance are ONE tx.
-		if err := cs.store.WithTx(func(tx *kernel.Tx) error {
+		if err := cs.store.WithTx(func(tx *store.Tx) error {
 			for _, e := range stamped {
 				if err := tx.AppendEvent(e); err != nil {
 					return err
@@ -216,7 +217,7 @@ func (cs *ControlServer) Tick() ([]contract.Decision, error) {
 // dispatchOne runs the rule pre-gate for one event and returns the trusted events to append (proposals +
 // diagnostics). Events no rule handles (proposals, diagnostics, other domains) produce nothing — the cursor
 // still advances past them, so each event is consumed exactly once.
-func (cs *ControlServer) dispatchOne(ev contract.Event) ([]contract.Event, []kernel.OutboxRow, error) {
+func (cs *ControlServer) dispatchOne(ev contract.Event) ([]contract.Event, []store.OutboxRow, error) {
 	// Only OBSERVED events go through the readback check + rule pre-gate. Internal events — a *.proposed event
 	// (decided by the reconciler) carries a PROVENANCE digest, a *.diagnostic carries none — must NOT be
 	// readback-checked: re-scanning a proposal on a later Tick (its stamped digest now stale vs the current
@@ -234,7 +235,7 @@ func (cs *ControlServer) dispatchOne(ev contract.Event) ([]contract.Event, []ker
 	}
 	dec, diags := cs.rules.Evaluate(rule.RuleInput{Event: ev, View: view})
 	var stamped []contract.Event
-	var jobs []kernel.OutboxRow
+	var jobs []store.OutboxRow
 	for _, dg := range diags { // S7: every rule error is a durable diagnostic.
 		stamped = append(stamped, cs.diagnosticEvent(ev, dg))
 	}
@@ -281,7 +282,7 @@ func (cs *ControlServer) dispatchOne(ev contract.Event) ([]contract.Event, []ker
 			id = fmt.Sprintf("job_s_%d", ev.IngestSeq)
 		}
 		payload, _ := json.Marshal(jobPayload{Spec: *dec.Job, Actor: ev.Actor, TriggerID: ev.ID, Correlation: ev.CorrelationID})
-		jobs = append(jobs, kernel.OutboxRow{
+		jobs = append(jobs, store.OutboxRow{
 			ID: id, Kind: "job", EventSeq: ev.IngestSeq,
 			Target: dec.Job.Kind, Payload: string(payload), IdempotencyKey: dec.Job.IdempotencyKey})
 	}
@@ -441,12 +442,12 @@ func (cs *ControlServer) processDecisionSideEffects() error {
 	for _, dr := range decs {
 		d := dr.Decision
 		rid := dr.Rowid
-		if e := cs.store.WithTx(func(tx *kernel.Tx) error {
+		if e := cs.store.WithTx(func(tx *store.Tx) error {
 			if d.IngestSeq > 0 {
 				if d.Status == contract.Accepted {
 					payload, _ := json.Marshal(d.NewVersions)
 					key := "inv_" + d.DecisionID
-					if err := tx.EnqueueOutbox(kernel.OutboxRow{ID: key, Kind: "invalidation", EventSeq: d.IngestSeq, Target: "projection", Payload: string(payload), IdempotencyKey: key}); err != nil {
+					if err := tx.EnqueueOutbox(store.OutboxRow{ID: key, Kind: "invalidation", EventSeq: d.IngestSeq, Target: "projection", Payload: string(payload), IdempotencyKey: key}); err != nil {
 						return err
 					}
 					if d.Actor != SyncImportActor {

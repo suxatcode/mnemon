@@ -7,6 +7,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/reconcile"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 func proposeWrite(id string, w contract.ResourceWrite) contract.Event {
@@ -16,9 +17,9 @@ func proposeWrite(id string, w contract.ResourceWrite) contract.Event {
 
 // liveDecisions produces decisions the canonical way: append the proposed events to a fresh kernel and
 // reconcile (the same modes Replay uses), returning the store + decisions.
-func liveDecisions(t *testing.T, events []contract.Event) (*kernel.Store, []contract.Decision) {
+func liveDecisions(t *testing.T, events []contract.Event) (*store.Store, []contract.Decision) {
 	t.Helper()
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

@@ -8,9 +8,10 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
-func seqGen() func() string  { n := 0; return func() string { n++; return "id-" + strconv.Itoa(n) } }
+func seqGen() func() string   { n := 0; return func() string { n++; return "id-" + strconv.Itoa(n) } }
 func fixedNow() func() string { return func() string { return "2026-06-04T00:00:00Z" } }
 
 func agentSubs() map[contract.ActorID]contract.Subscription {
@@ -46,9 +47,9 @@ func denyRule() rule.Rule {
 		})
 }
 
-func newServerWith(t *testing.T, rs rule.RuleSet) (*kernel.Store, *kernel.Kernel, *ControlServer) {
+func newServerWith(t *testing.T, rs rule.RuleSet) (*store.Store, *kernel.Kernel, *ControlServer) {
 	t.Helper()
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // The bridge must stamp the PRODUCING rule's actor. r1 (alice) and r2 (bob) share the same (handles, emits),
@@ -13,7 +14,7 @@ import (
 // (Handles(ev.Type), Emits()==proposal.Type) picks alice — misattributing bob's proposal to alice. The
 // reduced decision carries the real origin (bob), so the stamped *.proposed event's Actor must be bob.
 func TestProposeStampsProducingRuleActorNotFirstMatch(t *testing.T) {
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -24,7 +25,9 @@ func TestProposeStampsProducingRuleActorNotFirstMatch(t *testing.T) {
 		"agent": {Actor: "agent", Refs: []contract.ResourceRef{{Kind: "memory", ID: "m1"}}},
 	}
 	r1 := rule.NewNativeRule("r1", "alice", "memory.write.proposed", []string{"memory.observed"},
-		func(rule.RuleInput) (contract.RuleDecision, error) { return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil })
+		func(rule.RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+		})
 	r2 := rule.NewNativeRule("r2", "bob", "memory.write.proposed", []string{"memory.observed"},
 		func(in rule.RuleInput) (contract.RuleDecision, error) {
 			rv := in.View.Resources[0]

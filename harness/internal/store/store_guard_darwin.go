@@ -1,6 +1,6 @@
 //go:build darwin
 
-package kernel
+package store
 
 import (
 	"path/filepath"

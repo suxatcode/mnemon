@@ -4,7 +4,21 @@ import (
 	"testing"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
+
+// newTestStore is the kernel package's local test store ctor. It mirrors the helper that moved to
+// the store package with store_test.go; kept in _test.go so the production store package never
+// imports testing.
+func newTestStore(t *testing.T) *store.Store {
+	t.Helper()
+	s, err := store.OpenStore(":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { s.Close() })
+	return s
+}
 
 func permissiveRules() AuthorityRules {
 	return AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"user": {"memory", "goal", "skill"}}}
@@ -20,7 +34,9 @@ func mustCreate(t *testing.T, k *Kernel, kind contract.ResourceKind, id contract
 		t.Fatalf("seed %s failed: %s", id, d.Reason)
 	}
 }
-func newKernel(t *testing.T) *Kernel { return NewKernel(newTestStore(t), DefaultSchemaGuard(), permissiveRules()) }
+func newKernel(t *testing.T) *Kernel {
+	return NewKernel(newTestStore(t), DefaultSchemaGuard(), permissiveRules())
+}
 
 func TestApplyMultiResourceAllOrNothing(t *testing.T) {
 	k := newKernel(t)

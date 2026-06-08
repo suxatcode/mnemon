@@ -5,6 +5,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 var refs = []contract.ResourceRef{
@@ -21,9 +22,9 @@ func p1Rules() kernel.AuthorityRules {
 func writeCASModes() contract.Modes {
 	return contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationWriteCAS, Authz: contract.AuthzStrict}
 }
-func newStoreKernel(t *testing.T) (*kernel.Store, *kernel.Kernel) {
+func newStoreKernel(t *testing.T) (*store.Store, *kernel.Kernel) {
 	t.Helper()
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -49,19 +50,19 @@ func updateP(t *testing.T, k *kernel.Kernel, ref contract.ResourceRef, basedOn c
 }
 
 // newStoreWith seeds m1@1, g1@5.
-func newStoreWith(t *testing.T) *kernel.Store {
+func newStoreWith(t *testing.T) *store.Store {
 	t.Helper()
 	s, k := newStoreKernel(t)
 	createP(t, k, contract.ResourceRef{Kind: "memory", ID: "m1"}, map[string]any{"content": "a"}) // m1@1
 	createP(t, k, contract.ResourceRef{Kind: "goal", ID: "g1"}, map[string]any{"statement": "s"}) // g1@1
-	for v := contract.Version(1); v < 5; v++ {                                                     // bump g1 -> @5
+	for v := contract.Version(1); v < 5; v++ {                                                    // bump g1 -> @5
 		updateP(t, k, contract.ResourceRef{Kind: "goal", ID: "g1"}, v, map[string]any{"statement": "s"})
 	}
 	return s
 }
 
 // accept applies one accepted update against an existing store.
-func accept(t *testing.T, s *kernel.Store, ref contract.ResourceRef, basedOn contract.Version, fields map[string]any) {
+func accept(t *testing.T, s *store.Store, ref contract.ResourceRef, basedOn contract.Version, fields map[string]any) {
 	t.Helper()
 	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), p1Rules())
 	updateP(t, k, ref, basedOn, fields)

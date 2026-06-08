@@ -46,7 +46,9 @@ type FakeRunner struct {
 	calls    int
 }
 
-func NewFakeRunner(proposal *contract.ProposedEvent) *FakeRunner { return &FakeRunner{proposal: proposal} }
+func NewFakeRunner(proposal *contract.ProposedEvent) *FakeRunner {
+	return &FakeRunner{proposal: proposal}
+}
 
 func (f *FakeRunner) Run(spec JobSpec) (Result, error) {
 	f.lastKey = spec.IdempotencyKey

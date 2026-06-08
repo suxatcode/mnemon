@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // ruleProposing always proposes the given writes for memory.observed (used to exercise each reject class).
@@ -18,7 +18,7 @@ func ruleProposing(id string, writes []contract.ResourceWrite) rule.Rule {
 		})
 }
 
-func diagEvents(t *testing.T, s *kernel.Store) []contract.Event {
+func diagEvents(t *testing.T, s *store.Store) []contract.Event {
 	t.Helper()
 	evs, _ := s.PendingEvents(0)
 	var out []contract.Event

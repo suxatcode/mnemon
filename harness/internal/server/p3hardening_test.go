@@ -12,11 +12,14 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/job"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 type erroringRunner struct{}
 
-func (erroringRunner) Run(contract.JobSpec) (job.Result, error) { return job.Result{}, errors.New("runner boom") }
+func (erroringRunner) Run(contract.JobSpec) (job.Result, error) {
+	return job.Result{}, errors.New("runner boom")
+}
 
 // #9: PullProjection must serve only the actor's CONFIGURED scope; client-named out-of-scope refs are denied.
 func TestPullProjectionEnforcesConfiguredScope(t *testing.T) {
@@ -366,7 +369,7 @@ func TestProposedEventReScanEmitsNoSpuriousReadback(t *testing.T) {
 	}
 }
 
-func hasDiagStage(t *testing.T, s *kernel.Store, stage string) bool {
+func hasDiagStage(t *testing.T, s *store.Store, stage string) bool {
 	t.Helper()
 	for _, dg := range diagEvents(t, s) {
 		if dg.Payload["stage"] == stage {

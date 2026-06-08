@@ -6,18 +6,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 type Kernel struct {
-	store  *Store
+	store  *store.Store
 	schema SchemaGuard
 	rules  AuthorityRules
 }
 
-func NewKernel(s *Store, g SchemaGuard, r AuthorityRules) *Kernel {
+func NewKernel(s *store.Store, g SchemaGuard, r AuthorityRules) *Kernel {
 	return &Kernel{store: s, schema: g, rules: r}
 }
-func (k *Kernel) Store() *Store { return k.store }
+func (k *Kernel) Store() *store.Store { return k.store }
 
 // Apply is the ONLY canonical writer (Invariant #2). check+write are one atomic txn (Invariant #3);
 // multi-resource is all-or-nothing (Invariant #5). It persists exactly one terminal decision (Invariant #7):
@@ -57,7 +58,7 @@ func (k *Kernel) Apply(op contract.KernelOp, m contract.Modes) contract.Decision
 		seen[w.Ref] = true
 	}
 
-	err := k.store.WithTx(func(tx *Tx) error {
+	err := k.store.WithTx(func(tx *store.Tx) error {
 		if m.Isolation == contract.IsolationProjectionReadSet { // read-set validation (Invariant #6)
 			for _, rv := range op.ReadSet {
 				cur, e := tx.ReadVersion(rv.Ref)

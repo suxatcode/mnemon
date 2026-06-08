@@ -99,7 +99,9 @@ func TestRunHTTPServerWithBindingsBoots(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- RunHTTPServerWithBindings(ctx, addr, filepath.Join(root, DefaultStorePath), loaded, io.Discard) }()
+	go func() {
+		done <- RunHTTPServerWithBindings(ctx, addr, filepath.Join(root, DefaultStorePath), loaded, io.Discard)
+	}()
 
 	c := NewClientWithToken("http://"+addr, "tok-codex")
 	var st ChannelStatus

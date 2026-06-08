@@ -7,6 +7,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/job"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
 // requestEvidenceRule asks the job lane to gather evidence (a fixed idempotency key) when none is present.
@@ -26,9 +27,9 @@ func laneProposal() *contract.ProposedEvent {
 		"writes": []contract.ResourceWrite{{Ref: contract.ResourceRef{Kind: "memory", ID: "m1"}, Kind: contract.OpUpdate, BasedOn: 1, Fields: map[string]any{"content": "evidence-gathered"}}}}}
 }
 
-func newServerWithLane(t *testing.T, rs rule.RuleSet, runner job.Runner) (*kernel.Store, *ControlServer) {
+func newServerWithLane(t *testing.T, rs rule.RuleSet, runner job.Runner) (*store.Store, *ControlServer) {
 	t.Helper()
-	s, err := kernel.OpenStore(":memory:")
+	s, err := store.OpenStore(":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
