@@ -16,12 +16,12 @@ func localRuntimeConfigT(bindings []channel.ChannelBinding) RuntimeConfig {
 	var rules []rule.Rule
 	allow := map[contract.ActorID][]contract.ResourceKind{}
 	for _, b := range bindings {
-		if b.Allows(channel.VerbObserve) && b.AllowsObservedType(capability.MemoryWriteCandidateObserved) {
+		if b.Allows(channel.VerbObserve) && allowsAnyT(b, capability.ObservedTypeAndAliases(capability.MemoryWriteCandidateObserved)) {
 			if ref, ok := scopeRefT(b, "memory"); ok {
 				rules = append(rules, capability.MemoryAdmissionRule(b.Principal, ref))
 			}
 		}
-		if b.Allows(channel.VerbObserve) && b.AllowsObservedType(capability.SkillWriteCandidateObserved) {
+		if b.Allows(channel.VerbObserve) && allowsAnyT(b, capability.ObservedTypeAndAliases(capability.SkillWriteCandidateObserved)) {
 			if ref, ok := scopeRefT(b, "skill"); ok {
 				rules = append(rules, capability.SkillAdmissionRule(b.Principal, ref))
 			}
@@ -45,6 +45,15 @@ func localRuntimeConfigT(bindings []channel.ChannelBinding) RuntimeConfig {
 		Rules:     rule.NewRuleSet(rules...),
 		Authority: kernel.AuthorityRules{Allow: allow},
 	}
+}
+
+func allowsAnyT(b channel.ChannelBinding, types []string) bool {
+	for _, t := range types {
+		if b.AllowsObservedType(t) {
+			return true
+		}
+	}
+	return false
 }
 
 func scopeRefT(b channel.ChannelBinding, kind contract.ResourceKind) (contract.ResourceRef, bool) {

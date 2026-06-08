@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	MemoryWriteCandidateObserved = "memory.write_candidate_observed"
+	MemoryWriteCandidateObserved = "memory.write_candidate.observed"
 	RemoteMemoryCommitObserved   = "remote.memory.commit_observed"
 	MemoryWriteProposed          = "memory.write.proposed"
 )
@@ -24,7 +24,7 @@ const (
 // MemoryAdmissionRule admits a memory write candidate from one authenticated principal, proposing an
 // append to the principal's memory resource. It only acts on events from its own principal.
 func MemoryAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) rule.Rule {
-	return rule.NewNativeRule("local-memory-admission:"+string(principal), principal, MemoryWriteProposed, []string{MemoryWriteCandidateObserved},
+	return rule.NewNativeRule("local-memory-admission:"+string(principal), principal, MemoryWriteProposed, ObservedTypeAndAliases(MemoryWriteCandidateObserved),
 		func(in rule.RuleInput) (contract.RuleDecision, error) {
 			if in.Event.Actor != principal {
 				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil

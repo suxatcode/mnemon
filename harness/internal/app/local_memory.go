@@ -69,12 +69,24 @@ func LocalAuthorityFromBindings(bindings []channel.ChannelBinding) kernel.Author
 	return kernel.AuthorityRules{Allow: allow}
 }
 
+// allowsAnyObservedType reports whether the binding admits any of the observed-type aliases — the
+// gate that keeps a loop from being stranded when a binding lists only the legacy underscore form
+// while the canonical type has converged to dotted.
+func allowsAnyObservedType(b channel.ChannelBinding, types []string) bool {
+	for _, t := range types {
+		if b.AllowsObservedType(t) {
+			return true
+		}
+	}
+	return false
+}
+
 // LocalMemoryRules creates one actor-bound admission rule per binding that can submit memory
 // candidates. Each rule only proposes for its own authenticated principal.
 func LocalMemoryRules(bindings []channel.ChannelBinding) []rule.Rule {
 	var rules []rule.Rule
 	for _, b := range bindings {
-		if !b.Allows(channel.VerbObserve) || !b.AllowsObservedType(capability.MemoryWriteCandidateObserved) {
+		if !b.Allows(channel.VerbObserve) || !allowsAnyObservedType(b, capability.ObservedTypeAndAliases(capability.MemoryWriteCandidateObserved)) {
 			continue
 		}
 		ref, ok := memoryRefForBinding(b)

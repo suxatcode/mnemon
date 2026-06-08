@@ -12,7 +12,7 @@ var localProjectSkillRef = contract.ResourceRef{Kind: "skill", ID: "project"}
 func LocalSkillRules(bindings []channel.ChannelBinding) []rule.Rule {
 	var rules []rule.Rule
 	for _, b := range bindings {
-		if !b.Allows(channel.VerbObserve) || !b.AllowsObservedType(capability.SkillWriteCandidateObserved) {
+		if !b.Allows(channel.VerbObserve) || !allowsAnyObservedType(b, capability.ObservedTypeAndAliases(capability.SkillWriteCandidateObserved)) {
 			continue
 		}
 		ref, ok := skillRefForBinding(b)

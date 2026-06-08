@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
@@ -204,7 +205,9 @@ func (h *Harness) channelBinding(opts SetupOptions) channel.ChannelBinding {
 	observed := []string{"session.observed"}
 	var scope []contract.ResourceRef
 	for _, loop := range opts.Loops {
-		observed = append(observed, loop+".write_candidate_observed")
+		// Dual-emit the dotted canonical observed type and its legacy underscore alias, so a host
+		// that still sends either form is admitted during the naming convergence (gate-1).
+		observed = append(observed, capability.ObservedTypeAndAliases(loop+".write_candidate.observed")...)
 		scope = append(scope, contract.ResourceRef{Kind: contract.ResourceKind(loop), ID: "project"})
 	}
 	return channel.ChannelBinding{

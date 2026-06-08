@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	SkillWriteCandidateObserved = "skill.write_candidate_observed"
+	SkillWriteCandidateObserved = "skill.write_candidate.observed"
 	RemoteSkillCommitObserved   = "remote.skill.commit_observed"
 	SkillWriteProposed          = "skill.write.proposed"
 )
 
 // SkillAdmissionRule admits an append-only skill declaration from one authenticated principal.
 func SkillAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) rule.Rule {
-	return rule.NewNativeRule("local-skill-admission:"+string(principal), principal, SkillWriteProposed, []string{SkillWriteCandidateObserved},
+	return rule.NewNativeRule("local-skill-admission:"+string(principal), principal, SkillWriteProposed, ObservedTypeAndAliases(SkillWriteCandidateObserved),
 		func(in rule.RuleInput) (contract.RuleDecision, error) {
 			if in.Event.Actor != principal {
 				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
