@@ -10,6 +10,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/app"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/mnemon-dev/mnemon/harness/internal/remotesync"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -143,14 +144,14 @@ func tokenForPrincipal(tokens map[string]contract.ActorID, principal contract.Ac
 	return ""
 }
 
-func syncCounts(projectRoot string) server.LocalSyncCounts {
+func syncCounts(projectRoot string) remotesync.LocalSyncCounts {
 	storePath := filepath.Join(projectRoot, server.DefaultStorePath)
 	if _, err := os.Stat(storePath); err != nil {
-		return server.LocalSyncCounts{}
+		return remotesync.LocalSyncCounts{}
 	}
-	counts, err := server.ReadLocalSyncCounts(storePath)
+	counts, err := remotesync.ReadLocalSyncCounts(storePath)
 	if err != nil {
-		return server.LocalSyncCounts{}
+		return remotesync.LocalSyncCounts{}
 	}
 	return counts
 }

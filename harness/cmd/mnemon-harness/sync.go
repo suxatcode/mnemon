@@ -13,6 +13,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/mnemon-dev/mnemon/harness/internal/remotesync"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -161,7 +162,7 @@ type syncPullResult struct {
 
 func syncPushOnce() (syncPushResult, error) {
 	storePath := resolvedSyncStorePath()
-	batch, err := server.ReadLocalSyncPushBatch(storePath)
+	batch, err := remotesync.ReadLocalSyncPushBatch(storePath)
 	if err != nil {
 		return syncPushResult{}, err
 	}
@@ -181,7 +182,7 @@ func syncPushOnce() (syncPushResult, error) {
 	if err != nil {
 		return syncPushResult{}, fmt.Errorf("sync push failed: %w", err)
 	}
-	if err := server.ApplyLocalSyncPushResponse(storePath, remote.ID, resp); err != nil {
+	if err := remotesync.ApplyLocalSyncPushResponse(storePath, remote.ID, resp); err != nil {
 		return syncPushResult{}, err
 	}
 	return syncPushResult{accepted: len(resp.Accepted), rejected: len(resp.Rejected), conflicts: len(resp.Conflicts)}, nil
@@ -193,7 +194,7 @@ func syncPullOnce() (syncPullResult, error) {
 		return syncPullResult{}, err
 	}
 	storePath := resolvedSyncStorePath()
-	state, err := server.ReadLocalSyncPullState(storePath, remote.ID)
+	state, err := remotesync.ReadLocalSyncPullState(storePath, remote.ID)
 	if err != nil {
 		return syncPullResult{}, err
 	}

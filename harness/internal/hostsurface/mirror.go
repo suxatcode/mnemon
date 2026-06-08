@@ -1,4 +1,4 @@
-package server
+package hostsurface
 
 import (
 	"os"

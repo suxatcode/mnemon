@@ -8,7 +8,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/server"
+	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
 	"github.com/spf13/cobra"
 )
 
@@ -101,7 +101,7 @@ var controlPullCmd = &cobra.Command{
 			return fmt.Errorf("channel pull failed (service unreachable or unauthorized): %w", err)
 		}
 		if controlMirrorPath != "" {
-			if err := server.WriteMemoryMirror(controlMirrorPath, proj); err != nil {
+			if err := hostsurface.WriteMemoryMirror(controlMirrorPath, proj); err != nil {
 				return fmt.Errorf("write memory mirror: %w", err)
 			}
 			if !controlPullJSON {
