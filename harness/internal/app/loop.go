@@ -4,19 +4,31 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
 	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
-// LoopValidate validates the harness loop/host/binding declarations under the
-// facade root and returns the human-readable report lines.
+// LoopValidate validates the embedded harness loop/host/binding manifests unconditionally, then —
+// when root names an external tree carrying its own loops/hosts/bindings — validates that too (the
+// union). A root with no harness assets (the common case, including the repo root after the assets
+// moved under internal/assets) contributes nothing, so the validation passes.
 func (h *Harness) LoopValidate() ([]string, error) {
-	result, err := manifest.ValidateHarness(h.root)
+	result, err := manifest.ValidateFS(assets.FS)
 	if err != nil {
 		return nil, err
 	}
-	return result.Lines, nil
+	lines := result.Lines
+	if h.root != "" {
+		external, err := manifest.ValidateFS(os.DirFS(h.root))
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, external.Lines...)
+	}
+	return lines, nil
 }
 
 // LoopProject runs the product projector action against a supported host
@@ -31,21 +43,19 @@ func (h *Harness) LoopProject(ctx context.Context, out, errw io.Writer, action, 
 	switch host {
 	case "codex":
 		return hostsurface.RunCodexProjector(ctx, action, hostsurface.CodexOptions{
-			DeclarationRoot: h.root,
-			ProjectRoot:     projectRoot,
-			Loops:           loops,
-			HostArgs:        hostArgs,
-			Stdout:          out,
-			Stderr:          errw,
+			ProjectRoot: projectRoot,
+			Loops:       loops,
+			HostArgs:    hostArgs,
+			Stdout:      out,
+			Stderr:      errw,
 		})
 	case "claude-code":
 		return hostsurface.RunClaudeProjector(ctx, action, hostsurface.ClaudeOptions{
-			DeclarationRoot: h.root,
-			ProjectRoot:     projectRoot,
-			Loops:           loops,
-			HostArgs:        hostArgs,
-			Stdout:          out,
-			Stderr:          errw,
+			ProjectRoot: projectRoot,
+			Loops:       loops,
+			HostArgs:    hostArgs,
+			Stdout:      out,
+			Stderr:      errw,
 		})
 	default:
 		return fmt.Errorf("unsupported host %q; setup supports codex and claude-code", host)

@@ -7,22 +7,24 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
 type ClaudeOptions struct {
-	DeclarationRoot string
-	ProjectRoot     string
-	Loops           []string
-	HostArgs        []string
-	Stdout          io.Writer
-	Stderr          io.Writer
+	ProjectRoot string
+	Loops       []string
+	HostArgs    []string
+	Stdout      io.Writer
+	Stderr      io.Writer
 }
 
 type claudeHostOptions struct {
@@ -48,13 +50,7 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 	if action != "install" && action != "uninstall" {
 		return fmt.Errorf("unsupported Claude Code projector action: %s", action)
 	}
-	if opts.DeclarationRoot == "" {
-		opts.DeclarationRoot = "."
-	}
-	declarationRoot, err := filepath.Abs(opts.DeclarationRoot)
-	if err != nil {
-		return fmt.Errorf("resolve declaration root: %w", err)
-	}
+	var err error
 	if opts.ProjectRoot == "" {
 		opts.ProjectRoot, err = os.Getwd()
 		if err != nil {
@@ -75,7 +71,7 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 	if opts.Stderr == nil {
 		opts.Stderr = io.Discard
 	}
-	if _, err := manifest.ValidateHarness(declarationRoot); err != nil {
+	if _, err := manifest.ValidateFS(assets.FS); err != nil {
 		return err
 	}
 	loops := append([]string(nil), opts.Loops...)
@@ -86,21 +82,20 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 
 	projector := claudeProjector{
 		projectorCore: projectorCore{
-			host:            "claude-code",
-			declarationRoot: declarationRoot,
-			projectRoot:     projectRoot,
-			paths:           claudeProjectorPaths(hostOptions),
-			stdout:          opts.Stdout,
-			stderr:          opts.Stderr,
+			host:        "claude-code",
+			projectRoot: projectRoot,
+			paths:       claudeProjectorPaths(hostOptions),
+			stdout:      opts.Stdout,
+			stderr:      opts.Stderr,
 		},
 		hostOptions: hostOptions,
 	}
 	for _, loopName := range loops {
-		loop, err := manifest.LoadLoop(declarationRoot, loopName)
+		loop, err := manifest.LoadLoop(assets.FS, loopName)
 		if err != nil {
 			return err
 		}
-		binding, err := manifest.LoadBinding(declarationRoot, "claude-code", loopName)
+		binding, err := manifest.LoadBinding(assets.FS, "claude-code", loopName)
 		if err != nil {
 			return err
 		}
@@ -341,7 +336,7 @@ func (p claudeProjector) writeRuntimeEnv(loop manifest.LoopManifest, binding man
 func (p claudeProjector) projectSkills(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	hostSkillsDir := p.hostSkillsDir(loop.Name)
 	for _, skill := range loop.Assets.Skills {
-		content, err := os.ReadFile(p.loopAsset(loop, skill))
+		content, err := fs.ReadFile(assets.FS, p.loopAsset(loop, skill))
 		if err != nil {
 			return fmt.Errorf("read %s: %w", skill, err)
 		}
@@ -365,8 +360,8 @@ func (p claudeProjector) projectAgents(loop manifest.LoopManifest, binding manif
 
 func (p claudeProjector) projectHooks(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	for phase := range loop.Assets.HookPrompts {
-		source := filepath.Join(p.declarationRoot, "harness", "hosts", "claude-code", loop.Name, "hooks", phase+".sh")
-		if _, err := os.Stat(source); os.IsNotExist(err) {
+		source := path.Join("hosts", "claude-code", loop.Name, "hooks", phase+".sh")
+		if _, err := fs.Stat(assets.FS, source); errors.Is(err, fs.ErrNotExist) {
 			continue
 		} else if err != nil {
 			return fmt.Errorf("stat hook %s: %w", phase, err)

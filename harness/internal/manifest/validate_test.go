@@ -11,7 +11,7 @@ func TestValidateHarnessAcceptsFixtureDeclarations(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
 
-	result, err := ValidateHarness(root)
+	result, err := ValidateFS(os.DirFS(root))
 	if err != nil {
 		t.Fatalf("ValidateHarness returned error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestValidateHarnessRejectsMissingDeclaredAsset(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/missing/SKILL.md")
 
-	_, err := ValidateHarness(root)
+	_, err := ValidateFS(os.DirFS(root))
 	if err == nil || !strings.Contains(err.Error(), "missing memory asset: skills/missing/SKILL.md") {
 		t.Fatalf("expected missing asset error, got %v", err)
 	}
@@ -40,7 +40,7 @@ func TestValidateHarnessRejectsMissingDeclaredAsset(t *testing.T) {
 func TestValidateHarnessRejectsDuplicateBindingName(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
-	writeFile(t, filepath.Join(root, "harness", "bindings", "codex.memory.duplicate.json"), `{
+	writeFile(t, filepath.Join(root, "bindings", "codex.memory.duplicate.json"), `{
   "schema_version": 1,
   "name": "codex.memory",
   "host": "codex",
@@ -51,7 +51,7 @@ func TestValidateHarnessRejectsDuplicateBindingName(t *testing.T) {
   "reconcile": []
 }`)
 
-	_, err := ValidateHarness(root)
+	_, err := ValidateFS(os.DirFS(root))
 	if err == nil || !strings.Contains(err.Error(), `duplicate binding name "codex.memory"`) {
 		t.Fatalf("expected duplicate binding name error, got %v", err)
 	}
@@ -60,7 +60,7 @@ func TestValidateHarnessRejectsDuplicateBindingName(t *testing.T) {
 func TestValidateHarnessAcceptsBindingSchemaV2(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
-	writeFile(t, filepath.Join(root, "harness", "bindings", "codex.memory.json"), `{
+	writeFile(t, filepath.Join(root, "bindings", "codex.memory.json"), `{
   "schema_version": 2,
   "name": "codex.memory",
   "host": "codex",
@@ -81,7 +81,7 @@ func TestValidateHarnessAcceptsBindingSchemaV2(t *testing.T) {
   }
 }`)
 
-	result, err := ValidateHarness(root)
+	result, err := ValidateFS(os.DirFS(root))
 	if err != nil {
 		t.Fatalf("ValidateHarness returned error: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestValidateHarnessAcceptsBindingSchemaV2(t *testing.T) {
 func TestValidateHarnessRejectsBindingSchemaV2MissingHookMode(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
-	writeFile(t, filepath.Join(root, "harness", "bindings", "codex.memory.json"), `{
+	writeFile(t, filepath.Join(root, "bindings", "codex.memory.json"), `{
   "schema_version": 2,
   "name": "codex.memory",
   "host": "codex",
@@ -110,7 +110,7 @@ func TestValidateHarnessRejectsBindingSchemaV2MissingHookMode(t *testing.T) {
   }
 }`)
 
-	_, err := ValidateHarness(root)
+	_, err := ValidateFS(os.DirFS(root))
 	if err == nil || !strings.Contains(err.Error(), "missing hook_mode") {
 		t.Fatalf("expected missing hook_mode error, got %v", err)
 	}
@@ -118,9 +118,9 @@ func TestValidateHarnessRejectsBindingSchemaV2MissingHookMode(t *testing.T) {
 
 func writeFixtureHarness(t *testing.T, root, skillPath string) {
 	t.Helper()
-	loopDir := filepath.Join(root, "harness", "loops", "memory")
-	hostDir := filepath.Join(root, "harness", "hosts", "codex")
-	bindingsDir := filepath.Join(root, "harness", "bindings")
+	loopDir := filepath.Join(root, "loops", "memory")
+	hostDir := filepath.Join(root, "hosts", "codex")
+	bindingsDir := filepath.Join(root, "bindings")
 	for _, dir := range []string{
 		filepath.Join(loopDir, "hook-prompts"),
 		filepath.Join(loopDir, "skills", "memory-get"),

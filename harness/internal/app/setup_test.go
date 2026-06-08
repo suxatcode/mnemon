@@ -264,12 +264,12 @@ func TestSetupRejectsUnsupportedProductLoop(t *testing.T) {
 func TestAgentIntegrationAssetsDoNotReferenceRemoteWorkspace(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
-		"harness/hosts/codex/memory/hooks",
-		"harness/hosts/codex/skill/hooks",
-		"harness/hosts/claude-code/memory/hooks",
-		"harness/hosts/claude-code/skill/hooks",
-		"harness/loops/memory/skills",
-		"harness/loops/skill/skills",
+		"harness/internal/assets/hosts/codex/memory/hooks",
+		"harness/internal/assets/hosts/codex/skill/hooks",
+		"harness/internal/assets/hosts/claude-code/memory/hooks",
+		"harness/internal/assets/hosts/claude-code/skill/hooks",
+		"harness/internal/assets/loops/memory/skills",
+		"harness/internal/assets/loops/skill/skills",
 	} {
 		assertProjectedAssetsHaveNoRemoteWorkspace(t, filepath.Join(root, rel))
 	}

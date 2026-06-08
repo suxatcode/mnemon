@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
+	"path"
 	"sort"
 )
 
@@ -13,26 +13,17 @@ type ValidationResult struct {
 	Lines []string
 }
 
-func ValidateHarness(root string) (ValidationResult, error) {
-	if root == "" {
-		root = "."
-	}
-	root = filepath.Clean(root)
-	validator := harnessValidator{
-		root:        root,
-		loopsDir:    filepath.Join(root, "harness", "loops"),
-		hostsDir:    filepath.Join(root, "harness", "hosts"),
-		bindingsDir: filepath.Join(root, "harness", "bindings"),
-	}
+// ValidateFS validates the loop/host/binding manifests rooted at fsys ("loops/", "hosts/",
+// "bindings/" — no "harness/" prefix). An absent loops directory is tolerated (nothing to validate),
+// so validating an external root that carries no harness assets passes trivially.
+func ValidateFS(fsys fs.FS) (ValidationResult, error) {
+	validator := harnessValidator{fsys: fsys}
 	return validator.validate()
 }
 
 type harnessValidator struct {
-	root        string
-	loopsDir    string
-	hostsDir    string
-	bindingsDir string
-	lines       []string
+	fsys  fs.FS
+	lines []string
 }
 
 func (v *harnessValidator) validate() (ValidationResult, error) {
@@ -49,15 +40,18 @@ func (v *harnessValidator) validate() (ValidationResult, error) {
 }
 
 func (v *harnessValidator) validateLoops() error {
-	entries, err := os.ReadDir(v.loopsDir)
+	entries, err := fs.ReadDir(v.fsys, "loops")
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 		return fmt.Errorf("read loops directory: %w", err)
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		if err := v.validateLoop(filepath.Join(v.loopsDir, entry.Name())); err != nil {
+		if err := v.validateLoop(path.Join("loops", entry.Name())); err != nil {
 			return err
 		}
 	}
@@ -65,16 +59,16 @@ func (v *harnessValidator) validateLoops() error {
 }
 
 func (v *harnessValidator) validateLoop(loopDir string) error {
-	manifest := filepath.Join(loopDir, "loop.json")
-	if _, err := os.Stat(manifest); err != nil {
-		if os.IsNotExist(err) {
+	manifest := path.Join(loopDir, "loop.json")
+	if _, err := fs.Stat(v.fsys, manifest); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("missing loop manifest: %s", manifest)
 		}
 		return fmt.Errorf("stat loop manifest: %w", err)
 	}
 
 	var data map[string]json.RawMessage
-	if err := readManifest(manifest, &data); err != nil {
+	if err := readManifest(v.fsys, manifest, &data); err != nil {
 		return err
 	}
 	name, err := requiredString(data, "name", "loop manifest", manifest)
@@ -129,15 +123,15 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 		if rel == "" {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(loopDir, rel)); err != nil {
-			if os.IsNotExist(err) {
+		if _, err := fs.Stat(v.fsys, path.Join(loopDir, rel)); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("missing %s asset: %s", name, rel)
 			}
 			return fmt.Errorf("stat %s asset %s: %w", name, rel, err)
 		}
 	}
 
-	jobs, err := loopJobSpecs(data, loopDir)
+	jobs, err := loopJobSpecs(v.fsys, data, loopDir)
 	if err != nil {
 		return fmt.Errorf("loop manifest invalid jobs: %s: %w", manifest, err)
 	}
@@ -159,8 +153,8 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 		if rel == "" {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(loopDir, rel)); err != nil {
-			if os.IsNotExist(err) {
+		if _, err := fs.Stat(v.fsys, path.Join(loopDir, rel)); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("missing %s host adapter path: %s", name, rel)
 			}
 			return fmt.Errorf("stat %s host adapter path %s: %w", name, rel, err)
@@ -172,7 +166,7 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 }
 
 func (v *harnessValidator) validateHosts() error {
-	matches, err := filepath.Glob(filepath.Join(v.hostsDir, "*", "host.json"))
+	matches, err := fs.Glob(v.fsys, "hosts/*/host.json")
 	if err != nil {
 		return fmt.Errorf("glob host manifests: %w", err)
 	}
@@ -186,7 +180,7 @@ func (v *harnessValidator) validateHosts() error {
 
 func (v *harnessValidator) validateHost(manifest string) error {
 	var data map[string]json.RawMessage
-	if err := readManifest(manifest, &data); err != nil {
+	if err := readManifest(v.fsys, manifest, &data); err != nil {
 		return err
 	}
 	name, err := requiredString(data, "name", "host manifest", manifest)
@@ -222,7 +216,7 @@ func (v *harnessValidator) validateHost(manifest string) error {
 }
 
 func (v *harnessValidator) validateBindings() error {
-	matches, err := filepath.Glob(filepath.Join(v.bindingsDir, "*.json"))
+	matches, err := fs.Glob(v.fsys, "bindings/*.json")
 	if err != nil {
 		return fmt.Errorf("glob binding manifests: %w", err)
 	}
@@ -242,7 +236,7 @@ func (v *harnessValidator) validateBindings() error {
 
 func (v *harnessValidator) validateBinding(manifest string) (string, error) {
 	var data map[string]json.RawMessage
-	if err := readManifest(manifest, &data); err != nil {
+	if err := readManifest(v.fsys, manifest, &data); err != nil {
 		return "", err
 	}
 	schemaVersion, err := intField(data, "schema_version")
@@ -264,26 +258,26 @@ func (v *harnessValidator) validateBinding(manifest string) (string, error) {
 	if name == "" || host == "" || loop == "" {
 		return "", fmt.Errorf("binding manifest missing name, host, or loop: %s", manifest)
 	}
-	if _, err := os.Stat(filepath.Join(v.hostsDir, host, "host.json")); err != nil {
-		if os.IsNotExist(err) {
+	if _, err := fs.Stat(v.fsys, path.Join("hosts", host, "host.json")); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			return "", fmt.Errorf("binding references missing host: %s", manifest)
 		}
 		return "", fmt.Errorf("stat binding host reference: %w", err)
 	}
-	if _, err := os.Stat(filepath.Join(v.loopsDir, loop, "loop.json")); err != nil {
-		if os.IsNotExist(err) {
+	if _, err := fs.Stat(v.fsys, path.Join("loops", loop, "loop.json")); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			return "", fmt.Errorf("binding references missing loop: %s", manifest)
 		}
 		return "", fmt.Errorf("stat binding loop reference: %w", err)
 	}
-	loopDir := filepath.Join(v.loopsDir, loop)
+	loopDir := path.Join("loops", loop)
 	switch schemaVersion {
 	case 1:
-		if err := validateBindingV1(data, loopDir); err != nil {
+		if err := validateBindingV1(v.fsys, data, loopDir); err != nil {
 			return "", fmt.Errorf("binding manifest invalid v1 shape: %s: %w", manifest, err)
 		}
 	case 2:
-		if err := validateBindingV2(data, loopDir); err != nil {
+		if err := validateBindingV2(v.fsys, data, loopDir); err != nil {
 			return "", fmt.Errorf("binding manifest invalid v2 shape: %s: %w", manifest, err)
 		}
 	default:
@@ -293,7 +287,7 @@ func (v *harnessValidator) validateBinding(manifest string) (string, error) {
 	return name, nil
 }
 
-func validateBindingV1(data map[string]json.RawMessage, loopDir string) error {
+func validateBindingV1(fsys fs.FS, data map[string]json.RawMessage, loopDir string) error {
 	for _, field := range []string{"projection_path", "runtime_surface", "lifecycle_mapping", "reconcile"} {
 		if !hasField(data, field) {
 			return fmt.Errorf("missing %s", field)
@@ -315,10 +309,10 @@ func validateBindingV1(data map[string]json.RawMessage, loopDir string) error {
 	if _, err := stringSlice(rawReconcile); err != nil {
 		return fmt.Errorf("reconcile: %w", err)
 	}
-	return validateRunnerBindings(data, loopDir)
+	return validateRunnerBindings(fsys, data, loopDir)
 }
 
-func validateBindingV2(data map[string]json.RawMessage, loopDir string) error {
+func validateBindingV2(fsys fs.FS, data map[string]json.RawMessage, loopDir string) error {
 	spec, err := objectField(data, "spec")
 	if err != nil {
 		return err
@@ -360,7 +354,7 @@ func validateBindingV2(data map[string]json.RawMessage, loopDir string) error {
 	if _, err := stringSlice(rawReconcile); err != nil {
 		return fmt.Errorf("spec.reconcile: %w", err)
 	}
-	if err := validateRunnerBindings(spec, loopDir); err != nil {
+	if err := validateRunnerBindings(fsys, spec, loopDir); err != nil {
 		return fmt.Errorf("spec.runner_bindings: %w", err)
 	}
 	return nil
@@ -405,7 +399,7 @@ func loopAssetPaths(assets map[string]json.RawMessage) ([]string, error) {
 	return paths, nil
 }
 
-func loopJobSpecs(data map[string]json.RawMessage, loopDir string) (map[string]JobSpec, error) {
+func loopJobSpecs(fsys fs.FS, data map[string]json.RawMessage, loopDir string) (map[string]JobSpec, error) {
 	raw, ok := data["jobs"]
 	if !ok {
 		return map[string]JobSpec{}, nil
@@ -425,8 +419,8 @@ func loopJobSpecs(data map[string]json.RawMessage, loopDir string) (map[string]J
 			return nil, fmt.Errorf("job %s type must be deterministic or semantic", name)
 		}
 		if spec.Spec != "" {
-			if _, err := os.Stat(filepath.Join(loopDir, spec.Spec)); err != nil {
-				if os.IsNotExist(err) {
+			if _, err := fs.Stat(fsys, path.Join(loopDir, spec.Spec)); err != nil {
+				if errors.Is(err, fs.ErrNotExist) {
 					return nil, fmt.Errorf("job %s references missing spec asset: %s", name, spec.Spec)
 				}
 				return nil, fmt.Errorf("stat job %s spec asset %s: %w", name, spec.Spec, err)
@@ -467,7 +461,7 @@ func loopControllers(data map[string]json.RawMessage) ([]LoopController, error) 
 	return controllers, nil
 }
 
-func validateRunnerBindings(data map[string]json.RawMessage, loopDir string) error {
+func validateRunnerBindings(fsys fs.FS, data map[string]json.RawMessage, loopDir string) error {
 	raw, ok := data["runner_bindings"]
 	if !ok {
 		return nil
@@ -496,8 +490,8 @@ func validateRunnerBindings(data map[string]json.RawMessage, loopDir string) err
 			return fmt.Errorf("runner binding %s mode must be app_server or native_subagent", name)
 		}
 		if binding.PromptFrom != "" {
-			if _, err := os.Stat(filepath.Join(loopDir, binding.PromptFrom)); err != nil {
-				if os.IsNotExist(err) {
+			if _, err := fs.Stat(fsys, path.Join(loopDir, binding.PromptFrom)); err != nil {
+				if errors.Is(err, fs.ErrNotExist) {
 					return fmt.Errorf("runner binding %s references missing prompt asset: %s", name, binding.PromptFrom)
 				}
 				return fmt.Errorf("stat runner binding %s prompt asset %s: %w", name, binding.PromptFrom, err)
@@ -507,13 +501,13 @@ func validateRunnerBindings(data map[string]json.RawMessage, loopDir string) err
 	return nil
 }
 
-func readManifest(path string, target any) error {
-	data, err := os.ReadFile(path)
+func readManifest(fsys fs.FS, name string, target any) error {
+	data, err := fs.ReadFile(fsys, name)
 	if err != nil {
-		return fmt.Errorf("read manifest %s: %w", path, err)
+		return fmt.Errorf("read manifest %s: %w", name, err)
 	}
 	if err := json.Unmarshal(data, target); err != nil {
-		return fmt.Errorf("parse manifest %s: %w", path, err)
+		return fmt.Errorf("parse manifest %s: %w", name, err)
 	}
 	return nil
 }

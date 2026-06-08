@@ -8,23 +8,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
 type CodexOptions struct {
-	DeclarationRoot string
-	ProjectRoot     string
-	Loops           []string
-	HostArgs        []string
-	Stdout          io.Writer
-	Stderr          io.Writer
+	ProjectRoot string
+	Loops       []string
+	HostArgs    []string
+	Stdout      io.Writer
+	Stderr      io.Writer
 }
 
 type codexHostOptions struct {
@@ -83,11 +85,11 @@ func RunCodexProjector(ctx context.Context, action string, opts CodexOptions) er
 		return err
 	}
 	for _, loopName := range loops {
-		loop, err := manifest.LoadLoop(projector.declarationRoot, loopName)
+		loop, err := manifest.LoadLoop(assets.FS, loopName)
 		if err != nil {
 			return err
 		}
-		binding, err := manifest.LoadBinding(projector.declarationRoot, "codex", loopName)
+		binding, err := manifest.LoadBinding(assets.FS, "codex", loopName)
 		if err != nil {
 			return err
 		}
@@ -112,13 +114,7 @@ func RunCodexProjector(ctx context.Context, action string, opts CodexOptions) er
 }
 
 func newCodexProjector(action string, opts CodexOptions) (codexProjector, []string, error) {
-	if opts.DeclarationRoot == "" {
-		opts.DeclarationRoot = "."
-	}
-	declarationRoot, err := filepath.Abs(opts.DeclarationRoot)
-	if err != nil {
-		return codexProjector{}, nil, fmt.Errorf("resolve declaration root: %w", err)
-	}
+	var err error
 	if opts.ProjectRoot == "" {
 		opts.ProjectRoot, err = os.Getwd()
 		if err != nil {
@@ -139,7 +135,7 @@ func newCodexProjector(action string, opts CodexOptions) (codexProjector, []stri
 	if opts.Stderr == nil {
 		opts.Stderr = io.Discard
 	}
-	if _, err := manifest.ValidateHarness(declarationRoot); err != nil {
+	if _, err := manifest.ValidateFS(assets.FS); err != nil {
 		return codexProjector{}, nil, err
 	}
 	loops := append([]string(nil), opts.Loops...)
@@ -150,12 +146,11 @@ func newCodexProjector(action string, opts CodexOptions) (codexProjector, []stri
 
 	return codexProjector{
 		projectorCore: projectorCore{
-			host:            "codex",
-			declarationRoot: declarationRoot,
-			projectRoot:     projectRoot,
-			paths:           codexProjectorPaths(hostOptions),
-			stdout:          opts.Stdout,
-			stderr:          opts.Stderr,
+			host:        "codex",
+			projectRoot: projectRoot,
+			paths:       codexProjectorPaths(hostOptions),
+			stdout:      opts.Stdout,
+			stderr:      opts.Stderr,
 		},
 		hostOptions: hostOptions,
 	}, loops, nil
@@ -269,7 +264,7 @@ func (p codexProjector) installLoop(ctx context.Context, loop manifest.LoopManif
 }
 
 func (p codexProjector) uninstallLoop(loop manifest.LoopManifest) error {
-	binding, err := manifest.LoadBinding(p.declarationRoot, "codex", loop.Name)
+	binding, err := manifest.LoadBinding(assets.FS, "codex", loop.Name)
 	if err != nil {
 		return err
 	}
@@ -402,7 +397,7 @@ func (p codexProjector) projectSkills(loop manifest.LoopManifest, binding manife
 }
 
 func (p codexProjector) projectedSkillContent(loop manifest.LoopManifest, binding manifest.BindingManifest, skill string) ([]byte, error) {
-	content, err := os.ReadFile(p.loopAsset(loop, skill))
+	content, err := fs.ReadFile(assets.FS, p.loopAsset(loop, skill))
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", skill, err)
 	}
@@ -412,8 +407,8 @@ func (p codexProjector) projectedSkillContent(loop manifest.LoopManifest, bindin
 
 func (p codexProjector) projectHooks(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	for phase := range loop.Assets.HookPrompts {
-		source := filepath.Join(p.declarationRoot, "harness", "hosts", "codex", loop.Name, "hooks", phase+".sh")
-		if _, err := os.Stat(source); os.IsNotExist(err) {
+		source := path.Join("hosts", "codex", loop.Name, "hooks", phase+".sh")
+		if _, err := fs.Stat(assets.FS, source); errors.Is(err, fs.ErrNotExist) {
 			continue
 		} else if err != nil {
 			return fmt.Errorf("stat hook %s: %w", phase, err)

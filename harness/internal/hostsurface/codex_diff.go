@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
+	"path"
 	"sort"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
@@ -77,7 +79,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 		{rel: loop.Assets.Env, name: "env.sh", mode: 0o755},
 		{rel: "loop.json", name: "loop.json", mode: 0o644},
 	} {
-		content, err := os.ReadFile(p.loopAsset(loop, asset.rel))
+		content, err := fs.ReadFile(assets.FS, p.loopAsset(loop, asset.rel))
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", asset.rel, err)
 		}
@@ -88,7 +90,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 		})
 	}
 	for _, runtimeFile := range loop.Assets.RuntimeFiles {
-		content, err := os.ReadFile(p.loopAsset(loop, runtimeFile))
+		content, err := fs.ReadFile(assets.FS, p.loopAsset(loop, runtimeFile))
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", runtimeFile, err)
 		}
@@ -99,7 +101,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 			PreserveExisting: loop.Name == "memory",
 		})
 	}
-	guideContent, err := os.ReadFile(p.loopAsset(loop, loop.Assets.Guide))
+	guideContent, err := fs.ReadFile(assets.FS, p.loopAsset(loop, loop.Assets.Guide))
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", loop.Assets.Guide, err)
 	}
@@ -117,7 +119,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 	)
 	if loop.Name == "memory" {
 		for _, runtimeFile := range loop.Assets.RuntimeFiles {
-			content, err := os.ReadFile(p.loopAsset(loop, runtimeFile))
+			content, err := fs.ReadFile(assets.FS, p.loopAsset(loop, runtimeFile))
 			if err != nil {
 				return nil, fmt.Errorf("read %s: %w", runtimeFile, err)
 			}
@@ -148,8 +150,8 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 	}
 	sort.Strings(phases)
 	for _, phase := range phases {
-		source := filepath.Join(p.declarationRoot, "harness", "hosts", "codex", loop.Name, "hooks", phase+".sh")
-		content, err := os.ReadFile(source)
+		source := path.Join("hosts", "codex", loop.Name, "hooks", phase+".sh")
+		content, err := fs.ReadFile(assets.FS, source)
 		if err != nil {
 			return nil, fmt.Errorf("read %s hook: %w", phase, err)
 		}

@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
@@ -23,12 +25,11 @@ type corePaths struct {
 // composition, not a frozen host adapter interface; each concrete projector adds
 // only its host-specific surfaces.
 type projectorCore struct {
-	host            string // "codex" | "claude-code"
-	declarationRoot string
-	projectRoot     string
-	paths           corePaths
-	stdout          io.Writer
-	stderr          io.Writer
+	host        string // "codex" | "claude-code"
+	projectRoot string
+	paths       corePaths
+	stdout      io.Writer
+	stderr      io.Writer
 }
 
 func (c projectorCore) displayJoin(base string, elems ...string) string {
@@ -56,8 +57,10 @@ func (c projectorCore) exists(displayPath string) bool {
 	return err == nil
 }
 
+// copyFile reads src from the embedded asset FS (a forward-slash key like "loops/<loop>/GUIDE.md")
+// and writes it to the on-disk host surface at dstDisplay.
 func (c projectorCore) copyFile(src, dstDisplay string, mode os.FileMode) error {
-	data, err := os.ReadFile(src)
+	data, err := fs.ReadFile(assets.FS, src)
 	if err != nil {
 		return fmt.Errorf("read %s: %w", src, err)
 	}
@@ -108,8 +111,9 @@ func (c projectorCore) hostManifestPath() string {
 	return pathJoin(c.paths.mnemonDir, "hosts", c.host, "manifest.json")
 }
 
+// loopAsset returns the embedded-FS key (forward slashes) for a loop's projected asset.
 func (c projectorCore) loopAsset(loop manifest.LoopManifest, rel string) string {
-	return filepath.Join(c.declarationRoot, "harness", "loops", loop.Name, filepath.FromSlash(rel))
+	return path.Join("loops", loop.Name, rel)
 }
 
 func (c projectorCore) readExportValue(displayPath, key string) (string, bool) {
@@ -165,8 +169,8 @@ func (c projectorCore) removeHostManifestLoop(loopName string) error {
 }
 
 func (c projectorCore) hostHookExists(loopName, phase string) bool {
-	source := filepath.Join(c.declarationRoot, "harness", "hosts", c.host, loopName, "hooks", phase+".sh")
-	_, err := os.Stat(source)
+	source := path.Join("hosts", c.host, loopName, "hooks", phase+".sh")
+	_, err := fs.Stat(assets.FS, source)
 	return err == nil
 }
 

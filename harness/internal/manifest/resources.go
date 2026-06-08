@@ -2,7 +2,8 @@ package manifest
 
 import (
 	"fmt"
-	"path/filepath"
+	"io/fs"
+	"path"
 	"sort"
 )
 
@@ -105,43 +106,39 @@ type RunnerBinding struct {
 	FallbackRunner string `json:"fallback_runner,omitempty"`
 }
 
-func LoadLoop(root, loop string) (LoopManifest, error) {
+func LoadLoop(fsys fs.FS, loop string) (LoopManifest, error) {
 	var manifest LoopManifest
-	path := filepath.Join(cleanRoot(root), "harness", "loops", loop, "loop.json")
-	if err := readManifest(path, &manifest); err != nil {
+	if err := readManifest(fsys, path.Join("loops", loop, "loop.json"), &manifest); err != nil {
 		return LoopManifest{}, err
 	}
 	return manifest, nil
 }
 
-func LoadHost(root, host string) (HostManifest, error) {
+func LoadHost(fsys fs.FS, host string) (HostManifest, error) {
 	var manifest HostManifest
-	path := filepath.Join(cleanRoot(root), "harness", "hosts", host, "host.json")
-	if err := readManifest(path, &manifest); err != nil {
+	if err := readManifest(fsys, path.Join("hosts", host, "host.json"), &manifest); err != nil {
 		return HostManifest{}, err
 	}
 	return manifest, nil
 }
 
-func LoadBinding(root, host, loop string) (BindingManifest, error) {
+func LoadBinding(fsys fs.FS, host, loop string) (BindingManifest, error) {
 	var manifest BindingManifest
-	path := filepath.Join(cleanRoot(root), "harness", "bindings", host+"."+loop+".json")
-	if err := readManifest(path, &manifest); err != nil {
+	if err := readManifest(fsys, path.Join("bindings", host+"."+loop+".json"), &manifest); err != nil {
 		return BindingManifest{}, err
 	}
 	return manifest, nil
 }
 
-func BindingsForHost(root, host string) ([]BindingManifest, error) {
-	bindingsDir := filepath.Join(cleanRoot(root), "harness", "bindings")
-	matches, err := filepath.Glob(filepath.Join(bindingsDir, "*.json"))
+func BindingsForHost(fsys fs.FS, host string) ([]BindingManifest, error) {
+	matches, err := fs.Glob(fsys, "bindings/*.json")
 	if err != nil {
 		return nil, fmt.Errorf("glob binding manifests: %w", err)
 	}
 	var bindings []BindingManifest
 	for _, manifestPath := range matches {
 		var binding BindingManifest
-		if err := readManifest(manifestPath, &binding); err != nil {
+		if err := readManifest(fsys, manifestPath, &binding); err != nil {
 			return nil, err
 		}
 		if binding.Host == host && binding.Loop != "" {
@@ -154,8 +151,8 @@ func BindingsForHost(root, host string) ([]BindingManifest, error) {
 	return bindings, nil
 }
 
-func LoopsForHost(root, host string) ([]string, error) {
-	bindings, err := BindingsForHost(root, host)
+func LoopsForHost(fsys fs.FS, host string) ([]string, error) {
+	bindings, err := BindingsForHost(fsys, host)
 	if err != nil {
 		return nil, err
 	}
@@ -164,11 +161,4 @@ func LoopsForHost(root, host string) ([]string, error) {
 		loops = append(loops, binding.Loop)
 	}
 	return loops, nil
-}
-
-func cleanRoot(root string) string {
-	if root == "" {
-		root = "."
-	}
-	return filepath.Clean(root)
 }
