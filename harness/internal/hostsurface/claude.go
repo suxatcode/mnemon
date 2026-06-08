@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/declaration"
+	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
 type ClaudeOptions struct {
@@ -75,7 +75,7 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 	if opts.Stderr == nil {
 		opts.Stderr = io.Discard
 	}
-	if _, err := declaration.ValidateHarness(declarationRoot); err != nil {
+	if _, err := manifest.ValidateHarness(declarationRoot); err != nil {
 		return err
 	}
 	loops := append([]string(nil), opts.Loops...)
@@ -96,11 +96,11 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 		hostOptions: hostOptions,
 	}
 	for _, loopName := range loops {
-		loop, err := declaration.LoadLoop(declarationRoot, loopName)
+		loop, err := manifest.LoadLoop(declarationRoot, loopName)
 		if err != nil {
 			return err
 		}
-		binding, err := declaration.LoadBinding(declarationRoot, "claude-code", loopName)
+		binding, err := manifest.LoadBinding(declarationRoot, "claude-code", loopName)
 		if err != nil {
 			return err
 		}
@@ -186,7 +186,7 @@ func claudeProjectorPaths(opts claudeHostOptions) corePaths {
 	return corePaths{configDir: filepath.ToSlash(opts.configDir), mnemonDir: filepath.ToSlash(mnemonDir)}
 }
 
-func (p claudeProjector) installLoop(ctx context.Context, loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p claudeProjector) installLoop(ctx context.Context, loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	switch loop.Name {
 	case "memory", "skill":
 	default:
@@ -242,7 +242,7 @@ func (p claudeProjector) installLoop(ctx context.Context, loop declaration.LoopM
 	return nil
 }
 
-func (p claudeProjector) uninstallLoop(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p claudeProjector) uninstallLoop(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	if loop.Name == "memory" || loop.Name == "skill" {
 		if err := p.unpatchSettings(loop.Name); err != nil {
 			return err
@@ -275,7 +275,7 @@ func (p claudeProjector) uninstallLoop(loop declaration.LoopManifest, binding de
 	return nil
 }
 
-func (p claudeProjector) copyCommonCanonicalAssets(loop declaration.LoopManifest) error {
+func (p claudeProjector) copyCommonCanonicalAssets(loop manifest.LoopManifest) error {
 	for _, asset := range []struct {
 		rel  string
 		name string
@@ -292,7 +292,7 @@ func (p claudeProjector) copyCommonCanonicalAssets(loop declaration.LoopManifest
 	return nil
 }
 
-func (p claudeProjector) prepareLoopState(loop declaration.LoopManifest) error {
+func (p claudeProjector) prepareLoopState(loop manifest.LoopManifest) error {
 	switch loop.Name {
 	case "memory":
 		for _, runtimeFile := range loop.Assets.RuntimeFiles {
@@ -310,7 +310,7 @@ func (p claudeProjector) prepareLoopState(loop declaration.LoopManifest) error {
 	return nil
 }
 
-func (p claudeProjector) writeRuntimeEnv(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p claudeProjector) writeRuntimeEnv(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	stateDir := p.stateDir(loop.Name)
 	lines := []string{
 		"#!/usr/bin/env bash",
@@ -338,7 +338,7 @@ func (p claudeProjector) writeRuntimeEnv(loop declaration.LoopManifest, binding 
 	return p.writeFile(pathJoin(binding.RuntimeSurface, "env.sh"), []byte(content), 0o755)
 }
 
-func (p claudeProjector) projectSkills(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p claudeProjector) projectSkills(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	hostSkillsDir := p.hostSkillsDir(loop.Name)
 	for _, skill := range loop.Assets.Skills {
 		content, err := os.ReadFile(p.loopAsset(loop, skill))
@@ -353,7 +353,7 @@ func (p claudeProjector) projectSkills(loop declaration.LoopManifest, binding de
 	return nil
 }
 
-func (p claudeProjector) projectAgents(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p claudeProjector) projectAgents(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	for _, subagent := range loop.Assets.Subagents {
 		target := pathJoin(binding.ProjectionPath, "agents", agentFile(loop.Name, subagent))
 		if err := p.copyFile(p.loopAsset(loop, subagent), target, 0o644); err != nil {
@@ -363,7 +363,7 @@ func (p claudeProjector) projectAgents(loop declaration.LoopManifest, binding de
 	return nil
 }
 
-func (p claudeProjector) projectHooks(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p claudeProjector) projectHooks(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	for phase := range loop.Assets.HookPrompts {
 		source := filepath.Join(p.declarationRoot, "harness", "hosts", "claude-code", loop.Name, "hooks", phase+".sh")
 		if _, err := os.Stat(source); os.IsNotExist(err) {
@@ -430,7 +430,7 @@ func (p claudeProjector) ensureStore(ctx context.Context, storeName string) erro
 	return nil
 }
 
-func (p claudeProjector) writeLoopStatus(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p claudeProjector) writeLoopStatus(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	status := map[string]any{
 		"schema_version":  2,
 		"loop":            loop.Name,
@@ -447,7 +447,7 @@ func (p claudeProjector) writeLoopStatus(loop declaration.LoopManifest, binding 
 	return p.writeJSON(pathJoin(p.stateDir(loop.Name), "status.json"), status, 0o644)
 }
 
-func (p claudeProjector) writeHostManifest(loop declaration.LoopManifest, binding declaration.BindingManifest, ownership projectionOwnership) error {
+func (p claudeProjector) writeHostManifest(loop manifest.LoopManifest, binding manifest.BindingManifest, ownership projectionOwnership) error {
 	manifestPath := p.resolve(p.hostManifestPath())
 	manifest := hostProjectionManifest{
 		SchemaVersion: 2,
@@ -500,7 +500,7 @@ func (p claudeProjector) writeHostManifest(loop declaration.LoopManifest, bindin
 	return p.writeJSON(p.hostManifestPath(), manifest, 0o644)
 }
 
-func (p claudeProjector) removeCanonicalState(loop declaration.LoopManifest) error {
+func (p claudeProjector) removeCanonicalState(loop manifest.LoopManifest) error {
 	stateDir := p.stateDir(loop.Name)
 	switch loop.Name {
 	case "memory":
@@ -523,7 +523,7 @@ func (p claudeProjector) removeCanonicalState(loop declaration.LoopManifest) err
 	return nil
 }
 
-func (p claudeProjector) loopOwnership(loop declaration.LoopManifest, binding declaration.BindingManifest) projectionOwnership {
+func (p claudeProjector) loopOwnership(loop manifest.LoopManifest, binding manifest.BindingManifest) projectionOwnership {
 	files := []string{
 		pathJoin(p.stateDir(loop.Name), "GUIDE.md"),
 		pathJoin(p.stateDir(loop.Name), "env.sh"),
@@ -560,7 +560,7 @@ func (p claudeProjector) loopOwnership(loop declaration.LoopManifest, binding de
 	}
 }
 
-func (p claudeProjector) installedHostSkillsDir(loopName string, binding declaration.BindingManifest) string {
+func (p claudeProjector) installedHostSkillsDir(loopName string, binding manifest.BindingManifest) string {
 	envPath := pathJoin(binding.RuntimeSurface, "env.sh")
 	envVar := "MNEMON_" + strings.ToUpper(strings.ReplaceAll(loopName, "-", "_")) + "_LOOP_HOST_SKILLS_DIR"
 	if value, ok := p.readExportValue(envPath, envVar); ok {

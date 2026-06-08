@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/declaration"
 	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
+	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
 // LoopValidate validates the harness loop/host/binding declarations under the
 // facade root and returns the human-readable report lines.
 func (h *Harness) LoopValidate() ([]string, error) {
-	result, err := declaration.ValidateHarness(h.root)
+	result, err := manifest.ValidateHarness(h.root)
 	if err != nil {
 		return nil, err
 	}

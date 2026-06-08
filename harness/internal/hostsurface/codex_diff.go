@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/declaration"
+	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
 type codexDesiredFile struct {
@@ -28,7 +28,7 @@ type DriftItem struct {
 	DryRun bool   `json:"dry_run,omitempty"`
 }
 
-func (p codexProjector) diffLoop(loop declaration.LoopManifest, binding declaration.BindingManifest, dryRun bool) (bool, error) {
+func (p codexProjector) diffLoop(loop manifest.LoopManifest, binding manifest.BindingManifest, dryRun bool) (bool, error) {
 	items, err := p.driftItems(loop, binding, dryRun)
 	if err != nil {
 		return false, err
@@ -47,7 +47,7 @@ func (p codexProjector) diffLoop(loop declaration.LoopManifest, binding declarat
 	return len(items) > 0, nil
 }
 
-func (p codexProjector) driftItems(loop declaration.LoopManifest, binding declaration.BindingManifest, dryRun bool) ([]DriftItem, error) {
+func (p codexProjector) driftItems(loop manifest.LoopManifest, binding manifest.BindingManifest, dryRun bool) ([]DriftItem, error) {
 	files, err := p.desiredLoopFiles(loop, binding)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (p codexProjector) driftItems(loop declaration.LoopManifest, binding declar
 	return items, nil
 }
 
-func (p codexProjector) desiredLoopFiles(loop declaration.LoopManifest, binding declaration.BindingManifest) ([]codexDesiredFile, error) {
+func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding manifest.BindingManifest) ([]codexDesiredFile, error) {
 	var files []codexDesiredFile
 	for _, asset := range []struct {
 		rel  string

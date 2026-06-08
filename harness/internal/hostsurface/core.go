@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/declaration"
+	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
 // corePaths is the host config dir + the project-local mnemon state dir.
@@ -108,7 +108,7 @@ func (c projectorCore) hostManifestPath() string {
 	return pathJoin(c.paths.mnemonDir, "hosts", c.host, "manifest.json")
 }
 
-func (c projectorCore) loopAsset(loop declaration.LoopManifest, rel string) string {
+func (c projectorCore) loopAsset(loop manifest.LoopManifest, rel string) string {
 	return filepath.Join(c.declarationRoot, "harness", "loops", loop.Name, filepath.FromSlash(rel))
 }
 

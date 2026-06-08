@@ -1,4 +1,4 @@
-package declaration
+package manifest
 
 import (
 	"fmt"

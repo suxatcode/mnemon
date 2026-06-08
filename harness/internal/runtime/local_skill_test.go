@@ -83,7 +83,7 @@ func TestLocalSkillLifecycleChangesAppendDeclarations(t *testing.T) {
 		status     string
 		content    string
 	}{
-		{"skill-release-active", "active", "Initial active declaration."},
+		{"skill-release-active", "active", "Initial active manifest."},
 		{"skill-release-stale", "stale", "Approved lifecycle change to stale."},
 	} {
 		if _, err := client.IngestObserve("codex@project", contract.ObservationEnvelope{

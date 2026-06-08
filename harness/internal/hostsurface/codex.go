@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/declaration"
+	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
 type CodexOptions struct {
@@ -83,11 +83,11 @@ func RunCodexProjector(ctx context.Context, action string, opts CodexOptions) er
 		return err
 	}
 	for _, loopName := range loops {
-		loop, err := declaration.LoadLoop(projector.declarationRoot, loopName)
+		loop, err := manifest.LoadLoop(projector.declarationRoot, loopName)
 		if err != nil {
 			return err
 		}
-		binding, err := declaration.LoadBinding(projector.declarationRoot, "codex", loopName)
+		binding, err := manifest.LoadBinding(projector.declarationRoot, "codex", loopName)
 		if err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func newCodexProjector(action string, opts CodexOptions) (codexProjector, []stri
 	if opts.Stderr == nil {
 		opts.Stderr = io.Discard
 	}
-	if _, err := declaration.ValidateHarness(declarationRoot); err != nil {
+	if _, err := manifest.ValidateHarness(declarationRoot); err != nil {
 		return codexProjector{}, nil, err
 	}
 	loops := append([]string(nil), opts.Loops...)
@@ -217,7 +217,7 @@ func codexProjectorPaths(opts codexHostOptions) corePaths {
 	return corePaths{configDir: filepath.ToSlash(opts.configDir), mnemonDir: filepath.ToSlash(mnemonDir)}
 }
 
-func (p codexProjector) installLoop(ctx context.Context, loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p codexProjector) installLoop(ctx context.Context, loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	if loop.Name != "memory" && loop.Name != "skill" {
 		return fmt.Errorf("unsupported loop for Codex: %s", loop.Name)
 	}
@@ -268,8 +268,8 @@ func (p codexProjector) installLoop(ctx context.Context, loop declaration.LoopMa
 	return nil
 }
 
-func (p codexProjector) uninstallLoop(loop declaration.LoopManifest) error {
-	binding, err := declaration.LoadBinding(p.declarationRoot, "codex", loop.Name)
+func (p codexProjector) uninstallLoop(loop manifest.LoopManifest) error {
+	binding, err := manifest.LoadBinding(p.declarationRoot, "codex", loop.Name)
 	if err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func (p codexProjector) uninstallLoop(loop declaration.LoopManifest) error {
 	return nil
 }
 
-func (p codexProjector) copyCommonCanonicalAssets(loop declaration.LoopManifest) error {
+func (p codexProjector) copyCommonCanonicalAssets(loop manifest.LoopManifest) error {
 	for _, asset := range []struct {
 		rel  string
 		name string
@@ -322,7 +322,7 @@ func (p codexProjector) copyCommonCanonicalAssets(loop declaration.LoopManifest)
 	return nil
 }
 
-func (p codexProjector) prepareLoopState(loop declaration.LoopManifest) error {
+func (p codexProjector) prepareLoopState(loop manifest.LoopManifest) error {
 	switch loop.Name {
 	case "memory":
 		for _, runtimeFile := range loop.Assets.RuntimeFiles {
@@ -340,11 +340,11 @@ func (p codexProjector) prepareLoopState(loop declaration.LoopManifest) error {
 	return nil
 }
 
-func (p codexProjector) writeRuntimeEnv(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p codexProjector) writeRuntimeEnv(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	return p.writeFile(p.displayJoin(binding.RuntimeSurface, "env.sh"), p.runtimeEnvContent(loop, binding), 0o755)
 }
 
-func (p codexProjector) projectRuntimeMirrors(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p codexProjector) projectRuntimeMirrors(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	if loop.Name != "memory" {
 		return nil
 	}
@@ -356,7 +356,7 @@ func (p codexProjector) projectRuntimeMirrors(loop declaration.LoopManifest, bin
 	return nil
 }
 
-func (p codexProjector) runtimeEnvContent(loop declaration.LoopManifest, binding declaration.BindingManifest) []byte {
+func (p codexProjector) runtimeEnvContent(loop manifest.LoopManifest, binding manifest.BindingManifest) []byte {
 	envName := loopEnvName(loop.Name)
 	loopDirVar := loopDirVarName(loop.Name)
 	stateDir := p.stateDir(loop.Name)
@@ -386,7 +386,7 @@ func (p codexProjector) runtimeEnvContent(loop declaration.LoopManifest, binding
 	return []byte(content)
 }
 
-func (p codexProjector) projectSkills(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p codexProjector) projectSkills(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	hostSkillsDir := p.hostSkillsDir(loop.Name)
 	for _, skill := range loop.Assets.Skills {
 		target := p.displayJoin(hostSkillsDir, skillID(skill), "SKILL.md")
@@ -401,7 +401,7 @@ func (p codexProjector) projectSkills(loop declaration.LoopManifest, binding dec
 	return nil
 }
 
-func (p codexProjector) projectedSkillContent(loop declaration.LoopManifest, binding declaration.BindingManifest, skill string) ([]byte, error) {
+func (p codexProjector) projectedSkillContent(loop manifest.LoopManifest, binding manifest.BindingManifest, skill string) ([]byte, error) {
 	content, err := os.ReadFile(p.loopAsset(loop, skill))
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", skill, err)
@@ -410,7 +410,7 @@ func (p codexProjector) projectedSkillContent(loop declaration.LoopManifest, bin
 	return append(content, []byte(note)...), nil
 }
 
-func (p codexProjector) projectHooks(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p codexProjector) projectHooks(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	for phase := range loop.Assets.HookPrompts {
 		source := filepath.Join(p.declarationRoot, "harness", "hosts", "codex", loop.Name, "hooks", phase+".sh")
 		if _, err := os.Stat(source); os.IsNotExist(err) {
@@ -492,7 +492,7 @@ func storeListContains(output []byte, storeName string) bool {
 	return false
 }
 
-func (p codexProjector) writeLoopStatus(loop declaration.LoopManifest, binding declaration.BindingManifest) error {
+func (p codexProjector) writeLoopStatus(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	status := map[string]any{
 		"schema_version":  2,
 		"loop":            loop.Name,
@@ -509,7 +509,7 @@ func (p codexProjector) writeLoopStatus(loop declaration.LoopManifest, binding d
 	return p.writeJSON(p.displayJoin(p.stateDir(loop.Name), "status.json"), status, 0o644)
 }
 
-func (p codexProjector) writeHostManifest(loop declaration.LoopManifest, binding declaration.BindingManifest, ownership projectionOwnership) error {
+func (p codexProjector) writeHostManifest(loop manifest.LoopManifest, binding manifest.BindingManifest, ownership projectionOwnership) error {
 	manifestPath := p.resolve(p.hostManifestPath())
 	manifest := hostProjectionManifest{
 		SchemaVersion: 2,
@@ -569,7 +569,7 @@ func (p codexProjector) writeHostManifest(loop declaration.LoopManifest, binding
 	return p.writeJSON(p.hostManifestPath(), manifest, 0o644)
 }
 
-func (p codexProjector) removeCanonicalState(loop declaration.LoopManifest) error {
+func (p codexProjector) removeCanonicalState(loop manifest.LoopManifest) error {
 	stateDir := p.stateDir(loop.Name)
 	switch loop.Name {
 	case "memory":
@@ -594,7 +594,7 @@ func (p codexProjector) removeCanonicalState(loop declaration.LoopManifest) erro
 	return nil
 }
 
-func (p codexProjector) installedHostSkillsDir(loopName string, binding declaration.BindingManifest) string {
+func (p codexProjector) installedHostSkillsDir(loopName string, binding manifest.BindingManifest) string {
 	envPath := p.displayJoin(binding.RuntimeSurface, "env.sh")
 	envVar := "MNEMON_" + strings.ToUpper(strings.ReplaceAll(loopName, "-", "_")) + "_LOOP_HOST_SKILLS_DIR"
 	if value, ok := p.readExportValue(envPath, envVar); ok {
@@ -629,7 +629,7 @@ func (p codexProjector) removeGeneratedSkillViews(hostSkillsDir string) error {
 	return nil
 }
 
-func (p codexProjector) loopOwnership(loop declaration.LoopManifest, binding declaration.BindingManifest) projectionOwnership {
+func (p codexProjector) loopOwnership(loop manifest.LoopManifest, binding manifest.BindingManifest) projectionOwnership {
 	files := []string{
 		p.displayJoin(p.stateDir(loop.Name), "GUIDE.md"),
 		p.displayJoin(p.stateDir(loop.Name), "env.sh"),
