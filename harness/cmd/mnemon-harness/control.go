@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 	"github.com/spf13/cobra"
@@ -13,7 +14,7 @@ import (
 
 // The control verbs are the host/control agent's view of the channel (D6): observe pushes an
 // observation IN, pull reads the scoped projection OUT, status checks reachability. They reach
-// the engine ONLY through server.ServerAPI (the channel client), never kernel/reconcile — the
+// the engine ONLY through channel.ServerAPI (the channel client), never kernel/reconcile — the
 // same channel a HostAgent and a ControlAgent both speak, differing only by binding/credential.
 
 var (
@@ -33,7 +34,7 @@ var (
 // controlClient builds the channel client from the resolved credential: a bearer token (from
 // --token or, preferring it, --token-file so projected hooks keep the token out of prompt-visible
 // command lines), else the trusted principal header.
-func controlClient() (*server.Client, error) {
+func controlClient() (*channel.Client, error) {
 	token := controlToken
 	if controlTokenFile != "" {
 		data, err := os.ReadFile(controlTokenFile)
@@ -43,9 +44,9 @@ func controlClient() (*server.Client, error) {
 		token = strings.TrimSpace(string(data))
 	}
 	if token != "" {
-		return server.NewClientWithToken(controlAddr, token), nil
+		return channel.NewClientWithToken(controlAddr, token), nil
 	}
-	return server.NewClient(controlAddr, contract.ActorID(controlPrincipal)), nil
+	return channel.NewClient(controlAddr, contract.ActorID(controlPrincipal)), nil
 }
 
 var controlCmd = &cobra.Command{

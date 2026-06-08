@@ -10,16 +10,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
 func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 	ref := contract.ResourceRef{Kind: "memory", ID: "project"}
-	host := HostAgentBinding("codex@project", "http://localhost:8787", []contract.ResourceRef{ref})
-	replica := ReplicaAgentBinding("replica@project", "http://localhost:8787", []contract.ResourceRef{ref})
+	host := channel.HostAgentBinding("codex@project", "http://localhost:8787", []contract.ResourceRef{ref})
+	replica := channel.ReplicaAgentBinding("replica@project", "http://localhost:8787", []contract.ResourceRef{ref})
 	rt, err := OpenRuntime(filepath.Join(t.TempDir(), "remote.db"), RuntimeConfig{
-		Bindings: []ChannelBinding{host, replica},
-		Subs:     SubsFromBindings([]ChannelBinding{host, replica}),
+		Bindings: []channel.ChannelBinding{host, replica},
+		Subs:     channel.SubsFromBindings([]channel.ChannelBinding{host, replica}),
 	})
 	if err != nil {
 		t.Fatalf("open remote runtime: %v", err)
@@ -32,7 +33,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 	defer srv.Close()
 
 	commit := syncAPITestCommit("local-a", "dec-1", ref, map[string]any{"content": "remote accepted memory"})
-	replicaClient := NewClientWithToken(srv.URL, "replica-token")
+	replicaClient := channel.NewClientWithToken(srv.URL, "replica-token")
 	first, err := replicaClient.SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "batch-1",
@@ -78,7 +79,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 		t.Fatalf("forged request replica_id must be rejected instead of trusted")
 	}
 
-	hostClient := NewClientWithToken(srv.URL, "host-token")
+	hostClient := channel.NewClientWithToken(srv.URL, "host-token")
 	if _, err := hostClient.SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "host-batch",
@@ -103,10 +104,10 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 
 func TestRemoteSyncPushRejectsBadCommitsWithDiagnostics(t *testing.T) {
 	ref := contract.ResourceRef{Kind: "memory", ID: "project"}
-	replica := ReplicaAgentBinding("replica@project", "http://localhost:8787", []contract.ResourceRef{ref})
+	replica := channel.ReplicaAgentBinding("replica@project", "http://localhost:8787", []contract.ResourceRef{ref})
 	rt, err := OpenRuntime(filepath.Join(t.TempDir(), "remote.db"), RuntimeConfig{
-		Bindings: []ChannelBinding{replica},
-		Subs:     SubsFromBindings([]ChannelBinding{replica}),
+		Bindings: []channel.ChannelBinding{replica},
+		Subs:     channel.SubsFromBindings([]channel.ChannelBinding{replica}),
 	})
 	if err != nil {
 		t.Fatalf("open remote runtime: %v", err)
@@ -117,7 +118,7 @@ func TestRemoteSyncPushRejectsBadCommitsWithDiagnostics(t *testing.T) {
 
 	bad := syncAPITestCommit("local-a", "dec-bad", ref, map[string]any{"content": "bad digest"})
 	bad.FieldsDigest = "wrong"
-	resp, err := NewClientWithToken(srv.URL, "replica-token").SyncPush(contract.SyncPushRequest{
+	resp, err := channel.NewClientWithToken(srv.URL, "replica-token").SyncPush(contract.SyncPushRequest{
 		ReplicaID: "local-a",
 		BatchID:   "batch-bad",
 		Commits:   []contract.LocalCommit{bad},
@@ -132,7 +133,7 @@ func TestRemoteSyncPushRejectsBadCommitsWithDiagnostics(t *testing.T) {
 
 func newTokenRuntimeServer(t *testing.T, rt *Runtime, tokens map[string]contract.ActorID) *httptest.Server {
 	t.Helper()
-	return httptest.NewServer(NewRuntimeHandler(rt, TokenAuthenticator{Tokens: tokens}))
+	return httptest.NewServer(NewRuntimeHandler(rt, channel.TokenAuthenticator{Tokens: tokens}))
 }
 
 func syncAPITestCommit(replicaID, decisionID string, ref contract.ResourceRef, fields map[string]any) contract.LocalCommit {

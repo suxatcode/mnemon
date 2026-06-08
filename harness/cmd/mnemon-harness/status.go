@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/app"
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 	"github.com/spf13/cobra"
@@ -75,15 +76,15 @@ func localServiceStatus(projectRoot string, cfg localConfig, principal string) (
 	}
 	bindingFile := cfg.BindingFile
 	if bindingFile == "" {
-		bindingFile = server.DefaultBindingFile
+		bindingFile = channel.DefaultBindingFile
 	}
-	loaded, err := server.LoadBindingFile(projectRoot, resolveProjectPath(projectRoot, bindingFile))
+	loaded, err := channel.LoadBindingFile(projectRoot, resolveProjectPath(projectRoot, bindingFile))
 	if err != nil {
 		return contract.ChannelStatus{}, false
 	}
-	client := server.NewClient(cfg.Endpoint, contract.ActorID(principal))
+	client := channel.NewClient(cfg.Endpoint, contract.ActorID(principal))
 	if tok := tokenForPrincipal(loaded.Tokens, contract.ActorID(principal)); tok != "" {
-		client = server.NewClientWithToken(cfg.Endpoint, tok)
+		client = channel.NewClientWithToken(cfg.Endpoint, tok)
 	}
 	st, err := client.Status(contract.ActorID(principal))
 	if err != nil {

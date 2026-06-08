@@ -8,11 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
 func (r *Runtime) SyncPush(principal contract.ActorID, req contract.SyncPushRequest) (contract.SyncPushResponse, error) {
-	if _, err := r.requireSyncBinding(principal, VerbSyncPush); err != nil {
+	if _, err := r.requireSyncBinding(principal, channel.VerbSyncPush); err != nil {
 		return contract.SyncPushResponse{}, err
 	}
 	replicaID := strings.TrimSpace(req.ReplicaID)
@@ -46,7 +47,7 @@ func (r *Runtime) SyncPush(principal contract.ActorID, req contract.SyncPushRequ
 }
 
 func (r *Runtime) SyncPull(principal contract.ActorID, req contract.SyncPullRequest) (contract.SyncPullResponse, error) {
-	b, err := r.requireSyncBinding(principal, VerbSyncPull)
+	b, err := r.requireSyncBinding(principal, channel.VerbSyncPull)
 	if err != nil {
 		return contract.SyncPullResponse{}, err
 	}
@@ -77,25 +78,25 @@ func (r *Runtime) SyncPull(principal contract.ActorID, req contract.SyncPullRequ
 }
 
 func (r *Runtime) SyncStatus(principal contract.ActorID) (contract.SyncStatusResponse, error) {
-	if _, err := r.requireSyncBinding(principal, VerbSyncStatus); err != nil {
+	if _, err := r.requireSyncBinding(principal, channel.VerbSyncStatus); err != nil {
 		return contract.SyncStatusResponse{}, err
 	}
 	return contract.SyncStatusResponse{Principal: principal, RemoteWorkspace: "connected"}, nil
 }
 
-func (r *Runtime) requireSyncBinding(principal contract.ActorID, verb Verb) (ChannelBinding, error) {
+func (r *Runtime) requireSyncBinding(principal contract.ActorID, verb channel.Verb) (channel.ChannelBinding, error) {
 	if r.bindings == nil {
-		return ChannelBinding{}, fmt.Errorf("sync requires a replica-agent binding")
+		return channel.ChannelBinding{}, fmt.Errorf("sync requires a replica-agent binding")
 	}
 	b, ok := r.bindings.Binding(principal)
 	if !ok {
-		return ChannelBinding{}, fmt.Errorf("no channel binding for principal %q", principal)
+		return channel.ChannelBinding{}, fmt.Errorf("no channel binding for principal %q", principal)
 	}
 	if b.ActorKind != contract.KindReplicaAgent {
-		return ChannelBinding{}, fmt.Errorf("principal %q is not a replica-agent", principal)
+		return channel.ChannelBinding{}, fmt.Errorf("principal %q is not a replica-agent", principal)
 	}
 	if !b.Allows(verb) {
-		return ChannelBinding{}, fmt.Errorf("principal %q is not bound to %s", principal, verb)
+		return channel.ChannelBinding{}, fmt.Errorf("principal %q is not bound to %s", principal, verb)
 	}
 	return b, nil
 }
@@ -131,7 +132,7 @@ func syncResult(commit contract.LocalCommit, status, diagnostic string) contract
 	}
 }
 
-func clampSyncScopes(binding ChannelBinding, requested []contract.ResourceRef) ([]contract.ResourceRef, error) {
+func clampSyncScopes(binding channel.ChannelBinding, requested []contract.ResourceRef) ([]contract.ResourceRef, error) {
 	if len(requested) == 0 {
 		return append([]contract.ResourceRef(nil), binding.SubscriptionScope...), nil
 	}

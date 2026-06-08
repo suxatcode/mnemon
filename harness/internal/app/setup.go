@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 )
@@ -132,7 +133,7 @@ func (h *Harness) Setup(ctx context.Context, out, errw io.Writer, opts SetupOpti
 		}
 		res.Changes = append(res.Changes, "wrote bearer token file "+tokenFile)
 	}
-	if err := server.UpsertBinding(bindingFile, binding, tokenRel); err != nil {
+	if err := channel.UpsertBinding(bindingFile, binding, tokenRel); err != nil {
 		return res, fmt.Errorf("setup: upsert binding: %w", err)
 	}
 	res.Changes = append(res.Changes, "upserted channel binding for "+opts.Principal+" in "+bindingFile)
@@ -195,7 +196,7 @@ func displayHost(host string) string {
 	}
 }
 
-func (h *Harness) channelBinding(opts SetupOptions) server.ChannelBinding {
+func (h *Harness) channelBinding(opts SetupOptions) channel.ChannelBinding {
 	kind := contract.KindHostAgent
 	if opts.ActorKind == string(contract.KindControlAgent) {
 		kind = contract.KindControlAgent
@@ -206,12 +207,12 @@ func (h *Harness) channelBinding(opts SetupOptions) server.ChannelBinding {
 		observed = append(observed, loop+".write_candidate_observed")
 		scope = append(scope, contract.ResourceRef{Kind: contract.ResourceKind(loop), ID: "project"})
 	}
-	return server.ChannelBinding{
+	return channel.ChannelBinding{
 		Principal:            contract.ActorID(opts.Principal),
 		ActorKind:            kind,
-		Transport:            server.TransportHTTP,
+		Transport:            channel.TransportHTTP,
 		Endpoint:             opts.ControlURL,
-		AllowedVerbs:         []server.Verb{server.VerbObserve, server.VerbPull, server.VerbStatus},
+		AllowedVerbs:         []channel.Verb{channel.VerbObserve, channel.VerbPull, channel.VerbStatus},
 		AllowedObservedTypes: observed,
 		SubscriptionScope:    scope,
 		IdempotencyNamespace: "host:" + opts.Principal,
@@ -278,7 +279,7 @@ func (h *Harness) SetupStatus(projectRoot, principal string) ([]string, error) {
 		projectRoot = h.root
 	}
 	bindingFile := filepath.Join(channelBase(projectRoot), "bindings.json")
-	loaded, err := server.LoadBindingFile(projectRoot, bindingFile)
+	loaded, err := channel.LoadBindingFile(projectRoot, bindingFile)
 	if err != nil {
 		return []string{
 			"Agent Integration: not installed",
@@ -319,7 +320,7 @@ func (h *Harness) SetupUninstall(ctx context.Context, out, errw io.Writer, opts 
 	}
 	base := channelBase(projectRoot)
 	if opts.Principal != "" {
-		removed, err := server.RemoveBinding(filepath.Join(base, "bindings.json"), contract.ActorID(opts.Principal))
+		removed, err := channel.RemoveBinding(filepath.Join(base, "bindings.json"), contract.ActorID(opts.Principal))
 		if err != nil {
 			return fmt.Errorf("setup uninstall: remove binding: %w", err)
 		}

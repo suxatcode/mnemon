@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 )
@@ -85,7 +86,7 @@ func TestProductStatusUsesReachableLocalMnemon(t *testing.T) {
 		t.Fatalf("tick local runtime: %v", err)
 	}
 
-	srv := httptest.NewServer(server.NewRuntimeHandler(rt, server.TokenAuthenticator{Tokens: boot.Loaded.Tokens}))
+	srv := httptest.NewServer(server.NewRuntimeHandler(rt, channel.TokenAuthenticator{Tokens: boot.Loaded.Tokens}))
 	defer srv.Close()
 	cfg := boot.Config
 	cfg.Endpoint = srv.URL

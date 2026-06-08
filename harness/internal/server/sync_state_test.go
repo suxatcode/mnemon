@@ -6,20 +6,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
 func TestAcceptedLocalMemoryCreatesPendingSyncCommit(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "governed.db")
 	ref := contract.ResourceRef{Kind: "memory", ID: "project"}
-	binding := HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
+	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
 	binding.AllowedObservedTypes = []string{MemoryWriteCandidateObserved}
-	rt, err := OpenLocalRuntime(storePath, LoadedBindings{Bindings: []ChannelBinding{binding}})
+	rt, err := OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}})
 	if err != nil {
 		t.Fatalf("open local runtime: %v", err)
 	}
-	srv := httptest.NewServer(NewRuntimeHandler(rt, HeaderAuthenticator{}))
-	client := NewClient(srv.URL, "codex@project")
+	srv := httptest.NewServer(NewRuntimeHandler(rt, channel.HeaderAuthenticator{}))
+	client := channel.NewClient(srv.URL, "codex@project")
 	if rec, err := client.IngestObserve("codex@project", contract.ObservationEnvelope{
 		ExternalID: "sync-memory-1",
 		Event: contract.Event{Type: MemoryWriteCandidateObserved, Payload: map[string]any{
@@ -66,7 +67,7 @@ func TestAcceptedLocalMemoryCreatesPendingSyncCommit(t *testing.T) {
 	if err := rt.Close(); err != nil {
 		t.Fatalf("close runtime: %v", err)
 	}
-	rt2, err := OpenLocalRuntime(storePath, LoadedBindings{Bindings: []ChannelBinding{binding}})
+	rt2, err := OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}})
 	if err != nil {
 		t.Fatalf("reopen local runtime: %v", err)
 	}

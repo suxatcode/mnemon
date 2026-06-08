@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
 // NewRuntimeHandler is the Local Mnemon HTTP channel endpoint over a Runtime.
-// It differs from the api-only NewHTTPHandler in two ways the Runtime makes possible:
+// It differs from the api-only channel.NewHTTPHandler in two ways the Runtime makes possible:
 //
 //   - P2.2 synchronous local mode: after a successful NEW observation, /ingest drives ONE Tick on the
 //     runtime's single driver, so a lone observe closes the governed loop. The Tick is serialized by
@@ -18,7 +19,7 @@ import (
 //   - P2.3 /status: channel evidence (principal, digest, binding actor kind, store ref, mode).
 //
 // Auth resolves the principal; the request body never names identity (D7/S9).
-func NewRuntimeHandler(rt *Runtime, auth Authenticator) http.Handler {
+func NewRuntimeHandler(rt *Runtime, auth channel.Authenticator) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ingest", func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.Authenticate(r)
@@ -36,7 +37,7 @@ func NewRuntimeHandler(rt *Runtime, auth Authenticator) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		rec := IngestReceipt{Seq: seq, Dup: dup}
+		rec := channel.IngestReceipt{Seq: seq, Dup: dup}
 		// Synchronous local mode: a NEW observation is processed by one Tick now. A duplicate was
 		// already processed on its first ingest, so it is not re-ticked.
 		if !dup {

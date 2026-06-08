@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 )
 
 // DiscoverProjectStore resolves the canonical control-store path for the project that contains the
@@ -49,9 +51,9 @@ func DiscoverProjectRoot() string {
 const DefaultStorePath = ".mnemon/harness/local/governed.db"
 
 // RunHTTPServer boots a ControlServer over a persistent kernel store and serves the channel
-// (ServerAPI: observe via Ingest, pull via PullProjection) over httpapi on addr until ctx is
+// (channel.ServerAPI: observe via Ingest, pull via PullProjection) over httpapi on addr until ctx is
 // cancelled. The kernel store + kernel are constructed inside the server
-// package so command surfaces use this factory + ServerAPI rather than importing
+// package so command surfaces use this factory + channel.ServerAPI rather than importing
 // kernel/reconcile directly.
 //
 // The server boots the one server-owned Runtime over the store (service mode, S11 single-writer) with
@@ -64,33 +66,33 @@ func RunHTTPServer(ctx context.Context, addr, storePath string, out io.Writer) e
 		return err
 	}
 	defer rt.Close()
-	return serveRuntime(ctx, addr, rt, HeaderAuthenticator{}, out)
+	return serveRuntime(ctx, addr, rt, channel.HeaderAuthenticator{}, out)
 }
 
 // RunHTTPServerWithBindings boots the server from a loaded channel-binding manifest (P3.2): the
-// runtime enforces the bindings (BindingSet authorizer) and serves only the subscription scopes the
-// bindings declare, and — when the bindings carry credential refs — a TokenAuthenticator resolves the
+// runtime enforces the bindings (channel.BindingSet authorizer) and serves only the subscription scopes the
+// bindings declare, and — when the bindings carry credential refs — a channel.TokenAuthenticator resolves the
 // principal from the bearer token (trusted-header auth remains the local/dev/httptest default when no
 // tokens are configured). The store path is still the canonical project store.
-func RunHTTPServerWithBindings(ctx context.Context, addr, storePath string, loaded LoadedBindings, out io.Writer) error {
+func RunHTTPServerWithBindings(ctx context.Context, addr, storePath string, loaded channel.LoadedBindings, out io.Writer) error {
 	rt, err := OpenRuntime(storePath, RuntimeConfig{
 		Bindings: loaded.Bindings,
-		Subs:     SubsFromBindings(loaded.Bindings),
+		Subs:     channel.SubsFromBindings(loaded.Bindings),
 	})
 	if err != nil {
 		return err
 	}
 	defer rt.Close()
-	var auth Authenticator = HeaderAuthenticator{}
+	var auth channel.Authenticator = channel.HeaderAuthenticator{}
 	if len(loaded.Tokens) > 0 {
-		auth = TokenAuthenticator{Tokens: loaded.Tokens}
+		auth = channel.TokenAuthenticator{Tokens: loaded.Tokens}
 	}
 	return serveRuntime(ctx, addr, rt, auth, out)
 }
 
 // serveRuntime serves the runtime's channel over httpapi until ctx is cancelled. It is the shared
 // boot loop for the bare and binding-configured server front doors.
-func serveRuntime(ctx context.Context, addr string, rt *Runtime, auth Authenticator, out io.Writer) error {
+func serveRuntime(ctx context.Context, addr string, rt *Runtime, auth channel.Authenticator, out io.Writer) error {
 	srv := &http.Server{Addr: addr, Handler: NewRuntimeHandler(rt, auth)}
 	errc := make(chan error, 1)
 	go func() {

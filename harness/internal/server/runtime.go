@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
@@ -25,9 +26,9 @@ import (
 type Runtime struct {
 	store     *store.Store
 	cs        *ControlServer
-	api       ServerAPI // cs, or an authorizedAPI wrapping cs when Bindings are configured
+	api       channel.ServerAPI // cs, or an authorizedAPI wrapping cs when Bindings are configured
 	storePath string
-	bindings  *BindingSet // nil when unbound (embedded/trusted owner)
+	bindings  *channel.BindingSet // nil when unbound (embedded/trusted owner)
 }
 
 // RuntimeConfig selects the runtime's policy: the rule pre-gate set, the kernel authority, the
@@ -42,10 +43,10 @@ type RuntimeConfig struct {
 	NewID     func() string
 	Now       func() string
 
-	// Bindings, when non-empty, gates the runtime's channel API with a BindingSet authorizer (P2.1):
+	// Bindings, when non-empty, gates the runtime's channel API with a channel.BindingSet authorizer (P2.1):
 	// every principal must have a binding granting the verb / observed type / pull scope it uses. The
 	// zero (nil) leaves the API unbound — correct for a trusted in-process owner (embedded coreengine).
-	Bindings []ChannelBinding
+	Bindings []channel.ChannelBinding
 }
 
 func (cfg RuntimeConfig) withDefaults() RuntimeConfig {
@@ -93,21 +94,21 @@ func OpenRuntime(storePath string, cfg RuntimeConfig) (*Runtime, error) {
 	cs := New(store, k, cfg.Rules, cfg.Subs, cfg.Modes, cfg.NewID, cfg.Now)
 	rt := &Runtime{store: store, cs: cs, api: cs, storePath: storePath}
 	if len(cfg.Bindings) > 0 {
-		bindings, err := NewBindingSet(cfg.Bindings...)
+		bindings, err := channel.NewBindingSet(cfg.Bindings...)
 		if err != nil {
 			_ = store.Close()
 			return nil, fmt.Errorf("channel bindings: %w", err)
 		}
 		rt.bindings = bindings
-		rt.api = NewAuthorizedAPI(cs, bindings)
+		rt.api = channel.NewAuthorizedAPI(cs, bindings)
 	}
 	return rt, nil
 }
 
-// API returns the channel boundary (ServerAPI: observe via Ingest, pull via PullProjection) every
-// surface speaks to: the bare ControlServer, or — when bindings are configured — a BindingSet
+// API returns the channel boundary (channel.ServerAPI: observe via Ingest, pull via PullProjection) every
+// surface speaks to: the bare ControlServer, or — when bindings are configured — a channel.BindingSet
 // authorizer wrapping it (P2.1). The Tick driver and read helpers stay on the unwrapped runtime.
-func (r *Runtime) API() ServerAPI { return r.api }
+func (r *Runtime) API() channel.ServerAPI { return r.api }
 
 // StorePath is the canonical store path this runtime owns (status/diagnostic evidence).
 func (r *Runtime) StorePath() string { return r.storePath }
@@ -147,7 +148,7 @@ func (r *Runtime) PendingEvents(afterSeq int64) ([]contract.Event, error) {
 }
 
 // Status builds the principal's channel status. When bindings are configured it is gated on the
-// binding's VerbStatus (a grant distinct from pull). The digest is the principal's server-configured
+// binding's channel.VerbStatus (a grant distinct from pull). The digest is the principal's server-configured
 // scope, read through the kernel store directly (the server owns the runtime), so status does not
 // require the pull verb.
 func (r *Runtime) Status(principal contract.ActorID) (contract.ChannelStatus, error) {
@@ -158,7 +159,7 @@ func (r *Runtime) Status(principal contract.ActorID) (contract.ChannelStatus, er
 		if !ok {
 			return contract.ChannelStatus{}, fmt.Errorf("no channel binding for principal %q", principal)
 		}
-		if !b.Allows(VerbStatus) {
+		if !b.Allows(channel.VerbStatus) {
 			return contract.ChannelStatus{}, fmt.Errorf("principal %q is not bound to status", principal)
 		}
 		kind = b.ActorKind

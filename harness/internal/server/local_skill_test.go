@@ -5,22 +5,23 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
 func TestLocalSkillCandidateCreatesSyncPendingDeclaration(t *testing.T) {
 	ref := contract.ResourceRef{Kind: "skill", ID: "project"}
-	binding := HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
+	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
 	binding.AllowedObservedTypes = []string{SkillWriteCandidateObserved}
-	rt, err := OpenLocalRuntime(filepath.Join(t.TempDir(), "local.db"), LoadedBindings{Bindings: []ChannelBinding{binding}})
+	rt, err := OpenLocalRuntime(filepath.Join(t.TempDir(), "local.db"), channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}})
 	if err != nil {
 		t.Fatalf("open local runtime: %v", err)
 	}
 	defer rt.Close()
-	srv := httptest.NewServer(NewRuntimeHandler(rt, HeaderAuthenticator{}))
+	srv := httptest.NewServer(NewRuntimeHandler(rt, channel.HeaderAuthenticator{}))
 	defer srv.Close()
 
-	client := NewClient(srv.URL, "codex@project")
+	client := channel.NewClient(srv.URL, "codex@project")
 	if _, err := client.IngestObserve("codex@project", contract.ObservationEnvelope{
 		ExternalID: "skill-declare-release-checklist",
 		Event: contract.Event{Type: SkillWriteCandidateObserved, Payload: map[string]any{
@@ -65,16 +66,16 @@ func TestLocalSkillCandidateCreatesSyncPendingDeclaration(t *testing.T) {
 
 func TestLocalSkillLifecycleChangesAppendDeclarations(t *testing.T) {
 	ref := contract.ResourceRef{Kind: "skill", ID: "project"}
-	binding := HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
+	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
 	binding.AllowedObservedTypes = []string{SkillWriteCandidateObserved}
-	rt, err := OpenLocalRuntime(filepath.Join(t.TempDir(), "local.db"), LoadedBindings{Bindings: []ChannelBinding{binding}})
+	rt, err := OpenLocalRuntime(filepath.Join(t.TempDir(), "local.db"), channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}})
 	if err != nil {
 		t.Fatalf("open local runtime: %v", err)
 	}
 	defer rt.Close()
-	srv := httptest.NewServer(NewRuntimeHandler(rt, HeaderAuthenticator{}))
+	srv := httptest.NewServer(NewRuntimeHandler(rt, channel.HeaderAuthenticator{}))
 	defer srv.Close()
-	client := NewClient(srv.URL, "codex@project")
+	client := channel.NewClient(srv.URL, "codex@project")
 
 	for _, item := range []struct {
 		externalID string

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -104,7 +105,7 @@ var errLocalNotSetup = errors.New(localNotSetupMessage)
 type localBoot struct {
 	Configured bool
 	StorePath  string
-	Loaded     server.LoadedBindings
+	Loaded     channel.LoadedBindings
 	Config     localConfig
 }
 
@@ -122,7 +123,7 @@ func resolveLocalBoot() (localBoot, error) {
 	root := projectRoot()
 	if localBindingsPath != "" {
 		bindingsPath := resolvedLocalPath(localBindingsPath)
-		loaded, err := server.LoadBindingFile(root, bindingsPath)
+		loaded, err := channel.LoadBindingFile(root, bindingsPath)
 		if err != nil {
 			return localBoot{}, err
 		}
@@ -137,9 +138,9 @@ func resolveLocalBoot() (localBoot, error) {
 	}
 	bindingPath := cfg.BindingFile
 	if bindingPath == "" {
-		bindingPath = server.DefaultBindingFile
+		bindingPath = channel.DefaultBindingFile
 	}
-	loaded, err := server.LoadBindingFile(root, resolveProjectPath(root, bindingPath))
+	loaded, err := channel.LoadBindingFile(root, resolveProjectPath(root, bindingPath))
 	if err != nil {
 		return localBoot{}, err
 	}

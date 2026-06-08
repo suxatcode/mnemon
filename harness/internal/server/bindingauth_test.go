@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
@@ -25,12 +26,12 @@ func TestChannelBindingAuthorizer(t *testing.T) {
 			"operator": {Actor: "operator", Refs: []contract.ResourceRef{ref}},
 			"reader":   {Actor: "reader", Refs: []contract.ResourceRef{ref}},
 		},
-		Bindings: []ChannelBinding{
-			{Principal: "codex", ActorKind: contract.KindHostAgent, AllowedVerbs: []Verb{VerbObserve, VerbPull},
+		Bindings: []channel.ChannelBinding{
+			{Principal: "codex", ActorKind: contract.KindHostAgent, AllowedVerbs: []channel.Verb{channel.VerbObserve, channel.VerbPull},
 				AllowedObservedTypes: []string{"session.observed"}, SubscriptionScope: []contract.ResourceRef{ref}},
-			{Principal: "operator", ActorKind: contract.KindControlAgent, AllowedVerbs: []Verb{VerbObserve, VerbPull},
+			{Principal: "operator", ActorKind: contract.KindControlAgent, AllowedVerbs: []channel.Verb{channel.VerbObserve, channel.VerbPull},
 				SubscriptionScope: []contract.ResourceRef{ref}}, // empty AllowedObservedTypes => any
-			{Principal: "reader", ActorKind: contract.KindHostAgent, AllowedVerbs: []Verb{VerbPull},
+			{Principal: "reader", ActorKind: contract.KindHostAgent, AllowedVerbs: []channel.Verb{channel.VerbPull},
 				SubscriptionScope: []contract.ResourceRef{ref}},
 		},
 	})

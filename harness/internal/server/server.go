@@ -1,7 +1,7 @@
 // Package server is the governed control loop: a ControlServer ingests observations exactly-once, runs them
 // through the rule pre-gate, bridges proposals into trusted *.proposed events, reconciles them through the
 // single-writer kernel, and emits outbox invalidations + durable diagnostics. The kernel stays minimal; the
-// rich admission semantics live here (D4). The edge<->server contract is the ServerAPI interface (D5).
+// rich admission semantics live here (D4). The edge<->server contract is the channel.ServerAPI interface (D5).
 package server
 
 import (
@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/config"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/job"
@@ -32,15 +33,7 @@ var syncableResourceKinds = map[contract.ResourceKind]bool{
 	"skill":  true,
 }
 
-// ServerAPI is the edge<->server boundary (D5). Production HTTP/gRPC+mTLS is a thin adapter over it
-// (httpapi.go); the in-process implementation is *ControlServer. It grows by phase: Ingest (P0),
-// PullProjection (P2), ClaimJob/FinishJob (P3).
-type ServerAPI interface {
-	Ingest(principal contract.ActorID, env contract.ObservationEnvelope) (seq int64, dup bool, err error)
-	PullProjection(principal contract.ActorID, sub contract.Subscription) (projection.Projection, error)
-}
-
-var _ ServerAPI = (*ControlServer)(nil)
+var _ channel.ServerAPI = (*ControlServer)(nil)
 
 // ControlServer is the one single-writer governed loop. Tick is its deterministic, restart-safe driver.
 type ControlServer struct {

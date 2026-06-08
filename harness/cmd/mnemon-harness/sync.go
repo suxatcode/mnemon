@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 	"github.com/spf13/cobra"
@@ -171,7 +172,7 @@ func syncPushOnce() (syncPushResult, error) {
 	if err != nil {
 		return syncPushResult{}, err
 	}
-	client := server.NewClientWithToken(remote.Endpoint, remote.Token)
+	client := channel.NewClientWithToken(remote.Endpoint, remote.Token)
 	resp, err := client.SyncPush(contract.SyncPushRequest{
 		ReplicaID: batch.ReplicaID,
 		BatchID:   syncBatchID(batch.ReplicaID, batch.Commits),
@@ -196,7 +197,7 @@ func syncPullOnce() (syncPullResult, error) {
 	if err != nil {
 		return syncPullResult{}, err
 	}
-	resp, err := server.NewClientWithToken(remote.Endpoint, remote.Token).SyncPull(contract.SyncPullRequest{
+	resp, err := channel.NewClientWithToken(remote.Endpoint, remote.Token).SyncPull(contract.SyncPullRequest{
 		ReplicaID:    state.ReplicaID,
 		RemoteCursor: state.RemoteCursor,
 	})

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
@@ -20,10 +21,10 @@ const (
 
 var localProjectSkillRef = contract.ResourceRef{Kind: "skill", ID: "project"}
 
-func LocalSkillRules(bindings []ChannelBinding) []rule.Rule {
+func LocalSkillRules(bindings []channel.ChannelBinding) []rule.Rule {
 	var rules []rule.Rule
 	for _, b := range bindings {
-		if !b.Allows(VerbObserve) || !b.AllowsObservedType(SkillWriteCandidateObserved) {
+		if !b.Allows(channel.VerbObserve) || !b.AllowsObservedType(SkillWriteCandidateObserved) {
 			continue
 		}
 		ref, ok := skillRefForBinding(b)
@@ -35,7 +36,7 @@ func LocalSkillRules(bindings []ChannelBinding) []rule.Rule {
 	return rules
 }
 
-func skillRefForBinding(b ChannelBinding) (contract.ResourceRef, bool) {
+func skillRefForBinding(b channel.ChannelBinding) (contract.ResourceRef, bool) {
 	for _, ref := range b.SubscriptionScope {
 		if ref == localProjectSkillRef {
 			return ref, true

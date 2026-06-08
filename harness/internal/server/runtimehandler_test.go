@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
@@ -46,9 +47,9 @@ func TestSyncTickAfterIngest(t *testing.T) {
 	}
 	defer rt.Close()
 
-	srv := httptest.NewServer(NewRuntimeHandler(rt, HeaderAuthenticator{}))
+	srv := httptest.NewServer(NewRuntimeHandler(rt, channel.HeaderAuthenticator{}))
 	defer srv.Close()
-	c := NewClient(srv.URL, "agent")
+	c := channel.NewClient(srv.URL, "agent")
 
 	rec, err := c.IngestObserve("agent", contract.ObservationEnvelope{ExternalID: "e1", Event: contract.Event{Type: "memory.observed", CorrelationID: "c1"}})
 	if err != nil {
