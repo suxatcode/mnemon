@@ -1,6 +1,7 @@
 package capability
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/config"
@@ -49,6 +50,31 @@ var Builtins = map[string]Capability{
 		Name: "skill", ObservedType: SkillWriteCandidateObserved, ProposedType: SkillWriteProposed,
 		ResourceKind: "skill", ItemsField: "declarations", Decode: decodeSkillItem, Header: skillHeader,
 	},
+	// note is a 3rd capability that reuses the generic kind via DATA only — no new rule code. It exists
+	// to prove a new capability stands up by descriptor + config alone (Phase 2 acceptance).
+	"note": {
+		Name: "note", ObservedType: "note.write_candidate.observed", ProposedType: "note.write.proposed",
+		ResourceKind: "note", ItemsField: "items", Decode: decodeNoteItem, Header: noteHeader,
+	},
+}
+
+func decodeNoteItem(payload map[string]any) (Item, error) {
+	text := strings.TrimSpace(stringField(payload, "text"))
+	if text == "" {
+		return nil, fmt.Errorf("note candidate denied: empty text")
+	}
+	if containsSecretLikeContent(text) || containsPromptInjectionShape(text) {
+		return nil, fmt.Errorf("note candidate denied: unsafe content")
+	}
+	return Item{"text": text}, nil
+}
+
+func noteHeader(items []Item) map[string]any {
+	lines := []string{"# Notes"}
+	for _, it := range items {
+		lines = append(lines, "- "+itemString(it, "text"))
+	}
+	return map[string]any{"content": strings.Join(lines, "\n")}
 }
 
 // appendItemRule is the ONE generic kind: decode the candidate to an Item, stamp trusted id/actor/seq,

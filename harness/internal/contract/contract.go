@@ -231,4 +231,4 @@ var (
 // coordination is the host-lifecycle teamwork-topology kind (P2.2 route 3/3): an approved
 // coordination op is recorded as a governed coordination resource so the mutation flows
 // through the kernel single-writer before the host emits its mirror topology events.
-var KindCatalog = map[ResourceKind]bool{"memory": true, "goal": true, "skill": true, "lease": true, "budget": true, "receipt": true, "coordination": true}
+var KindCatalog = map[ResourceKind]bool{"memory": true, "goal": true, "skill": true, "lease": true, "budget": true, "receipt": true, "coordination": true, "note": true}
