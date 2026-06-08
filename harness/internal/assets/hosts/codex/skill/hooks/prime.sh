@@ -21,6 +21,40 @@ if [[ -f "${ENV_PATH}" ]]; then
   source "${ENV_PATH}"
 fi
 
+PROJECT_ROOT="$(cd "${CONFIG_DIR}/.." && pwd)"
+# Local Mnemon env (MNEMON_HARNESS_BIN / MNEMON_CONTROL_*), written by `mnemon-harness setup`.
+LOCAL_ENV="${PROJECT_ROOT}/.mnemon/harness/local/env.sh"
+if [[ -f "${LOCAL_ENV}" ]]; then
+  # shellcheck source=/dev/null
+  source "${LOCAL_ENV}"
+fi
+HARNESS_BIN="${MNEMON_HARNESS_BIN:-mnemon-harness}"
+CONTROL_ADDR="${MNEMON_CONTROL_ADDR:-http://127.0.0.1:8787}"
+CONTROL_PRINCIPAL="${MNEMON_CONTROL_PRINCIPAL:-}"
+TOKEN_ARGS=()
+if [[ -n "${MNEMON_CONTROL_TOKEN_FILE:-}" ]]; then
+  TOKEN_PATH="${MNEMON_CONTROL_TOKEN_FILE}"
+  if [[ "${TOKEN_PATH}" != /* ]]; then
+    TOKEN_PATH="${PROJECT_ROOT}/${TOKEN_PATH}"
+  fi
+  TOKEN_ARGS=(--token-file "${TOKEN_PATH}")
+fi
+# Best-effort: announce this session to Local Mnemon and check reachability via the channel.
+if command -v "${HARNESS_BIN}" >/dev/null 2>&1; then
+  "${HARNESS_BIN}" control observe \
+    --type session.observed \
+    --addr "${CONTROL_ADDR}" \
+    --principal "${CONTROL_PRINCIPAL}" \
+    ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} \
+    --external-id "prime-${SESSION_ID:-session}" \
+    --payload '{"hook":"SessionStart"}' \
+    >/dev/null 2>&1 || true
+  "${HARNESS_BIN}" control status \
+    --addr "${CONTROL_ADDR}" \
+    --principal "${CONTROL_PRINCIPAL}" \
+    ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>/dev/null || echo "Warning: Local Mnemon status unavailable."
+fi
+
 SKILL_LOOP_DIR="${MNEMON_SKILL_LOOP_DIR:-${CONFIG_DIR}/mnemon-skill}"
 ACTIVE_DIR="${MNEMON_SKILL_LOOP_ACTIVE_DIR:-${SKILL_LOOP_DIR}/skills/active}"
 STALE_DIR="${MNEMON_SKILL_LOOP_STALE_DIR:-${SKILL_LOOP_DIR}/skills/stale}"
