@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
 )
 
@@ -57,8 +58,8 @@ func TestLocalBootAutoDiscoversSetupConfig(t *testing.T) {
 	cfg := server.LocalRuntimeConfigFromBindings(boot.Loaded.Bindings)
 	var handlesMemory, handlesSkill bool
 	for _, r := range cfg.Rules.Rules() {
-		handlesMemory = handlesMemory || r.Handles(server.MemoryWriteCandidateObserved)
-		handlesSkill = handlesSkill || r.Handles(server.SkillWriteCandidateObserved)
+		handlesMemory = handlesMemory || r.Handles(capability.MemoryWriteCandidateObserved)
+		handlesSkill = handlesSkill || r.Handles(capability.SkillWriteCandidateObserved)
 	}
 	if !handlesMemory || !handlesSkill {
 		t.Fatalf("local boot must enable memory and skill rules; memory=%v skill=%v", handlesMemory, handlesSkill)

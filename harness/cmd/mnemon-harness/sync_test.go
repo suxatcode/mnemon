@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/server"
@@ -28,7 +29,7 @@ func TestSyncPushOnceAcksPendingLocalCommits(t *testing.T) {
 		Transport:            channel.TransportHTTP,
 		Endpoint:             "http://127.0.0.1:8787",
 		AllowedVerbs:         []channel.Verb{channel.VerbObserve, channel.VerbPull, channel.VerbStatus},
-		AllowedObservedTypes: []string{server.MemoryWriteCandidateObserved},
+		AllowedObservedTypes: []string{capability.MemoryWriteCandidateObserved},
 		SubscriptionScope:    []contract.ResourceRef{ref},
 		IdempotencyNamespace: "host:codex@project",
 	}
@@ -40,7 +41,7 @@ func TestSyncPushOnceAcksPendingLocalCommits(t *testing.T) {
 	client := channel.NewClient(localSrv.URL, "codex@project")
 	if _, err := client.IngestObserve("codex@project", contract.ObservationEnvelope{
 		ExternalID: "sync-push-memory",
-		Event: contract.Event{Type: server.MemoryWriteCandidateObserved, Payload: map[string]any{
+		Event: contract.Event{Type: capability.MemoryWriteCandidateObserved, Payload: map[string]any{
 			"content":    "sync push should ack this local memory",
 			"source":     "test",
 			"confidence": "high",

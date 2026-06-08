@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
@@ -14,7 +15,7 @@ func TestAcceptedLocalMemoryCreatesPendingSyncCommit(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "governed.db")
 	ref := contract.ResourceRef{Kind: "memory", ID: "project"}
 	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
-	binding.AllowedObservedTypes = []string{MemoryWriteCandidateObserved}
+	binding.AllowedObservedTypes = []string{capability.MemoryWriteCandidateObserved}
 	rt, err := OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}})
 	if err != nil {
 		t.Fatalf("open local runtime: %v", err)
@@ -23,7 +24,7 @@ func TestAcceptedLocalMemoryCreatesPendingSyncCommit(t *testing.T) {
 	client := channel.NewClient(srv.URL, "codex@project")
 	if rec, err := client.IngestObserve("codex@project", contract.ObservationEnvelope{
 		ExternalID: "sync-memory-1",
-		Event: contract.Event{Type: MemoryWriteCandidateObserved, Payload: map[string]any{
+		Event: contract.Event{Type: capability.MemoryWriteCandidateObserved, Payload: map[string]any{
 			"content": "Sync should queue this local memory entry.",
 			"source":  "user", "confidence": "high",
 		}},

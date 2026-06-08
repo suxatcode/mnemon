@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
@@ -93,7 +94,7 @@ func ingestRemoteMemoryForTest(rt *Runtime, externalID string, commit contract.L
 	_, _, err := rt.API().Ingest(SyncImportActor, contract.ObservationEnvelope{
 		ExternalID: externalID,
 		Event: contract.Event{
-			Type: RemoteMemoryCommitObserved,
+			Type: capability.RemoteMemoryCommitObserved,
 			Payload: map[string]any{
 				"commit": commit,
 			},
@@ -106,7 +107,7 @@ func ingestRemoteSkillForTest(rt *Runtime, externalID string, commit contract.Lo
 	_, _, err := rt.API().Ingest(SyncImportActor, contract.ObservationEnvelope{
 		ExternalID: externalID,
 		Event: contract.Event{
-			Type: RemoteSkillCommitObserved,
+			Type: capability.RemoteSkillCommitObserved,
 			Payload: map[string]any{
 				"commit": commit,
 			},

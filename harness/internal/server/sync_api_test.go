@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
@@ -90,7 +91,7 @@ func TestRemoteSyncPushIsIdempotentAndAuthenticated(t *testing.T) {
 	if _, _, err := replicaClient.Ingest("replica@project", contract.ObservationEnvelope{
 		ExternalID: "replica-observe",
 		Event: contract.Event{
-			Type: MemoryWriteCandidateObserved,
+			Type: capability.MemoryWriteCandidateObserved,
 			Payload: map[string]any{
 				"content":    "replica should not be able to submit host observations",
 				"source":     "test",

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
@@ -149,9 +150,9 @@ func ReadLocalSyncCounts(storePath string) (LocalSyncCounts, error) {
 func remoteImportEventType(kind contract.ResourceKind) (string, bool) {
 	switch kind {
 	case "memory":
-		return RemoteMemoryCommitObserved, true
+		return capability.RemoteMemoryCommitObserved, true
 	case "skill":
-		return RemoteSkillCommitObserved, true
+		return capability.RemoteSkillCommitObserved, true
 	default:
 		return "", false
 	}
