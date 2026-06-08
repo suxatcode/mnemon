@@ -27,6 +27,7 @@ func NewRuntimeHandler(rt *Runtime, auth channel.Authenticator) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, channel.MaxIngestBytes)
 		var env contract.ObservationEnvelope
 		if err := json.NewDecoder(r.Body).Decode(&env); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

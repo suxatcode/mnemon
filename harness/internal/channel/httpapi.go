@@ -16,6 +16,11 @@ import (
 // (D7/S9). In production an auth layer (mTLS/OIDC) sets it; httptest sets it from the edge's bound credential.
 const principalHeader = "X-Mnemon-Principal"
 
+// MaxIngestBytes caps an observation request body, so an oversize payload is rejected at the edge
+// rather than buffered into memory. interim Phase-1 default; superseded by Phase-2 per-capability
+// max_payload_bytes.
+const MaxIngestBytes = 1 << 20
+
 // Authenticator resolves the authenticated edge principal from a request — the P3 seam that
 // replaces the bare trusted X-Mnemon-Principal header. A production transport binds it to
 // mTLS / OIDC / a local-socket peer credential; the default (HeaderAuthenticator) trusts the
@@ -80,6 +85,7 @@ func NewHTTPHandlerWithAuth(api ServerAPI, auth Authenticator) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, MaxIngestBytes)
 		var env contract.ObservationEnvelope
 		if err := json.NewDecoder(r.Body).Decode(&env); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

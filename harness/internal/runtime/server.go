@@ -121,9 +121,46 @@ func (cs *ControlServer) Ingest(principal contract.ActorID, env contract.Observa
 	if t := env.Event.Type; strings.HasSuffix(t, ".proposed") || strings.HasSuffix(t, ".diagnostic") {
 		return 0, false, fmt.Errorf("ingest: event type %q is internal-only; the wire admits observations, never proposals/diagnostics (R11/S9)", t)
 	}
+	if err := cs.normalizeObservedEvent(principal, &env.Event); err != nil {
+		return 0, false, err
+	}
 	env.Source = principal
-	env.Event.Actor = principal
 	return cs.store.IngestObservation(env)
+}
+
+// normalizeObservedEvent turns a client EventDraft into a server-stamped observed Event (the Event
+// Intake duty): it STAMPS the server-authoritative fields from the AUTHENTICATED principal (id, ts,
+// schema version, actor) and ZEROES the client-forgeable provenance (read-set, projection ref, ingest
+// seq). The payload, resource refs, correlation/lineage, and context digest are preserved — a client
+// can never forge identity or a read-set on the wire (D7/S9).
+func (cs *ControlServer) normalizeObservedEvent(principal contract.ActorID, ev *contract.Event) error {
+	if err := validateObservedType(ev.Type); err != nil {
+		return err
+	}
+	ev.SchemaVersion, ev.ID, ev.TS, ev.Actor = 1, cs.newID(), cs.now(), principal // STAMP
+	ev.BasedOn, ev.ProjectionRef, ev.IngestSeq = nil, "", 0                       // ZERO forgeable
+	return nil
+}
+
+// validateObservedType requires a lowercase, dot-segmented observed event type (e.g.
+// "memory.write_candidate.observed"; the legacy underscore form is still lowercase). The reserved
+// *.proposed / *.diagnostic suffixes are rejected earlier, at the trust boundary.
+func validateObservedType(t string) error {
+	if t == "" {
+		return fmt.Errorf("intake: event type is required")
+	}
+	if t != strings.ToLower(t) {
+		return fmt.Errorf("intake: event type %q must be lowercase", t)
+	}
+	if !strings.Contains(t, ".") {
+		return fmt.Errorf("intake: event type %q must be dot-segmented", t)
+	}
+	for _, r := range t {
+		if !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9') && r != '.' && r != '_' {
+			return fmt.Errorf("intake: event type %q has an invalid character %q", t, string(r))
+		}
+	}
+	return nil
 }
 
 // PullProjection serves an actor's scoped, server-built view. The subscription's actor MUST equal the

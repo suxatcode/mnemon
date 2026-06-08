@@ -71,6 +71,20 @@ func (a *authorizedAPI) Ingest(principal contract.ActorID, env contract.Observat
 	if !b.AllowsObservedType(env.Event.Type) {
 		return 0, false, fmt.Errorf("principal %q may not observe event type %q", principal, env.Event.Type)
 	}
+	// The authorizer is the only layer holding the binding, so it clamps any ResourceRefs the
+	// observation names to the binding scope (mirrors the pull-scope clamp). An observation that
+	// names no refs is unconstrained here; the rule pre-gate still derives the in-scope target.
+	if len(env.Event.ResourceRefs) > 0 && len(b.SubscriptionScope) > 0 {
+		allowed := make(map[contract.ResourceRef]bool, len(b.SubscriptionScope))
+		for _, r := range b.SubscriptionScope {
+			allowed[r] = true
+		}
+		for _, r := range env.Event.ResourceRefs {
+			if !allowed[r] {
+				return 0, false, fmt.Errorf("principal %q observation ref %s/%s is outside its binding scope", principal, r.Kind, r.ID)
+			}
+		}
+	}
 	return a.inner.Ingest(principal, env)
 }
 
