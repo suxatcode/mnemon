@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-06-08
+
+### Added
+
+- Entity extraction now has an index-aware fourth path for known entities. When
+  Mnemon has already seen an entity through provided metadata or earlier
+  extraction, later graph operations can admit wider candidate tokens that match
+  the known-entity index. This improves recall for personal project names,
+  internal codenames, and single-segment CamelCase entities without globally
+  loosening first-mention extraction.
+- Store support for loading known entities from active insights, used by the
+  graph engine to seed index-aware extraction while still skipping soft-deleted
+  records.
+
+### Changed
+
+- Embedding blobs are now stored as little-endian `float32` values instead of
+  `float64`, cutting embedding storage size roughly in half while keeping the
+  public vector API and cosine-similarity calculations in `float64`.
+- Existing official databases are migrated on open from legacy `float64`
+  embedding blobs to the new `float32` storage format. The migration records its
+  completion in SQLite `PRAGMA user_version` and leaves malformed or
+  non-legacy-looking blobs untouched rather than blocking database startup.
+
+### Fixed
+
+- Claude Code project-local setup now detects the degenerate `$HOME/.claude`
+  collision. When `mnemon setup` is run from `$HOME`, the apparent local
+  `.claude/` directory is actually Claude Code's user-global config directory;
+  Mnemon now writes absolute hook commands in that case so hooks resolve
+  correctly from every future Claude Code session directory.
+- Added symlink-aware and `CLAUDE_CONFIG_DIR`-aware coverage for Claude Code
+  config collision detection, plus regression tests that genuine project-local
+  installs keep relative hook paths.
+
+### Tests
+
+- Added round-trip and invalid-length coverage for `float32` vector
+  serialization, plus legacy `float64` deserialization coverage for migration.
+- Added store migration coverage for normal legacy embeddings, malformed blobs,
+  and non-legacy-looking blobs that should be skipped.
+- Added entity extraction and store tests for the known-entity path, including
+  propagation of previously seeded project names without admitting arbitrary new
+  wide tokens.
+
 ## [0.1.11] - 2026-05-27
 
 ### Added
@@ -196,7 +241,8 @@ Initial public release.
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - Comprehensive documentation with Chinese translations
 
-[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.11...HEAD
+[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/mnemon-dev/mnemon/compare/v0.1.13...v0.1.14
 [0.1.11]: https://github.com/mnemon-dev/mnemon/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/mnemon-dev/mnemon/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/mnemon-dev/mnemon/compare/v0.1.8...v0.1.9
