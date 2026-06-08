@@ -190,6 +190,27 @@ func (r *Runtime) Status(principal contract.ActorID) (contract.ChannelStatus, er
 	}, nil
 }
 
+// DrainOutbox claims and acks the pending projection-invalidation outbox rows. It is the driver's
+// out-of-band duty, UNCONDITIONAL of the job lane (a second ClaimOutbox caller, kind "invalidation",
+// with an owner distinct from the lane). It returns how many rows it drained so the driver knows
+// whether a re-projection is warranted.
+//
+// (The locked signature was DrainOutbox() error; it also returns the count so the driver can gate
+// re-projection on whether anything was actually invalidated.)
+func (r *Runtime) DrainOutbox() (int, error) {
+	const owner = "invalidation-driver"
+	rows, err := r.store.ClaimOutbox(owner, 60*time.Second, "invalidation")
+	if err != nil {
+		return 0, err
+	}
+	for _, row := range rows {
+		if err := r.store.AckOutbox(row.ID, owner); err != nil {
+			return 0, err
+		}
+	}
+	return len(rows), nil
+}
+
 // Close releases the store and its single-writer lock. After Close the runtime no longer owns the
 // store, so another owner (embedded or service) may take it (S11).
 func (r *Runtime) Close() error { return r.store.Close() }
