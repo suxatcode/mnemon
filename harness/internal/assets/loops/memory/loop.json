@@ -92,10 +92,9 @@
   },
   "state": {
     "canonical": [
-      ".mnemon/data",
-      ".mnemon/reports",
-      ".mnemon/proposals",
-      ".mnemon/audit"
+      "harness/local/governed.db: events",
+      "harness/local/governed.db: resources",
+      "harness/local/governed.db: decisions"
     ],
     "loop_runtime": [
       "MEMORY.md"
