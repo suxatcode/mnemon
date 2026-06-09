@@ -32,12 +32,13 @@ type ChannelConfig struct {
 // CapabilityConfig enables and bounds one built-in capability. RuleRef ("native:<id>") selects the
 // compiled rule kind; the assembler resolves it select-only and fails closed on an unknown id.
 type CapabilityConfig struct {
-	Enabled         bool     `json:"enabled"`
-	ResourceRef     string   `json:"resource_ref,omitempty"`
-	MaxPayloadBytes int      `json:"max_payload_bytes,omitempty"`
-	Aliases         []string `json:"aliases,omitempty"`
-	MirrorMode      string   `json:"mirror_mode,omitempty"` // "manual" | "prime-refresh"
-	RuleRef         string   `json:"rule_ref,omitempty"`    // "native:<id>"
+	Enabled         bool   `json:"enabled"`
+	ResourceRef     string `json:"resource_ref,omitempty"`
+	MaxPayloadBytes int    `json:"max_payload_bytes,omitempty"`
+	// MirrorMode is staged for the `control pull --mirror` regenerate cadence (plan reconciliation
+	// ii): validated here, read when the mirror cadence lands. "manual" | "prime-refresh".
+	MirrorMode string `json:"mirror_mode,omitempty"`
+	RuleRef    string `json:"rule_ref,omitempty"` // "native:<id>"
 }
 
 type BackgroundConfig struct {
