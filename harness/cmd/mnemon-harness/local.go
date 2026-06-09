@@ -36,7 +36,11 @@ var localRunCmd = &cobra.Command{
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Local Mnemon: ready")
 		fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: disconnected")
-		return app.RunLocalHTTPServerWithBindings(cmd.Context(), localAddr, boot.StorePath, boot.Loaded, boot.Config.Loops, io.Discard)
+		return app.RunLocalHTTPServerWithBindings(cmd.Context(), localAddr, boot.StorePath, boot.Loaded, app.ServeOptions{
+			Loops:       boot.Config.Loops,
+			Hosts:       boot.Config.Hosts,
+			ProjectRoot: projectRoot(),
+		}, io.Discard)
 	},
 }
 
@@ -111,13 +115,14 @@ type localBoot struct {
 }
 
 type localConfig struct {
-	SchemaVersion int      `json:"schema_version"`
-	Mode          string   `json:"mode"`
-	Endpoint      string   `json:"endpoint"`
-	Principal     string   `json:"principal"`
-	Loops         []string `json:"loops"`
-	BindingFile   string   `json:"binding_file"`
-	StorePath     string   `json:"store_path"`
+	SchemaVersion int                 `json:"schema_version"`
+	Mode          string              `json:"mode"`
+	Endpoint      string              `json:"endpoint"`
+	Principal     string              `json:"principal"`
+	Loops         []string            `json:"loops"`
+	Hosts         map[string][]string `json:"hosts"` // per-host projected loops; absent on old installs (no background re-projection)
+	BindingFile   string              `json:"binding_file"`
+	StorePath     string              `json:"store_path"`
 }
 
 func resolveLocalBoot() (localBoot, error) {
