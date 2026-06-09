@@ -55,6 +55,11 @@ func ImportLocalSyncPull(storePath, remoteID, nextCursor string, commits []contr
 	return remotesync.SetSyncPullCursor(storePath, remoteID, nextCursor)
 }
 
+// remoteImportEventType maps a synced commit's resource kind to its import observation. Remote
+// import is memory/skill-only by design (see SyncImportRuntimeConfig); an unsupported kind returns
+// false and the caller SKIPS the commit while the pull cursor still advances — the commit is
+// permanently dropped with no diagnostic. Acceptable while sync is offline/manual; revisit (emit a
+// diagnostic or hold the cursor) when a third capability gains a remote producer.
 func remoteImportEventType(kind contract.ResourceKind) (string, bool) {
 	switch kind {
 	case "memory":
