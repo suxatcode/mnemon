@@ -157,3 +157,27 @@ func syncAPITestDigest(fields map[string]any) string {
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
+
+// The sync path's scope clamp had ZERO test coverage while being the only pre-SQL enforcement on
+// that path. Pin the ClampRefs semantics here: in-scope narrowing passes, out-of-scope is denied,
+// empty-requested defaults to the binding scope, and — the deliberate tightening — an empty-scope
+// replica binding now denies explicit refs instead of passing them through.
+func TestClampSyncScopesEnforcesBindingScope(t *testing.T) {
+	mem := contract.ResourceRef{Kind: "memory", ID: "project"}
+	skill := contract.ResourceRef{Kind: "skill", ID: "project"}
+	b := channel.ReplicaAgentBinding("replica@peer", "http://x", []contract.ResourceRef{mem, skill})
+
+	if got, err := clampSyncScopes(b, []contract.ResourceRef{mem}); err != nil || len(got) != 1 || got[0] != mem {
+		t.Fatalf("in-scope narrowing must pass: %v err=%v", got, err)
+	}
+	if _, err := clampSyncScopes(b, []contract.ResourceRef{{Kind: "note", ID: "project"}}); err == nil {
+		t.Fatal("an out-of-scope sync ref must be denied")
+	}
+	if got, err := clampSyncScopes(b, nil); err != nil || len(got) != 2 {
+		t.Fatalf("empty requested must default to the binding scope: %v err=%v", got, err)
+	}
+	unscoped := channel.ReplicaAgentBinding("replica@peer", "http://x", nil)
+	if _, err := clampSyncScopes(unscoped, []contract.ResourceRef{mem}); err == nil {
+		t.Fatal("an empty-scope replica binding must deny explicit refs (fail closed)")
+	}
+}

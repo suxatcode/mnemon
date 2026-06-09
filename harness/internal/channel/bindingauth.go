@@ -96,23 +96,15 @@ func (a *authorizedAPI) PullProjection(principal contract.ActorID, sub contract.
 	if !b.Allows(VerbPull) {
 		return projection.Projection{}, fmt.Errorf("principal %q is not bound to pull", principal)
 	}
-	if len(sub.Refs) > 0 {
-		// A narrowing request must stay within the binding scope.
-		allowed := make(map[contract.ResourceRef]bool, len(b.SubscriptionScope))
-		for _, r := range b.SubscriptionScope {
-			allowed[r] = true
-		}
-		for _, r := range sub.Refs {
-			if !allowed[r] {
-				return projection.Projection{}, fmt.Errorf("principal %q ref %s/%s is outside its binding scope", principal, r.Kind, r.ID)
-			}
-		}
-	} else if len(b.SubscriptionScope) > 0 {
-		// An empty request defaults to the binding's SubscriptionScope — the auditable narrowing
-		// ceiling — not the broader engine cfg.Subs the inner would otherwise fall back to. The inner
-		// still intersects this with the server-side subs, so the effective scope is subs ∩ binding.
-		sub.Refs = append([]contract.ResourceRef(nil), b.SubscriptionScope...)
+	// Clamp to the binding's SubscriptionScope (ClampRefs — the one scope clamp): an empty request
+	// defaults to the whole scope — the auditable narrowing ceiling, not the broader engine
+	// cfg.Subs the inner would otherwise fall back to. The inner still intersects with the
+	// server-side subs, so the effective scope is subs ∩ binding.
+	refs, err := b.ClampRefs(sub.Refs)
+	if err != nil {
+		return projection.Projection{}, err
 	}
+	sub.Refs = refs
 	return a.inner.PullProjection(principal, sub)
 }
 

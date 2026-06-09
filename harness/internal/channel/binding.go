@@ -110,3 +110,31 @@ func ReplicaAgentBinding(principal contract.ActorID, endpoint string, scope []co
 		IdempotencyNamespace: "replica:" + string(principal),
 	}
 }
+
+// scopeSet indexes the binding's SubscriptionScope for membership checks.
+func (b ChannelBinding) scopeSet() map[contract.ResourceRef]bool {
+	allowed := make(map[contract.ResourceRef]bool, len(b.SubscriptionScope))
+	for _, ref := range b.SubscriptionScope {
+		allowed[ref] = true
+	}
+	return allowed
+}
+
+// ClampRefs clamps a requested ref set to the binding's SubscriptionScope — the team-scale
+// authorization ceiling, implemented ONCE for pull / sync / status (hand-rolled copies had already
+// diverged on empty-scope handling). Empty requested defaults to the full scope; any explicit ref
+// outside the scope is an error; an EMPTY scope denies every explicit ref (fail closed). The ingest
+// path keeps its documented exception (an observation naming no refs is unconstrained) at its own
+// call site.
+func (b ChannelBinding) ClampRefs(requested []contract.ResourceRef) ([]contract.ResourceRef, error) {
+	if len(requested) == 0 {
+		return append([]contract.ResourceRef(nil), b.SubscriptionScope...), nil
+	}
+	allowed := b.scopeSet()
+	for _, ref := range requested {
+		if !allowed[ref] {
+			return nil, fmt.Errorf("ref %s/%s is outside principal %q binding scope", ref.Kind, ref.ID, b.Principal)
+		}
+	}
+	return append([]contract.ResourceRef(nil), requested...), nil
+}

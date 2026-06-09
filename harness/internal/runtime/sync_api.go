@@ -132,23 +132,16 @@ func syncResult(commit contract.LocalCommit, status, diagnostic string) contract
 	}
 }
 
+// clampSyncScopes delegates to the binding's ONE scope clamp (channel.ChannelBinding.ClampRefs).
+// TIGHTENING vs the prior hand-rolled copy: an empty-scope replica binding used to pass explicit
+// requested refs through unchecked — and this was the only enforcement on the sync path before
+// SQL. ClampRefs denies explicit refs under an empty scope (fail closed).
 func clampSyncScopes(binding channel.ChannelBinding, requested []contract.ResourceRef) ([]contract.ResourceRef, error) {
-	if len(requested) == 0 {
-		return append([]contract.ResourceRef(nil), binding.SubscriptionScope...), nil
+	scopes, err := binding.ClampRefs(requested)
+	if err != nil {
+		return nil, fmt.Errorf("sync scope: %w", err)
 	}
-	if len(binding.SubscriptionScope) == 0 {
-		return append([]contract.ResourceRef(nil), requested...), nil
-	}
-	allowed := make(map[contract.ResourceRef]bool, len(binding.SubscriptionScope))
-	for _, ref := range binding.SubscriptionScope {
-		allowed[ref] = true
-	}
-	for _, ref := range requested {
-		if !allowed[ref] {
-			return nil, fmt.Errorf("sync scope %s/%s is outside replica binding scope", ref.Kind, ref.ID)
-		}
-	}
-	return append([]contract.ResourceRef(nil), requested...), nil
+	return scopes, nil
 }
 
 func syncCommitFieldsDigest(fields map[string]any) string {

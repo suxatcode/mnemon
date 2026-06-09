@@ -176,10 +176,12 @@ func (r *Runtime) Status(principal contract.ActorID) (contract.ChannelStatus, er
 		}
 		kind = b.ActorKind
 		// Clamp the status digest/count to the binding scope (the auditable ceiling), not the broader
-		// engine cfg.Subs — mirroring the empty-ref pull path.
-		if len(b.SubscriptionScope) > 0 {
-			sub.Refs = append([]contract.ResourceRef(nil), b.SubscriptionScope...)
+		// engine cfg.Subs — the same ClampRefs default the empty-ref pull path uses.
+		refs, err := b.ClampRefs(nil)
+		if err != nil {
+			return contract.ChannelStatus{}, err
 		}
+		sub.Refs = refs
 	}
 	proj, err := r.cs.PullProjection(principal, sub)
 	if err != nil {
