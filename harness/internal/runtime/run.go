@@ -83,11 +83,7 @@ func RunHTTPServerWithBindings(ctx context.Context, addr, storePath string, load
 		return err
 	}
 	defer rt.Close()
-	var auth channel.Authenticator = channel.HeaderAuthenticator{}
-	if len(loaded.Tokens) > 0 {
-		auth = channel.TokenAuthenticator{Tokens: loaded.Tokens}
-	}
-	return ServeRuntime(ctx, addr, rt, auth, out)
+	return ServeRuntime(ctx, addr, rt, channel.NewBindingAuthenticator(loaded), out)
 }
 
 // ServeRuntime serves the runtime's channel over httpapi until ctx is cancelled. It is the shared

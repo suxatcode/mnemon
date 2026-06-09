@@ -41,11 +41,7 @@ func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string,
 		return err
 	}
 	defer rt.Close()
-	var auth channel.Authenticator = channel.HeaderAuthenticator{}
-	if len(loaded.Tokens) > 0 {
-		auth = channel.TokenAuthenticator{Tokens: loaded.Tokens}
-	}
-	return runtime.ServeRuntime(ctx, addr, rt, auth, out)
+	return runtime.ServeRuntime(ctx, addr, rt, channel.NewBindingAuthenticator(loaded), out)
 }
 
 // LocalAuthorityFromBindings grants each bound principal write authority only for resource kinds it

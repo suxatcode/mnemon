@@ -49,6 +49,46 @@ type TokenAuthenticator struct {
 	Tokens map[string]contract.ActorID
 }
 
+// bindingAuthenticator resolves each request per the principal's binding auth mode: a principal with a
+// token credential MUST present its bearer token; a principal with no credential authenticates via the
+// trusted principal header. This lets token-auth and header-auth principals coexist on ONE server
+// without it falling into a single global mode (which 401s the header-auth principals when any one
+// binding carries a token).
+type bindingAuthenticator struct {
+	tokens          map[string]contract.ActorID
+	tokenPrincipals map[contract.ActorID]bool
+}
+
+// NewBindingAuthenticator builds the per-principal authenticator from the loaded bindings' tokens. With
+// no tokens it is a plain header authenticator; with all-token it requires bearers; mixed is resolved
+// per principal.
+func NewBindingAuthenticator(loaded LoadedBindings) Authenticator {
+	tp := make(map[contract.ActorID]bool, len(loaded.Tokens))
+	for _, p := range loaded.Tokens {
+		if p != "" {
+			tp[p] = true
+		}
+	}
+	return bindingAuthenticator{tokens: loaded.Tokens, tokenPrincipals: tp}
+}
+
+func (a bindingAuthenticator) Authenticate(r *http.Request) (contract.ActorID, error) {
+	if tok := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")); tok != "" {
+		if p, ok := a.tokens[tok]; ok && p != "" {
+			return p, nil
+		}
+		return "", fmt.Errorf("unrecognized bearer token")
+	}
+	p := contract.ActorID(r.Header.Get(principalHeader))
+	if p == "" {
+		return "", fmt.Errorf("missing authenticated principal")
+	}
+	if a.tokenPrincipals[p] {
+		return "", fmt.Errorf("principal %q requires a bearer token", p)
+	}
+	return p, nil
+}
+
 func (a TokenAuthenticator) Authenticate(r *http.Request) (contract.ActorID, error) {
 	tok := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if p, ok := a.Tokens[tok]; ok && p != "" {
