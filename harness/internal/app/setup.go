@@ -10,11 +10,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
 )
 
@@ -54,19 +57,31 @@ func sanitizePrincipal(p string) string {
 	return strings.NewReplacer("@", "-", "/", "-", ":", "-").Replace(p)
 }
 
-var supportedProductLoops = map[string]bool{
-	"memory": true,
-	"skill":  true,
-}
-
-func validateProductLoops(loops []string) error {
+// validateProductLoops fail-closes setup to loops that are BOTH a built-in capability
+// (capability.Builtins) AND carry projectable assets for the host (manifest.LoopsForHost over the
+// embedded FS) — derived, not hardcoded, so a future loop whose assets land is admitted without
+// editing a literal. Today the intersection is exactly {memory, skill} (note has no host assets).
+func validateProductLoops(host string, loops []string) error {
+	hostLoops, err := manifest.LoopsForHost(assets.FS, host)
+	if err != nil {
+		return fmt.Errorf("setup: discover %s loops: %w", host, err)
+	}
+	available := map[string]bool{}
+	var names []string
+	for _, loop := range hostLoops {
+		if _, ok := capability.Builtins[loop]; ok && !available[loop] {
+			available[loop] = true
+			names = append(names, loop)
+		}
+	}
+	sort.Strings(names)
 	for _, loop := range loops {
 		loop = strings.TrimSpace(loop)
 		if loop == "" {
 			return fmt.Errorf("setup loop id cannot be empty")
 		}
-		if !supportedProductLoops[loop] {
-			return fmt.Errorf("unsupported product loop %q; setup supports memory and skill", loop)
+		if !available[loop] {
+			return fmt.Errorf("unsupported product loop %q for host %s; available: %s", loop, host, strings.Join(names, ", "))
 		}
 	}
 	return nil
@@ -83,7 +98,7 @@ func (h *Harness) Setup(ctx context.Context, out, errw io.Writer, opts SetupOpti
 	if len(opts.Loops) == 0 {
 		return SetupResult{}, fmt.Errorf("setup requires --memory, --skills, or at least one --loop")
 	}
-	if err := validateProductLoops(opts.Loops); err != nil {
+	if err := validateProductLoops(opts.Host, opts.Loops); err != nil {
 		return SetupResult{}, err
 	}
 	projectRoot := opts.ProjectRoot
