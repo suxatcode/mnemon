@@ -130,11 +130,74 @@ run_skill() {
 	echo "    skill loop ($host) OK"
 }
 
+# run_note proves the platform claim on the PRODUCT path: a capability whose descriptor +
+# KindCatalog entry exist in code (note) stands up via CONFIG EDIT ALONE — no new Go in app/cmd.
+# setup fail-closes `--loop note` (note has no host assets, correctly), so the stanza does what a
+# platform operator would: edit the setup-written config.json loops list + bindings.json scope.
+run_note() {
+	local principal="codex@project" addr="http://127.0.0.1:8787"
+	CUR_HOST="note-via-config"
+	local proj="$WORK/proj-note"
+	mkdir -p "$proj"
+	echo "=== E2E note capability via config alone ==="
+	(
+		cd "$proj"
+		local tok=".mnemon/harness/channel/credentials/codex-project.token"
+		"$MH" setup --host codex --memory --principal "$principal" --control-url "$addr" >/dev/null
+
+		# The config edit: enable the note loop + widen the binding to the note type/scope.
+		python3 - <<-'PYEOF'
+		import json
+		cfg = json.load(open(".mnemon/harness/local/config.json"))
+		cfg["loops"].append("note")
+		json.dump(cfg, open(".mnemon/harness/local/config.json", "w"), indent=2)
+		doc = json.load(open(".mnemon/harness/channel/bindings.json"))
+		b = doc["bindings"][0]
+		b["allowed_observed_types"].append("note.write_candidate.observed")
+		b["subscription_scope"].append({"kind": "note", "id": "project"})
+		json.dump(doc, open(".mnemon/harness/channel/bindings.json", "w"), indent=2)
+		PYEOF
+
+		"$MH" local run >"$WORK/run-note.log" 2>&1 &
+		local runpid=$!
+		echo "$runpid" >"$PIDFILE"
+		local up=0 i
+		for i in $(seq 1 60); do
+			if "$MH" control status --addr "$addr" --principal "$principal" --token-file "$tok" >/dev/null 2>&1; then
+				up=1
+				break
+			fi
+			sleep 0.1
+		done
+		[ "$up" = 1 ] || { cat "$WORK/run-note.log"; exit 1; }
+
+		# `resources=N` counts SCOPED refs (version-0 included), so it cannot prove existence.
+		# The content digest folds Kind:ID:Version+fields per scoped ref: an admitted note write
+		# necessarily changes it. ticked=true + digest delta = the note landed.
+		local out pre post
+		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
+		pre="${out##*digest=}"; pre="${pre%% *}"
+		out="$("$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
+			--type note.write_candidate.observed --external-id n1 \
+			--payload '{"text":"note stands up via config alone"}')"
+		case "$out" in *ticked=true*) ;; *) echo "note observe: $out"; exit 1 ;; esac
+		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
+		post="${out##*digest=}"; post="${post%% *}"
+		[ -n "$pre" ] && [ -n "$post" ] && [ "$pre" != "$post" ] || { echo "note write did not change the scoped digest (pre=$pre post=$post)"; exit 1; }
+
+		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
+		rm -f "$PIDFILE"
+	) || fail "note flow failed (see $WORK/run-note.log)"
+	sleep 0.3
+	echo "    note via config alone OK"
+}
+
 # Both hosts run sequentially (the server is stopped between them), so they share the default
 # local-run bind addr; the port is the same for both.
 run_host codex codex@project 8787 .codex
 run_host claude-code claude@project 8787 .claude
 run_skill codex codex@project
 run_skill claude-code claude@project
+run_note
 
-echo "E2E PASS (codex + claude-code; memory + skill)"
+echo "E2E PASS (codex + claude-code; memory + skill + note-via-config)"
