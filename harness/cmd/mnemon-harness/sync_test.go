@@ -34,7 +34,7 @@ func TestSyncPushOnceAcksPendingLocalCommits(t *testing.T) {
 		SubscriptionScope:    []contract.ResourceRef{ref},
 		IdempotencyNamespace: "host:codex@project",
 	}
-	local, err := app.OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{localBinding}})
+	local, err := app.OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{localBinding}}, nil)
 	if err != nil {
 		t.Fatalf("open local runtime: %v", err)
 	}
@@ -387,7 +387,7 @@ func syncStatusForTest(storePath string) (contract.ChannelStatus, error) {
 func localMemoryContentForTest(t *testing.T, storePath string, ref contract.ResourceRef) string {
 	t.Helper()
 	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
-	rt, err := app.OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}})
+	rt, err := app.OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}}, nil)
 	if err != nil {
 		t.Fatalf("open local runtime for projection: %v", err)
 	}
@@ -409,7 +409,7 @@ func localMemoryContentForTest(t *testing.T, storePath string, ref contract.Reso
 func localSkillDeclarationsForTest(t *testing.T, storePath string, ref contract.ResourceRef) []map[string]any {
 	t.Helper()
 	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
-	rt, err := app.OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}})
+	rt, err := app.OpenLocalRuntime(storePath, channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}}, nil)
 	if err != nil {
 		t.Fatalf("open local runtime for skill projection: %v", err)
 	}

@@ -36,7 +36,7 @@ var localRunCmd = &cobra.Command{
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Local Mnemon: ready")
 		fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: disconnected")
-		return app.RunLocalHTTPServerWithBindings(cmd.Context(), localAddr, boot.StorePath, boot.Loaded, io.Discard)
+		return app.RunLocalHTTPServerWithBindings(cmd.Context(), localAddr, boot.StorePath, boot.Loaded, boot.Config.Loops, io.Discard)
 	},
 }
 

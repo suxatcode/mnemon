@@ -25,7 +25,8 @@ import (
 //
 // Divergence from the locked Assemble(cfg, loops) signature (code wins): the runtime config needs the
 // channel bindings (principals/scope), which the loop manifests do not carry; bindings are the second
-// argument. This is the config-driven replacement for app.LocalRuntimeConfigFromBindings.
+// argument. This is the production boot path: app.OpenLocalRuntime derives the config.File from the
+// setup-written loops list and assembles here.
 func Assemble(cfg config.File, bindings []channel.ChannelBinding) (runtime.RuntimeConfig, error) {
 	var rules []rule.Rule
 	allow := map[contract.ActorID][]contract.ResourceKind{}

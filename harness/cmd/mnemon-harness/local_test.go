@@ -56,7 +56,10 @@ func TestLocalBootAutoDiscoversSetupConfig(t *testing.T) {
 	if len(boot.Loaded.Tokens) == 0 {
 		t.Fatal("local boot must load setup token credentials")
 	}
-	cfg := app.LocalRuntimeConfigFromBindings(boot.Loaded.Bindings)
+	cfg, err := app.LocalRuntimeConfigFromBindings(boot.Loaded.Bindings)
+	if err != nil {
+		t.Fatalf("boot config: %v", err)
+	}
 	var handlesMemory, handlesSkill bool
 	for _, r := range cfg.Rules.Rules() {
 		handlesMemory = handlesMemory || r.Handles(capability.MemoryWriteCandidateObserved)

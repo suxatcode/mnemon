@@ -3,40 +3,73 @@ package app
 import (
 	"context"
 	"io"
+	"sort"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assembler"
 	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
+	"github.com/mnemon-dev/mnemon/harness/internal/config"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
 	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
 )
 
-var localProjectMemoryRef = contract.ResourceRef{Kind: "memory", ID: "project"}
-
-// OpenLocalRuntime boots Local Mnemon policy over the server runtime: bindings define the Agent
-// Integration scope, local rules admit memory candidates, and the kernel remains the single writer.
-func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings) (*runtime.Runtime, error) {
-	return runtime.OpenRuntime(storePath, LocalRuntimeConfigFromBindings(loaded.Bindings))
+// OpenLocalRuntime boots Local Mnemon over the select-only assembler: loops (from the setup-written
+// localConfig) enable capabilities; bindings stay the source of truth for observe/pull/status scope.
+// An empty loops list (the hidden `local run --bindings` path, which has no localConfig) derives
+// enablement from the binding scope kinds ∩ capability.Builtins.
+func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings, loops []string) (*runtime.Runtime, error) {
+	if len(loops) == 0 {
+		loops = loopsFromBindings(loaded.Bindings)
+	}
+	rc, err := assembler.Assemble(capabilityFileFromLoops(loops), loaded.Bindings)
+	if err != nil {
+		return nil, err
+	}
+	return runtime.OpenRuntime(storePath, rc)
 }
 
 // LocalRuntimeConfigFromBindings derives Local Mnemon's policy from the installed Agent Integration
-// bindings. The binding remains the source of truth for observe/pull/status scope; this only adds the
-// local admission rules and kernel authority needed to apply accepted local writes.
-func LocalRuntimeConfigFromBindings(bindings []channel.ChannelBinding) runtime.RuntimeConfig {
-	rules := append(LocalMemoryRules(bindings), LocalSkillRules(bindings)...)
-	return runtime.RuntimeConfig{
-		Bindings:  bindings,
-		Subs:      channel.SubsFromBindings(bindings),
-		Rules:     rule.NewRuleSet(rules...),
-		Authority: LocalAuthorityFromBindings(bindings),
+// bindings alone (enablement = binding scope kinds ∩ Builtins). It is the bindings-only convenience
+// over the same select-only assembly OpenLocalRuntime uses.
+func LocalRuntimeConfigFromBindings(bindings []channel.ChannelBinding) (runtime.RuntimeConfig, error) {
+	return assembler.Assemble(capabilityFileFromLoops(loopsFromBindings(bindings)), bindings)
+}
+
+// capabilityFileFromLoops constructs the in-memory config.File for the enabled loops. The on-disk
+// localConfig (schema_version 1) stays the enablement authority; config.Load parses the FUTURE
+// on-disk form and is not yet the boot reader (do not migrate until a capability needs a knob the
+// loops list cannot express).
+func capabilityFileFromLoops(loops []string) config.File {
+	caps := make(map[string]config.CapabilityConfig, len(loops))
+	for _, loop := range loops {
+		caps[loop] = config.CapabilityConfig{Enabled: true, ResourceRef: loop + "/project", RuleRef: "native:" + loop}
 	}
+	return config.File{Capabilities: caps}
+}
+
+// loopsFromBindings derives capability enablement from binding scope kinds ∩ Builtins.
+func loopsFromBindings(bindings []channel.ChannelBinding) []string {
+	seen := map[string]bool{}
+	var loops []string
+	for _, b := range bindings {
+		for _, ref := range b.SubscriptionScope {
+			id := string(ref.Kind)
+			if _, ok := capability.Builtins[id]; ok && !seen[id] {
+				seen[id] = true
+				loops = append(loops, id)
+			}
+		}
+	}
+	sort.Strings(loops)
+	return loops
 }
 
 // RunLocalHTTPServerWithBindings serves Local Mnemon from a binding manifest. It is the product boot
 // path used by `mnemon-harness local run`.
-func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string, loaded channel.LoadedBindings, out io.Writer) error {
-	rt, err := OpenLocalRuntime(storePath, loaded)
+func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string, loaded channel.LoadedBindings, loops []string, out io.Writer) error {
+	rt, err := OpenLocalRuntime(storePath, loaded, loops)
 	if err != nil {
 		return err
 	}
@@ -44,60 +77,13 @@ func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string,
 	return runtime.ServeRuntime(ctx, addr, rt, channel.NewBindingAuthenticator(loaded), out)
 }
 
-// LocalAuthorityFromBindings grants each bound principal write authority only for resource kinds it
-// can see through its Local Mnemon scope. Wire clients still cannot submit proposals directly.
-func LocalAuthorityFromBindings(bindings []channel.ChannelBinding) kernel.AuthorityRules {
-	allow := map[contract.ActorID][]contract.ResourceKind{}
-	for _, b := range bindings {
-		if b.ActorKind != contract.KindHostAgent {
-			continue
-		}
-		seen := map[contract.ResourceKind]bool{}
-		for _, ref := range b.SubscriptionScope {
-			if ref.Kind == "memory" || ref.Kind == "skill" {
-				seen[ref.Kind] = true
-			}
-		}
-		for kind := range seen {
-			allow[b.Principal] = append(allow[b.Principal], kind)
-		}
-	}
-	return kernel.AuthorityRules{Allow: allow}
-}
-
-// allowsAnyObservedType reports whether the binding admits any of the observed-type aliases — the
-// gate that keeps a loop from being stranded when a binding lists only the legacy underscore form
-// while the canonical type has converged to dotted.
-func allowsAnyObservedType(b channel.ChannelBinding, types []string) bool {
-	for _, t := range types {
-		if b.AllowsObservedType(t) {
-			return true
-		}
-	}
-	return false
-}
-
-// LocalMemoryRules creates one actor-bound admission rule per binding that can submit memory
-// candidates. Each rule only proposes for its own authenticated principal.
-func LocalMemoryRules(bindings []channel.ChannelBinding) []rule.Rule {
-	var rules []rule.Rule
-	for _, b := range bindings {
-		if !b.Allows(channel.VerbObserve) || !allowsAnyObservedType(b, capability.ObservedTypeAndAliases(capability.MemoryWriteCandidateObserved)) {
-			continue
-		}
-		ref, ok := memoryRefForBinding(b)
-		if !ok {
-			continue
-		}
-		rules = append(rules, capability.MemoryAdmissionRule(b.Principal, ref))
-	}
-	return rules
-}
-
 func OpenSyncImportRuntime(storePath string, refs []contract.ResourceRef) (*runtime.Runtime, error) {
 	return runtime.OpenRuntime(storePath, SyncImportRuntimeConfig(refs))
 }
 
+// SyncImportRuntimeConfig is the sync-import policy. Remote import is memory/skill-only by design:
+// the two import rules carry genuinely different merge semantics and are NOT derived from the
+// capability descriptors — revisit when a third capability gains a remote producer.
 func SyncImportRuntimeConfig(refs []contract.ResourceRef) runtime.RuntimeConfig {
 	return runtime.RuntimeConfig{
 		Subs: map[contract.ActorID]contract.Subscription{
@@ -108,18 +94,4 @@ func SyncImportRuntimeConfig(refs []contract.ResourceRef) runtime.RuntimeConfig 
 			contract.SyncImportActor: {"memory", "skill"},
 		}},
 	}
-}
-
-func memoryRefForBinding(b channel.ChannelBinding) (contract.ResourceRef, bool) {
-	for _, ref := range b.SubscriptionScope {
-		if ref == localProjectMemoryRef {
-			return ref, true
-		}
-	}
-	for _, ref := range b.SubscriptionScope {
-		if ref.Kind == "memory" {
-			return ref, true
-		}
-	}
-	return contract.ResourceRef{}, false
 }
