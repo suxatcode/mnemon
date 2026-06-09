@@ -105,7 +105,20 @@ func runSyncConnect(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// ensureSyncStoreAvailable refuses an offline sync (one-shot or background) cleanly when a co-hosted
+// Local Mnemon (`local run`) holds the single-writer lock, instead of failing with a raw lock error.
+// Offline/manual: stop `local run` to sync, until co-hosted in-process sync lands.
+func ensureSyncStoreAvailable() error {
+	if err := remotesync.ProbeAvailable(resolvedSyncStorePath()); err != nil {
+		return fmt.Errorf("sync is offline-only for now: the local store is busy (is `mnemon-harness local run` running?) — stop it to sync: %w", err)
+	}
+	return nil
+}
+
 func runSyncPush(cmd *cobra.Command, args []string) error {
+	if err := ensureSyncStoreAvailable(); err != nil {
+		return err
+	}
 	result, err := syncPushOnce()
 	if err != nil {
 		return err
@@ -115,6 +128,9 @@ func runSyncPush(cmd *cobra.Command, args []string) error {
 }
 
 func runSyncPull(cmd *cobra.Command, args []string) error {
+	if err := ensureSyncStoreAvailable(); err != nil {
+		return err
+	}
 	result, err := syncPullOnce()
 	if err != nil {
 		return err
@@ -131,11 +147,10 @@ func runSyncBackground(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--interval must be positive")
 	}
 	// Background sync opens the governed store directly, so it cannot run while a co-hosted Local
-	// Mnemon (`local run`) holds the single-writer lock. Probe once up front and refuse cleanly with an
-	// actionable message rather than failing (with a raw lock error) every pass. Offline/manual: stop
-	// `local run` to sync, until co-hosted in-process sync lands.
-	if err := remotesync.ProbeAvailable(resolvedSyncStorePath()); err != nil {
-		return fmt.Errorf("background sync is offline-only for now: the local store is busy (is `mnemon-harness local run` running?) — stop it to sync: %w", err)
+	// Mnemon holds the single-writer lock. Probe once up front and refuse cleanly rather than failing
+	// (with a raw lock error) every pass.
+	if err := ensureSyncStoreAvailable(); err != nil {
+		return err
 	}
 	ticker := time.NewTicker(syncInterval)
 	defer ticker.Stop()

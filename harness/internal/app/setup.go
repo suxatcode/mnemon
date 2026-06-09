@@ -138,15 +138,18 @@ func (h *Harness) Setup(ctx context.Context, out, errw io.Writer, opts SetupOpti
 		return res, fmt.Errorf("setup: merge binding: %w", err)
 	}
 	res.Changes = append(res.Changes, "upserted channel binding for "+opts.Principal+" in "+bindingFile)
-	if err := writeLocalConfig(configFile, opts); err != nil {
+	// Config + env reflect ALL enabled loops (the union with any prior setup), so installing skill
+	// after memory leaves both the config AND the env naming both loops (additive, symmetric).
+	effectiveLoops := unionLoops(existingConfigLoops(configFile), opts.Loops)
+	if err := writeLocalConfig(configFile, opts, effectiveLoops); err != nil {
 		return res, err
 	}
 	res.Changes = append(res.Changes, "wrote Local Mnemon config "+configFile)
-	if err := writeLocalEnv(envFile, opts, tokenRel); err != nil {
+	if err := writeLocalEnv(envFile, opts, tokenRel, effectiveLoops); err != nil {
 		return res, err
 	}
 	res.Changes = append(res.Changes, "wrote Local Mnemon env "+envFile)
-	if err := writeLocalEnv(compatEnvFile, opts, tokenRel); err != nil {
+	if err := writeLocalEnv(compatEnvFile, opts, tokenRel, effectiveLoops); err != nil {
 		return res, err
 	}
 	res.Changes = append(res.Changes, "wrote compatibility env "+compatEnvFile)
@@ -238,18 +241,23 @@ func writeTokenFile(path string) error {
 	return os.WriteFile(path, []byte(hex.EncodeToString(buf)+"\n"), 0o600)
 }
 
-func writeLocalConfig(path string, opts SetupOptions) error {
-	// Union the enabled loops with any already recorded, so installing skill after memory leaves the
-	// config naming BOTH loops (additive setup).
-	loops := opts.Loops
-	if prev, err := os.ReadFile(path); err == nil {
-		var existing struct {
-			Loops []string `json:"loops"`
-		}
-		if json.Unmarshal(prev, &existing) == nil {
-			loops = unionLoops(existing.Loops, opts.Loops)
-		}
+// existingConfigLoops returns the loops recorded in an existing local config (nil if absent), so a
+// rerun can union them with the loops being installed.
+func existingConfigLoops(path string) []string {
+	prev, err := os.ReadFile(path)
+	if err != nil {
+		return nil
 	}
+	var existing struct {
+		Loops []string `json:"loops"`
+	}
+	if json.Unmarshal(prev, &existing) != nil {
+		return nil
+	}
+	return existing.Loops
+}
+
+func writeLocalConfig(path string, opts SetupOptions, loops []string) error {
 	doc := map[string]any{
 		"schema_version": 1,
 		"mode":           "local",
@@ -269,7 +277,7 @@ func writeLocalConfig(path string, opts SetupOptions) error {
 	return os.WriteFile(path, append(data, '\n'), 0o644)
 }
 
-func writeLocalEnv(path string, opts SetupOptions, tokenRel string) error {
+func writeLocalEnv(path string, opts SetupOptions, tokenRel string, loops []string) error {
 	var b strings.Builder
 	b.WriteString("# Managed by mnemon-harness setup - Local Mnemon environment.\n")
 	b.WriteString(exportLine("MNEMON_HARNESS_BIN", "mnemon-harness"))
@@ -278,7 +286,7 @@ func writeLocalEnv(path string, opts SetupOptions, tokenRel string) error {
 	if tokenRel != "" {
 		b.WriteString(exportLine("MNEMON_CONTROL_TOKEN_FILE", tokenRel))
 	}
-	for _, loop := range opts.Loops {
+	for _, loop := range loops {
 		b.WriteString(exportLine("MNEMON_"+strings.ToUpper(loop)+"_LOOP_DIR", filepath.ToSlash(filepath.Join(".mnemon", "harness", loop))))
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

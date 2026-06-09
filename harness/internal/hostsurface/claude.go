@@ -278,6 +278,11 @@ func (p claudeProjector) uninstallLoop(loop manifest.LoopManifest, binding manif
 		}
 	}
 	hostSkillsDir := p.installedHostSkillsDir(loop.Name, binding)
+	if loop.Name == "skill" {
+		if err := p.removeGeneratedSkillViews(hostSkillsDir); err != nil {
+			return err
+		}
+	}
 	for _, skill := range loop.Assets.Skills {
 		if err := p.removeManagedSkill(pathJoin(hostSkillsDir, skillID(skill), "SKILL.md")); err != nil {
 			return err

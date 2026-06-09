@@ -628,8 +628,11 @@ func (p codexProjector) installedHostSkillsDir(loopName string, binding manifest
 	return p.hostSkillsDir(loopName)
 }
 
-func (p codexProjector) removeGeneratedSkillViews(hostSkillsDir string) error {
-	entries, err := os.ReadDir(p.resolve(hostSkillsDir))
+// removeGeneratedSkillViews removes the host skill-view dirs the skill prime generated (marked by
+// .mnemon-skill-generated), leaving any user-authored host skill untouched. It is host-agnostic (both
+// hosts' skill primes write the same marker), so it lives on projectorCore.
+func (c projectorCore) removeGeneratedSkillViews(hostSkillsDir string) error {
+	entries, err := os.ReadDir(c.resolve(hostSkillsDir))
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -640,14 +643,14 @@ func (p codexProjector) removeGeneratedSkillViews(hostSkillsDir string) error {
 		if !entry.IsDir() {
 			continue
 		}
-		skillDir := p.displayJoin(hostSkillsDir, entry.Name())
-		marker := p.displayJoin(skillDir, ".mnemon-skill-generated")
-		if _, err := os.Stat(p.resolve(marker)); os.IsNotExist(err) {
+		skillDir := c.displayJoin(hostSkillsDir, entry.Name())
+		marker := c.displayJoin(skillDir, ".mnemon-skill-generated")
+		if _, err := os.Stat(c.resolve(marker)); os.IsNotExist(err) {
 			continue
 		} else if err != nil {
 			return fmt.Errorf("stat generated skill marker: %w", err)
 		}
-		if err := os.RemoveAll(p.resolve(skillDir)); err != nil {
+		if err := os.RemoveAll(c.resolve(skillDir)); err != nil {
 			return fmt.Errorf("remove generated skill view: %w", err)
 		}
 	}

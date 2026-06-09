@@ -93,15 +93,15 @@ run_host() {
 # run_skill exercises the SKILL loop end-to-end (the memory arm above covers the memory loop): setup
 # --skills, observe a skill candidate, tick, pull.
 run_skill() {
-	CUR_HOST="codex-skill"
-	local principal="codex@project" addr="http://127.0.0.1:8787"
-	local proj="$WORK/proj-skill"
+	local host="$1" principal="$2" addr="http://127.0.0.1:8787"
+	CUR_HOST="$host-skill"
+	local proj="$WORK/proj-skill-$host"
 	mkdir -p "$proj"
-	echo "=== E2E skill loop (codex) ==="
+	echo "=== E2E skill loop ($host) ==="
 	(
 		cd "$proj"
-		local tok=".mnemon/harness/channel/credentials/codex-project.token"
-		"$MH" setup --host codex --skills --principal "$principal" --control-url "$addr" >/dev/null
+		local tok=".mnemon/harness/channel/credentials/$(printf '%s' "$principal" | tr '@' '-').token"
+		"$MH" setup --host "$host" --skills --principal "$principal" --control-url "$addr" >/dev/null
 		"$MH" local run >"$WORK/run-skill.log" 2>&1 &
 		local runpid=$!
 		echo "$runpid" >"$PIDFILE"
@@ -127,13 +127,14 @@ run_skill() {
 		rm -f "$PIDFILE"
 	) || fail "skill flow failed (see $WORK/run-skill.log)"
 	sleep 0.3
-	echo "    skill loop OK"
+	echo "    skill loop ($host) OK"
 }
 
 # Both hosts run sequentially (the server is stopped between them), so they share the default
 # local-run bind addr; the port is the same for both.
 run_host codex codex@project 8787 .codex
 run_host claude-code claude@project 8787 .claude
-run_skill
+run_skill codex codex@project
+run_skill claude-code claude@project
 
-echo "E2E PASS (codex + claude-code)"
+echo "E2E PASS (codex + claude-code; memory + skill)"
