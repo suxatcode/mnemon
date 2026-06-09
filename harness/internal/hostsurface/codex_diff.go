@@ -84,7 +84,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 			return nil, fmt.Errorf("read %s: %w", asset.rel, err)
 		}
 		files = append(files, codexDesiredFile{
-			Path:    p.displayJoin(p.stateDir(loop.Name), asset.name),
+			Path:    pathJoin(p.stateDir(loop.Name), asset.name),
 			Content: content,
 			Mode:    asset.mode,
 		})
@@ -95,7 +95,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 			return nil, fmt.Errorf("read %s: %w", runtimeFile, err)
 		}
 		files = append(files, codexDesiredFile{
-			Path:             p.displayJoin(p.stateDir(loop.Name), runtimeFile),
+			Path:             pathJoin(p.stateDir(loop.Name), runtimeFile),
 			Content:          content,
 			Mode:             0o644,
 			PreserveExisting: loop.Name == "memory",
@@ -107,12 +107,12 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 	}
 	files = append(files,
 		codexDesiredFile{
-			Path:    p.displayJoin(binding.RuntimeSurface, "env.sh"),
+			Path:    pathJoin(binding.RuntimeSurface, "env.sh"),
 			Content: p.runtimeEnvContent(loop, binding),
 			Mode:    0o755,
 		},
 		codexDesiredFile{
-			Path:    p.displayJoin(binding.RuntimeSurface, "GUIDE.md"),
+			Path:    pathJoin(binding.RuntimeSurface, "GUIDE.md"),
 			Content: guideContent,
 			Mode:    0o644,
 		},
@@ -124,7 +124,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 				return nil, fmt.Errorf("read %s: %w", runtimeFile, err)
 			}
 			files = append(files, codexDesiredFile{
-				Path:    p.displayJoin(binding.RuntimeSurface, runtimeFile),
+				Path:    pathJoin(binding.RuntimeSurface, runtimeFile),
 				Content: content,
 				Mode:    0o644,
 			})
@@ -136,7 +136,7 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 			return nil, err
 		}
 		files = append(files, codexDesiredFile{
-			Path:    p.displayJoin(p.hostSkillsDir(loop.Name), skillID(skill), "SKILL.md"),
+			Path:    pathJoin(p.hostSkillsDir(loop.Name), skillID(skill), "SKILL.md"),
 			Content: content,
 			Mode:    0o644,
 		})
@@ -156,16 +156,16 @@ func (p codexProjector) desiredLoopFiles(loop manifest.LoopManifest, binding man
 			return nil, fmt.Errorf("read %s hook: %w", phase, err)
 		}
 		files = append(files, codexDesiredFile{
-			Path:    p.displayJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name, phase+".sh"),
+			Path:    pathJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name, phase+".sh"),
 			Content: content,
 			Mode:    0o755,
 		})
 	}
 	if p.codexHooksEnabled(loop.Name) {
-		files = append(files, codexDesiredFile{Path: p.displayJoin(binding.ProjectionPath, "hooks.json"), Metadata: "codex_hooks"})
+		files = append(files, codexDesiredFile{Path: pathJoin(binding.ProjectionPath, "hooks.json"), Metadata: "codex_hooks"})
 	}
 	files = append(files,
-		codexDesiredFile{Path: p.displayJoin(p.stateDir(loop.Name), "status.json"), Metadata: "loop_status"},
+		codexDesiredFile{Path: pathJoin(p.stateDir(loop.Name), "status.json"), Metadata: "loop_status"},
 		codexDesiredFile{Path: p.hostManifestPath(), Metadata: "host_manifest"},
 	)
 	return files, nil
@@ -229,17 +229,17 @@ func (p codexProjector) metadataMatches(file codexDesiredFile, loopName string) 
 			return false, nil
 		}
 		marker := "mnemon-" + loopName
-		hooksDir := p.displayJoin(p.paths.configDir, "hooks", marker)
+		hooksDir := pathJoin(p.paths.configDir, "hooks", marker)
 		opts := p.hookOptions(loopName)
-		expected := map[string]string{"SessionStart": p.displayJoin(hooksDir, "prime.sh")}
+		expected := map[string]string{"SessionStart": pathJoin(hooksDir, "prime.sh")}
 		if opts.Remind {
-			expected["UserPromptSubmit"] = p.displayJoin(hooksDir, "remind.sh")
+			expected["UserPromptSubmit"] = pathJoin(hooksDir, "remind.sh")
 		}
 		if opts.Nudge {
-			expected["Stop"] = p.displayJoin(hooksDir, "nudge.sh")
+			expected["Stop"] = pathJoin(hooksDir, "nudge.sh")
 		}
 		if opts.Compact {
-			expected["PreCompact"] = p.displayJoin(hooksDir, "compact.sh")
+			expected["PreCompact"] = pathJoin(hooksDir, "compact.sh")
 		}
 		return codexManagedHookCommandsMatch(hooks, marker, expected), nil
 	default:

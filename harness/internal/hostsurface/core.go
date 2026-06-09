@@ -1,11 +1,16 @@
 package hostsurface
 
 import (
+	"bufio"
+	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -28,13 +33,13 @@ type projectorCore struct {
 	host        string // "codex" | "claude-code"
 	projectRoot string
 	paths       corePaths
-	stdout      io.Writer
-	stderr      io.Writer
-	managed     *managedState // no-clobber projection state for managed definition files
-}
-
-func (c projectorCore) displayJoin(base string, elems ...string) string {
-	return pathJoin(base, elems...)
+	// shared host options (identical across hosts; set by each option parser)
+	skillsDirOverride string // --host-skills-dir
+	purgeMemory       bool   // --purge-memory
+	purgeLibrary      bool   // --purge-library
+	stdout            io.Writer
+	stderr            io.Writer
+	managed           *managedState // no-clobber projection state for managed definition files
 }
 
 // pathJoin is the package's display-path primitive: forward-slash joins for the host
@@ -137,7 +142,7 @@ func (c projectorCore) readExportValue(displayPath, key string) (string, bool) {
 
 func (c projectorCore) removeCommonStateFiles(stateDir string) error {
 	for _, name := range []string{"GUIDE.md", "env.sh", "loop.json", "status.json"} {
-		if err := os.Remove(c.resolve(c.displayJoin(stateDir, name))); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(c.resolve(pathJoin(stateDir, name))); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove %s: %w", name, err)
 		}
 	}
@@ -191,4 +196,224 @@ func agentFile(loopName, subagentPath string) string {
 	default:
 		return "mnemon-" + base + ".md"
 	}
+}
+
+// ---- methods shared verbatim by every host projector (hoisted from the per-host
+// adapters; the displayJoin/pathJoin split was cosmetic — displayJoin called pathJoin) ----
+
+func (p projectorCore) copyCommonCanonicalAssets(loop manifest.LoopManifest) error {
+	for _, asset := range []struct {
+		rel  string
+		name string
+		mode os.FileMode
+	}{
+		{rel: loop.Assets.Guide, name: "GUIDE.md", mode: 0o644},
+		{rel: loop.Assets.Env, name: "env.sh", mode: 0o755},
+		{rel: "loop.json", name: "loop.json", mode: 0o644},
+	} {
+		if err := p.copyFile(p.loopAsset(loop, asset.rel), pathJoin(p.stateDir(loop.Name), asset.name), asset.mode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p projectorCore) prepareLoopState(loop manifest.LoopManifest) error {
+	switch loop.Name {
+	case "memory":
+		for _, runtimeFile := range loop.Assets.RuntimeFiles {
+			if err := p.copyFileIfMissing(p.loopAsset(loop, runtimeFile), pathJoin(p.stateDir(loop.Name), runtimeFile), 0o644); err != nil {
+				return err
+			}
+		}
+	case "skill":
+		for _, dir := range []string{"skills/active", "skills/stale", "skills/archived", "proposals", "reports"} {
+			if err := os.MkdirAll(p.resolve(pathJoin(p.stateDir(loop.Name), dir)), 0o755); err != nil {
+				return fmt.Errorf("mkdir %s: %w", dir, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (p projectorCore) hostSkillsDir(loopName string) string {
+	if p.skillsDirOverride != "" && loopName != "memory" {
+		return filepath.ToSlash(p.skillsDirOverride)
+	}
+	return pathJoin(p.paths.configDir, "skills")
+}
+
+func (p projectorCore) installedHostSkillsDir(loopName string, binding manifest.BindingManifest) string {
+	envPath := pathJoin(binding.RuntimeSurface, "env.sh")
+	envVar := "MNEMON_" + strings.ToUpper(strings.ReplaceAll(loopName, "-", "_")) + "_LOOP_HOST_SKILLS_DIR"
+	if value, ok := p.readExportValue(envPath, envVar); ok {
+		return value
+	}
+	return p.hostSkillsDir(loopName)
+}
+
+func (p projectorCore) ensureStore(ctx context.Context, storeName string) error {
+	mnemon, err := exec.LookPath("mnemon")
+	if err != nil {
+		return fmt.Errorf("mnemon binary not found in PATH; build or install it before setting a %s memory store", p.host)
+	}
+	list := exec.CommandContext(ctx, mnemon, "store", "list")
+	list.Dir = p.projectRoot
+	list.Stderr = p.stderr
+	output, err := list.Output()
+	if err != nil {
+		return fmt.Errorf("mnemon store list: %w", err)
+	}
+	if !storeListContains(output, storeName) {
+		create := exec.CommandContext(ctx, mnemon, "store", "create", storeName)
+		create.Dir = p.projectRoot
+		create.Stdout = io.Discard
+		create.Stderr = p.stderr
+		if err := create.Run(); err != nil {
+			return fmt.Errorf("mnemon store create %s: %w", storeName, err)
+		}
+	}
+	set := exec.CommandContext(ctx, mnemon, "store", "set", storeName)
+	set.Dir = p.projectRoot
+	set.Stdout = io.Discard
+	set.Stderr = p.stderr
+	if err := set.Run(); err != nil {
+		return fmt.Errorf("mnemon store set %s: %w", storeName, err)
+	}
+	return nil
+}
+
+func (p projectorCore) projectHooks(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
+	for phase := range loop.Assets.HookPrompts {
+		source := path.Join("hosts", p.host, loop.Name, "hooks", phase+".sh")
+		if _, err := fs.Stat(assets.FS, source); errors.Is(err, fs.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return fmt.Errorf("stat hook %s: %w", phase, err)
+		}
+		target := pathJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name, phase+".sh")
+		if err := p.projectManaged(source, target, 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p projectorCore) removeCanonicalState(loop manifest.LoopManifest) error {
+	stateDir := p.stateDir(loop.Name)
+	switch loop.Name {
+	case "memory":
+		if p.purgeMemory {
+			return os.RemoveAll(p.resolve(stateDir))
+		}
+		return p.removeCommonStateFiles(stateDir)
+	case "skill":
+		if p.purgeLibrary {
+			return os.RemoveAll(p.resolve(stateDir))
+		}
+		if err := p.removeCommonStateFiles(stateDir); err != nil {
+			return err
+		}
+		for _, dir := range []string{"reports", "proposals"} {
+			_ = os.Remove(p.resolve(pathJoin(stateDir, dir)))
+		}
+		_ = os.Remove(p.resolve(stateDir))
+	default:
+		return p.removeCommonStateFiles(stateDir)
+	}
+	return nil
+}
+
+func (p projectorCore) writeLoopStatus(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
+	status := map[string]any{
+		"schema_version":  2,
+		"loop":            loop.Name,
+		"host":            p.host,
+		"phase":           "projected",
+		"updated_at":      nowUTC(),
+		"project_root":    p.projectRoot,
+		"projection_path": p.paths.configDir,
+		"state_path":      p.stateDir(loop.Name),
+		"control_model":   nonNilMap(loop.ControlModel),
+		"entity_profiles": nonNilMap(loop.EntityProfiles),
+		"surfaces":        loop.Surfaces,
+	}
+	return p.writeJSON(pathJoin(p.stateDir(loop.Name), "status.json"), status, 0o644)
+}
+
+func (p projectorCore) runtimeEnvContent(loop manifest.LoopManifest, binding manifest.BindingManifest) []byte {
+	envName := loopEnvName(loop.Name)
+	loopDirVar := loopDirVarName(loop.Name)
+	stateDir := p.stateDir(loop.Name)
+	lines := []string{
+		"#!/usr/bin/env bash",
+		exportLine(envName, pathJoin(stateDir, "env.sh")),
+		exportLine(loopDirVar, stateDir),
+	}
+	switch loop.Name {
+	case "memory":
+		lines = append(lines, `export MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES="${MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES:-200}"`)
+	case "skill":
+		hostSkillsDir := p.hostSkillsDir(loop.Name)
+		lines = append(lines,
+			exportLine("MNEMON_SKILL_LOOP_LIBRARY_DIR", pathJoin(stateDir, "skills")),
+			exportLine("MNEMON_SKILL_LOOP_ACTIVE_DIR", pathJoin(stateDir, "skills/active")),
+			exportLine("MNEMON_SKILL_LOOP_STALE_DIR", pathJoin(stateDir, "skills/stale")),
+			exportLine("MNEMON_SKILL_LOOP_ARCHIVED_DIR", pathJoin(stateDir, "skills/archived")),
+			exportLine("MNEMON_SKILL_LOOP_USAGE_FILE", pathJoin(stateDir, "skills/.usage.jsonl")),
+			exportLine("MNEMON_SKILL_LOOP_PROPOSALS_DIR", pathJoin(stateDir, "proposals")),
+			exportLine("MNEMON_SKILL_LOOP_HOST_SKILLS_DIR", hostSkillsDir),
+			`export MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS="${MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS:-20}"`,
+			`export MNEMON_SKILL_LOOP_PROTECTED_SKILLS="${MNEMON_SKILL_LOOP_PROTECTED_SKILLS:-skill-observe,skill-curate,skill-author,skill-manage,memory-get,memory-set}"`,
+		)
+	}
+	content := strings.Join(lines, "\n") + "\n"
+	return []byte(content)
+}
+
+func (p projectorCore) writeRuntimeEnv(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
+	// Route through projectManaged so env.sh is hash-recorded: a pre-existing/edited one is preserved
+	// on install and on uninstall, like every other managed runtime-surface file.
+	return p.projectManagedBytes(p.runtimeEnvContent(loop, binding), pathJoin(binding.RuntimeSurface, "env.sh"), 0o755)
+}
+
+// removeGeneratedSkillViews removes the host skill-view dirs the skill prime generated (marked by
+// .mnemon-skill-generated), leaving any user-authored host skill untouched. It is host-agnostic (both
+// hosts' skill primes write the same marker), so it lives on projectorCore.
+func (c projectorCore) removeGeneratedSkillViews(hostSkillsDir string) error {
+	entries, err := os.ReadDir(c.resolve(hostSkillsDir))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read host skills dir: %w", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		skillDir := pathJoin(hostSkillsDir, entry.Name())
+		marker := pathJoin(skillDir, ".mnemon-skill-generated")
+		if _, err := os.Stat(c.resolve(marker)); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return fmt.Errorf("stat generated skill marker: %w", err)
+		}
+		if err := os.RemoveAll(c.resolve(skillDir)); err != nil {
+			return fmt.Errorf("remove generated skill view: %w", err)
+		}
+	}
+	return nil
+}
+
+func storeListContains(output []byte, storeName string) bool {
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		line = strings.TrimLeft(line, "* ")
+		if strings.TrimSpace(line) == storeName {
+			return true
+		}
+	}
+	return false
 }

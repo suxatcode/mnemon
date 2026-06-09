@@ -154,7 +154,7 @@ func (c projectorCore) removeManagedTree(dirDisplay string) error {
 		return err
 	}
 	for _, e := range entries {
-		childDisplay := c.displayJoin(dirDisplay, e.Name())
+		childDisplay := pathJoin(dirDisplay, e.Name())
 		if e.IsDir() {
 			if err := c.removeManagedTree(childDisplay); err != nil {
 				return err

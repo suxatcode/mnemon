@@ -1,7 +1,6 @@
 package hostsurface
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,8 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -178,6 +175,10 @@ func newCodexProjector(action string, opts CodexOptions) (codexProjector, []stri
 			stdout:      opts.Stdout,
 			stderr:      opts.Stderr,
 			managed:     newManagedState(),
+
+			skillsDirOverride: hostOptions.hostSkillsDir,
+			purgeMemory:       hostOptions.purgeMemory,
+			purgeLibrary:      hostOptions.purgeLibrary,
 		},
 		hostOptions: hostOptions,
 	}, loops, nil
@@ -253,7 +254,7 @@ func (p codexProjector) installLoop(ctx context.Context, loop manifest.LoopManif
 	if err := p.writeRuntimeEnv(loop, binding); err != nil {
 		return err
 	}
-	if err := p.projectManaged(p.loopAsset(loop, loop.Assets.Guide), p.displayJoin(binding.RuntimeSurface, "GUIDE.md"), 0o644); err != nil {
+	if err := p.projectManaged(p.loopAsset(loop, loop.Assets.Guide), pathJoin(binding.RuntimeSurface, "GUIDE.md"), 0o644); err != nil {
 		return err
 	}
 	if err := p.projectRuntimeMirrors(loop, binding); err != nil {
@@ -312,11 +313,11 @@ func (p codexProjector) uninstallLoop(loop manifest.LoopManifest) error {
 		}
 	}
 	for _, skill := range loop.Assets.Skills {
-		if err := p.removeManagedSkill(p.displayJoin(hostSkillsDir, skillID(skill), "SKILL.md")); err != nil {
+		if err := p.removeManagedSkill(pathJoin(hostSkillsDir, skillID(skill), "SKILL.md")); err != nil {
 			return err
 		}
 	}
-	if err := p.removeManagedTree(p.displayJoin(p.paths.configDir, "hooks", "mnemon-"+loop.Name)); err != nil {
+	if err := p.removeManagedTree(pathJoin(p.paths.configDir, "hooks", "mnemon-"+loop.Name)); err != nil {
 		return err
 	}
 	if err := p.removeManagedTree(binding.RuntimeSurface); err != nil {
@@ -332,47 +333,6 @@ func (p codexProjector) uninstallLoop(loop manifest.LoopManifest) error {
 	return nil
 }
 
-func (p codexProjector) copyCommonCanonicalAssets(loop manifest.LoopManifest) error {
-	for _, asset := range []struct {
-		rel  string
-		name string
-		mode os.FileMode
-	}{
-		{rel: loop.Assets.Guide, name: "GUIDE.md", mode: 0o644},
-		{rel: loop.Assets.Env, name: "env.sh", mode: 0o755},
-		{rel: "loop.json", name: "loop.json", mode: 0o644},
-	} {
-		if err := p.copyFile(p.loopAsset(loop, asset.rel), p.displayJoin(p.stateDir(loop.Name), asset.name), asset.mode); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p codexProjector) prepareLoopState(loop manifest.LoopManifest) error {
-	switch loop.Name {
-	case "memory":
-		for _, runtimeFile := range loop.Assets.RuntimeFiles {
-			if err := p.copyFileIfMissing(p.loopAsset(loop, runtimeFile), p.displayJoin(p.stateDir(loop.Name), runtimeFile), 0o644); err != nil {
-				return err
-			}
-		}
-	case "skill":
-		for _, dir := range []string{"skills/active", "skills/stale", "skills/archived", "proposals", "reports"} {
-			if err := os.MkdirAll(p.resolve(p.displayJoin(p.stateDir(loop.Name), dir)), 0o755); err != nil {
-				return fmt.Errorf("mkdir %s: %w", dir, err)
-			}
-		}
-	}
-	return nil
-}
-
-func (p codexProjector) writeRuntimeEnv(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
-	// Route through projectManaged so env.sh is hash-recorded: a pre-existing/edited one is preserved
-	// on install and on uninstall, like every other managed runtime-surface file.
-	return p.projectManagedBytes(p.runtimeEnvContent(loop, binding), p.displayJoin(binding.RuntimeSurface, "env.sh"), 0o755)
-}
-
 func (p codexProjector) projectRuntimeMirrors(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	if loop.Name != "memory" {
 		return nil
@@ -380,47 +340,17 @@ func (p codexProjector) projectRuntimeMirrors(loop manifest.LoopManifest, bindin
 	for _, runtimeFile := range loop.Assets.RuntimeFiles {
 		// Hash-recorded too: seeds the mirror on first install, preserves a live (prime-regenerated) or
 		// user-edited mirror on re-setup and uninstall instead of clobbering/deleting it.
-		if err := p.projectManaged(p.loopAsset(loop, runtimeFile), p.displayJoin(binding.RuntimeSurface, runtimeFile), 0o644); err != nil {
+		if err := p.projectManaged(p.loopAsset(loop, runtimeFile), pathJoin(binding.RuntimeSurface, runtimeFile), 0o644); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p codexProjector) runtimeEnvContent(loop manifest.LoopManifest, binding manifest.BindingManifest) []byte {
-	envName := loopEnvName(loop.Name)
-	loopDirVar := loopDirVarName(loop.Name)
-	stateDir := p.stateDir(loop.Name)
-	lines := []string{
-		"#!/usr/bin/env bash",
-		exportLine(envName, p.displayJoin(stateDir, "env.sh")),
-		exportLine(loopDirVar, stateDir),
-	}
-	switch loop.Name {
-	case "memory":
-		lines = append(lines, `export MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES="${MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES:-200}"`)
-	case "skill":
-		hostSkillsDir := p.hostSkillsDir(loop.Name)
-		lines = append(lines,
-			exportLine("MNEMON_SKILL_LOOP_LIBRARY_DIR", p.displayJoin(stateDir, "skills")),
-			exportLine("MNEMON_SKILL_LOOP_ACTIVE_DIR", p.displayJoin(stateDir, "skills/active")),
-			exportLine("MNEMON_SKILL_LOOP_STALE_DIR", p.displayJoin(stateDir, "skills/stale")),
-			exportLine("MNEMON_SKILL_LOOP_ARCHIVED_DIR", p.displayJoin(stateDir, "skills/archived")),
-			exportLine("MNEMON_SKILL_LOOP_USAGE_FILE", p.displayJoin(stateDir, "skills/.usage.jsonl")),
-			exportLine("MNEMON_SKILL_LOOP_PROPOSALS_DIR", p.displayJoin(stateDir, "proposals")),
-			exportLine("MNEMON_SKILL_LOOP_HOST_SKILLS_DIR", hostSkillsDir),
-			`export MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS="${MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS:-20}"`,
-			`export MNEMON_SKILL_LOOP_PROTECTED_SKILLS="${MNEMON_SKILL_LOOP_PROTECTED_SKILLS:-skill-observe,skill-curate,skill-author,skill-manage,memory-get,memory-set}"`,
-		)
-	}
-	content := strings.Join(lines, "\n") + "\n"
-	return []byte(content)
-}
-
 func (p codexProjector) projectSkills(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	hostSkillsDir := p.hostSkillsDir(loop.Name)
 	for _, skill := range loop.Assets.Skills {
-		target := p.displayJoin(hostSkillsDir, skillID(skill), "SKILL.md")
+		target := pathJoin(hostSkillsDir, skillID(skill), "SKILL.md")
 		content, err := p.projectedSkillContent(loop, binding, skill)
 		if err != nil {
 			return err
@@ -437,32 +367,16 @@ func (p codexProjector) projectedSkillContent(loop manifest.LoopManifest, bindin
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", skill, err)
 	}
-	note := runtimeNote(loopDirVarName(loop.Name), p.displayJoin(binding.RuntimeSurface, "env.sh"), p.stateDir(loop.Name))
+	note := runtimeNote(loopDirVarName(loop.Name), pathJoin(binding.RuntimeSurface, "env.sh"), p.stateDir(loop.Name))
 	return append(content, []byte(note)...), nil
 }
 
-func (p codexProjector) projectHooks(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
-	for phase := range loop.Assets.HookPrompts {
-		source := path.Join("hosts", "codex", loop.Name, "hooks", phase+".sh")
-		if _, err := fs.Stat(assets.FS, source); errors.Is(err, fs.ErrNotExist) {
-			continue
-		} else if err != nil {
-			return fmt.Errorf("stat hook %s: %w", phase, err)
-		}
-		target := p.displayJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name, phase+".sh")
-		if err := p.projectManaged(source, target, 0o755); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (p codexProjector) patchHooks(loopName string) error {
-	return patchCodexHooks(p.resolve(p.displayJoin(p.paths.configDir, "hooks.json")), p.paths.configDir, "mnemon-"+loopName, p.hookOptions(loopName))
+	return patchCodexHooks(p.resolve(pathJoin(p.paths.configDir, "hooks.json")), p.paths.configDir, "mnemon-"+loopName, p.hookOptions(loopName))
 }
 
 func (p codexProjector) unpatchHooks(loopName string) error {
-	return unpatchCodexHooks(p.resolve(p.displayJoin(p.paths.configDir, "hooks.json")), "mnemon-"+loopName)
+	return unpatchCodexHooks(p.resolve(pathJoin(p.paths.configDir, "hooks.json")), "mnemon-"+loopName)
 }
 
 func (p codexProjector) hookOptions(loopName string) codexHookOptions {
@@ -478,66 +392,6 @@ func (p codexProjector) hookOptions(loopName string) codexHookOptions {
 
 func (p codexProjector) codexHooksEnabled(loopName string) bool {
 	return loopName == "memory" || loopName == "skill"
-}
-
-func (p codexProjector) ensureStore(ctx context.Context, storeName string) error {
-	mnemon, err := exec.LookPath("mnemon")
-	if err != nil {
-		return errors.New("mnemon binary not found in PATH; build or install it before setting a Codex memory store")
-	}
-	list := exec.CommandContext(ctx, mnemon, "store", "list")
-	list.Dir = p.projectRoot
-	list.Stderr = p.stderr
-	output, err := list.Output()
-	if err != nil {
-		return fmt.Errorf("mnemon store list: %w", err)
-	}
-	if !storeListContains(output, storeName) {
-		create := exec.CommandContext(ctx, mnemon, "store", "create", storeName)
-		create.Dir = p.projectRoot
-		create.Stdout = io.Discard
-		create.Stderr = p.stderr
-		if err := create.Run(); err != nil {
-			return fmt.Errorf("mnemon store create %s: %w", storeName, err)
-		}
-	}
-	set := exec.CommandContext(ctx, mnemon, "store", "set", storeName)
-	set.Dir = p.projectRoot
-	set.Stdout = io.Discard
-	set.Stderr = p.stderr
-	if err := set.Run(); err != nil {
-		return fmt.Errorf("mnemon store set %s: %w", storeName, err)
-	}
-	return nil
-}
-
-func storeListContains(output []byte, storeName string) bool {
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		line = strings.TrimLeft(line, "* ")
-		if strings.TrimSpace(line) == storeName {
-			return true
-		}
-	}
-	return false
-}
-
-func (p codexProjector) writeLoopStatus(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
-	status := map[string]any{
-		"schema_version":  2,
-		"loop":            loop.Name,
-		"host":            "codex",
-		"phase":           "projected",
-		"updated_at":      nowUTC(),
-		"project_root":    p.projectRoot,
-		"projection_path": p.paths.configDir,
-		"state_path":      p.stateDir(loop.Name),
-		"control_model":   nonNilMap(loop.ControlModel),
-		"entity_profiles": nonNilMap(loop.EntityProfiles),
-		"surfaces":        loop.Surfaces,
-	}
-	return p.writeJSON(p.displayJoin(p.stateDir(loop.Name), "status.json"), status, 0o644)
 }
 
 func (p codexProjector) writeHostManifest(loop manifest.LoopManifest, binding manifest.BindingManifest, ownership projectionOwnership) error {
@@ -570,17 +424,17 @@ func (p codexProjector) writeHostManifest(loop manifest.LoopManifest, binding ma
 		"runtime": binding.RuntimeSurface,
 	}
 	if p.codexHooksEnabled(loop.Name) {
-		surfaces["hooks"] = p.displayJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name)
+		surfaces["hooks"] = pathJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name)
 	}
 	manifest.Loops[loop.Name] = hostManifestLoop{
 		LoopPath:    p.stateDir(loop.Name),
 		LoopVersion: loop.Version,
 		StatePath:   p.stateDir(loop.Name),
-		IntentPolicy: p.displayJoin(
+		IntentPolicy: pathJoin(
 			p.stateDir(loop.Name),
 			"GUIDE.md",
 		),
-		StatusPath: p.displayJoin(p.stateDir(loop.Name), "status.json"),
+		StatusPath: pathJoin(p.stateDir(loop.Name), "status.json"),
 		Projection: map[string]any{
 			"path":     p.paths.configDir,
 			"surfaces": loop.Surfaces.Projection,
@@ -600,110 +454,40 @@ func (p codexProjector) writeHostManifest(loop manifest.LoopManifest, binding ma
 	return p.writeJSON(p.hostManifestPath(), manifest, 0o644)
 }
 
-func (p codexProjector) removeCanonicalState(loop manifest.LoopManifest) error {
-	stateDir := p.stateDir(loop.Name)
-	switch loop.Name {
-	case "memory":
-		if p.hostOptions.purgeMemory {
-			return os.RemoveAll(p.resolve(stateDir))
-		}
-		return p.removeCommonStateFiles(stateDir)
-	case "skill":
-		if p.hostOptions.purgeLibrary {
-			return os.RemoveAll(p.resolve(stateDir))
-		}
-		if err := p.removeCommonStateFiles(stateDir); err != nil {
-			return err
-		}
-		for _, dir := range []string{"reports", "proposals"} {
-			_ = os.Remove(p.resolve(p.displayJoin(stateDir, dir)))
-		}
-		_ = os.Remove(p.resolve(stateDir))
-	default:
-		return p.removeCommonStateFiles(stateDir)
-	}
-	return nil
-}
-
-func (p codexProjector) installedHostSkillsDir(loopName string, binding manifest.BindingManifest) string {
-	envPath := p.displayJoin(binding.RuntimeSurface, "env.sh")
-	envVar := "MNEMON_" + strings.ToUpper(strings.ReplaceAll(loopName, "-", "_")) + "_LOOP_HOST_SKILLS_DIR"
-	if value, ok := p.readExportValue(envPath, envVar); ok {
-		return value
-	}
-	return p.hostSkillsDir(loopName)
-}
-
-// removeGeneratedSkillViews removes the host skill-view dirs the skill prime generated (marked by
-// .mnemon-skill-generated), leaving any user-authored host skill untouched. It is host-agnostic (both
-// hosts' skill primes write the same marker), so it lives on projectorCore.
-func (c projectorCore) removeGeneratedSkillViews(hostSkillsDir string) error {
-	entries, err := os.ReadDir(c.resolve(hostSkillsDir))
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read host skills dir: %w", err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		skillDir := c.displayJoin(hostSkillsDir, entry.Name())
-		marker := c.displayJoin(skillDir, ".mnemon-skill-generated")
-		if _, err := os.Stat(c.resolve(marker)); os.IsNotExist(err) {
-			continue
-		} else if err != nil {
-			return fmt.Errorf("stat generated skill marker: %w", err)
-		}
-		if err := os.RemoveAll(c.resolve(skillDir)); err != nil {
-			return fmt.Errorf("remove generated skill view: %w", err)
-		}
-	}
-	return nil
-}
-
 func (p codexProjector) loopOwnership(loop manifest.LoopManifest, binding manifest.BindingManifest) projectionOwnership {
 	files := []string{
-		p.displayJoin(p.stateDir(loop.Name), "GUIDE.md"),
-		p.displayJoin(p.stateDir(loop.Name), "env.sh"),
-		p.displayJoin(p.stateDir(loop.Name), "loop.json"),
-		p.displayJoin(p.stateDir(loop.Name), "status.json"),
-		p.displayJoin(binding.RuntimeSurface, "env.sh"),
-		p.displayJoin(binding.RuntimeSurface, "GUIDE.md"),
+		pathJoin(p.stateDir(loop.Name), "GUIDE.md"),
+		pathJoin(p.stateDir(loop.Name), "env.sh"),
+		pathJoin(p.stateDir(loop.Name), "loop.json"),
+		pathJoin(p.stateDir(loop.Name), "status.json"),
+		pathJoin(binding.RuntimeSurface, "env.sh"),
+		pathJoin(binding.RuntimeSurface, "GUIDE.md"),
 	}
 	for _, runtimeFile := range loop.Assets.RuntimeFiles {
 		if loop.Name == "memory" {
 			continue
 		}
-		files = append(files, p.displayJoin(p.stateDir(loop.Name), runtimeFile))
+		files = append(files, pathJoin(p.stateDir(loop.Name), runtimeFile))
 	}
 	for _, skill := range loop.Assets.Skills {
-		files = append(files, p.displayJoin(p.hostSkillsDir(loop.Name), skillID(skill), "SKILL.md"))
+		files = append(files, pathJoin(p.hostSkillsDir(loop.Name), skillID(skill), "SKILL.md"))
 	}
 	if p.codexHooksEnabled(loop.Name) {
-		files = append(files, p.displayJoin(binding.ProjectionPath, "hooks.json"))
+		files = append(files, pathJoin(binding.ProjectionPath, "hooks.json"))
 	}
 	for phase := range loop.Assets.HookPrompts {
-		hook := p.displayJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name, phase+".sh")
+		hook := pathJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name, phase+".sh")
 		if p.exists(hook) || p.hostHookExists(loop.Name, phase) {
 			files = append(files, hook)
 		}
 	}
 	dirs := []string{binding.RuntimeSurface}
 	if p.codexHooksEnabled(loop.Name) {
-		dirs = append(dirs, p.displayJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name))
+		dirs = append(dirs, pathJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name))
 	}
 	sort.Strings(files)
 	sort.Strings(dirs)
 	return projectionOwnership{Files: files, Dirs: dirs}
-}
-
-func (p codexProjector) hostSkillsDir(loopName string) string {
-	if p.hostOptions.hostSkillsDir != "" && loopName != "memory" {
-		return filepath.ToSlash(p.hostOptions.hostSkillsDir)
-	}
-	return p.displayJoin(p.paths.configDir, "skills")
 }
 
 func runtimeNote(loopDirVar, runtimeFile, canonicalLoopDir string) string {
