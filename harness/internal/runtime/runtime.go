@@ -202,10 +202,11 @@ func (r *Runtime) Status(principal contract.ActorID) (contract.ChannelStatus, er
 	}, nil
 }
 
-// DrainOutbox claims and acks the pending projection-invalidation outbox rows. It is the driver's
-// out-of-band duty, UNCONDITIONAL of the job lane (a second ClaimOutbox caller, kind "invalidation",
-// with an owner distinct from the lane). It returns how many rows it drained so the driver knows
-// whether a re-projection is warranted.
+// DrainOutbox claims, acks, AND PRUNES the pending projection-invalidation outbox rows. It is the
+// driver's out-of-band duty, UNCONDITIONAL of the job lane (a second ClaimOutbox caller, kind
+// "invalidation", with an owner distinct from the lane). It returns how many rows it drained so the
+// driver knows whether a re-projection is warranted. Acked rows are pruned in the same pass —
+// nothing re-reads them, and without the prune the outbox grows one dead row per accepted decision.
 //
 // (The locked signature was DrainOutbox() error; it also returns the count so the driver can gate
 // re-projection on whether anything was actually invalidated.)
@@ -219,6 +220,9 @@ func (r *Runtime) DrainOutbox() (int, error) {
 		if err := r.store.AckOutbox(row.ID, owner); err != nil {
 			return 0, err
 		}
+	}
+	if _, err := r.store.DeleteAckedOutbox("invalidation"); err != nil {
+		return 0, err
 	}
 	return len(rows), nil
 }

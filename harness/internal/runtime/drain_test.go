@@ -43,3 +43,31 @@ func TestDrainOutboxClaimsInvalidations(t *testing.T) {
 		t.Fatalf("a re-drain must find nothing; got %d (err %v)", n2, err)
 	}
 }
+
+// DrainOutbox must PRUNE what it acks: acked rows are never re-read, so leaving them accumulates
+// one dead row per accepted decision for the life of the project.
+func TestDrainOutboxPrunesAckedRows(t *testing.T) {
+	rt, err := OpenRuntime(filepath.Join(t.TempDir(), "s.db"), RuntimeConfig{
+		Rules:     rule.NewRuleSet(createOnObserve()),
+		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"agent": {"memory"}}},
+		Subs:      map[contract.ActorID]contract.Subscription{"agent": {Actor: "agent", Refs: []contract.ResourceRef{{Kind: "memory", ID: "m1"}}}},
+	})
+	if err != nil {
+		t.Fatalf("open runtime: %v", err)
+	}
+	defer rt.Close()
+	if _, _, err := rt.API().Ingest("agent", contract.ObservationEnvelope{
+		ExternalID: "e1", Event: contract.Event{Type: "memory.observed", Payload: map[string]any{}},
+	}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if _, err := rt.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	if n, err := rt.DrainOutbox(); err != nil || n != 1 {
+		t.Fatalf("drain: n=%d err=%v", n, err)
+	}
+	if left, err := rt.store.DeleteAckedOutbox("invalidation"); err != nil || left != 0 {
+		t.Fatalf("DrainOutbox must have pruned its acked rows; a manual prune still found %d (err %v)", left, err)
+	}
+}

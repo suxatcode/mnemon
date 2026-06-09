@@ -84,3 +84,40 @@ func TestDuplicateIdempotencyKeyIsNoop(t *testing.T) {
 		t.Fatalf("duplicate idempotency key must yield exactly one row, got %d", len(claimed))
 	}
 }
+
+// DeleteAckedOutbox prunes terminally-acked rows of one kind: acked rows are dead weight (nothing
+// re-reads them), and without pruning the outbox grows one row per accepted decision forever.
+func TestDeleteAckedOutboxPrunesOnlyAckedOfKind(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.WithTx(func(tx *Tx) error {
+		for _, id := range []string{"i1", "i2"} {
+			if err := tx.EnqueueOutbox(OutboxRow{ID: id, Kind: "invalidation"}); err != nil {
+				return err
+			}
+		}
+		return tx.EnqueueOutbox(OutboxRow{ID: "j1", Kind: "job"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.ClaimOutbox("w", time.Minute, "invalidation")
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("claim: %d rows err=%v", len(rows), err)
+	}
+	if err := s.AckOutbox("i1", "w"); err != nil {
+		t.Fatal(err)
+	}
+	n, err := s.DeleteAckedOutbox("invalidation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("must prune exactly the acked invalidation; got %d", n)
+	}
+	// the unacked claim + the other kind survive
+	if err := s.AckOutbox("i2", "w"); err != nil {
+		t.Fatalf("unacked row must survive the prune: %v", err)
+	}
+	if n, _ := s.DeleteAckedOutbox("job"); n != 0 {
+		t.Fatalf("unacked job row must not be pruned; got %d", n)
+	}
+}

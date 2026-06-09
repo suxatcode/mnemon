@@ -365,6 +365,18 @@ func (s *Store) AckOutbox(id, owner string) error {
 	return nil
 }
 
+// DeleteAckedOutbox prunes terminally-acked rows of one kind. Acked rows are never re-read
+// (ClaimOutbox excludes them), so a consumer that acks without pruning grows the outbox by one dead
+// row per accepted decision for the life of the project. Returns how many rows were pruned.
+func (s *Store) DeleteAckedOutbox(kind string) (int, error) {
+	res, err := s.db.Exec(`DELETE FROM outbox WHERE kind=? AND status='acked'`, kind)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
 // AppendDecisionTx writes a decision INSIDE a caller's txn (used for accepted ops — crash-safe atomicity, Invariant #7).
 func (t *Tx) AppendDecisionTx(d contract.Decision) error {
 	b, _ := json.Marshal(d)
