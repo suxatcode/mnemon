@@ -284,7 +284,7 @@ func (p claudeProjector) uninstallLoop(loop manifest.LoopManifest, binding manif
 		}
 	}
 	for _, subagent := range loop.Assets.Subagents {
-		if err := os.Remove(p.resolve(pathJoin(p.paths.configDir, "agents", agentFile(loop.Name, subagent)))); err != nil && !os.IsNotExist(err) {
+		if err := p.removeManagedFile(pathJoin(p.paths.configDir, "agents", agentFile(loop.Name, subagent))); err != nil {
 			return fmt.Errorf("remove projected agent: %w", err)
 		}
 	}
@@ -381,7 +381,7 @@ func (p claudeProjector) projectSkills(loop manifest.LoopManifest, binding manif
 func (p claudeProjector) projectAgents(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
 	for _, subagent := range loop.Assets.Subagents {
 		target := pathJoin(binding.ProjectionPath, "agents", agentFile(loop.Name, subagent))
-		if err := p.copyFile(p.loopAsset(loop, subagent), target, 0o644); err != nil {
+		if err := p.projectManaged(p.loopAsset(loop, subagent), target, 0o644); err != nil {
 			return err
 		}
 	}

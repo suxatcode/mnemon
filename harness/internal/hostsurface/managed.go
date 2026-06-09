@@ -94,6 +94,27 @@ func (c projectorCore) removeManagedSkill(skillFileDisplay string) error {
 	return os.RemoveAll(filepath.Dir(abs))
 }
 
+// removeManagedFile removes a single projected managed file living in a SHARED directory (e.g. a
+// subagent under .claude/agents alongside the user's own agents) only if it is still ours — its
+// on-disk hash matches what we recorded. A user-edited or pre-existing (unrecorded) file is preserved
+// + reported; an absent file is a no-op. Call beginManaged(loop) first.
+func (c projectorCore) removeManagedFile(dstDisplay string) error {
+	abs := c.resolve(dstDisplay)
+	current, err := os.ReadFile(abs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if hash, ok := c.managed.prior[dstDisplay]; ok && hashBytes(current) == hash {
+		return os.Remove(abs)
+	}
+	c.managed.conflicts = append(c.managed.conflicts, dstDisplay)
+	c.printf("preserved %s (not Mnemon-managed or user-modified)\n", dstDisplay)
+	return nil
+}
+
 // removeManagedTree removes a Mnemon-owned projection directory safely on uninstall: each recorded
 // managed file (GUIDE, hook) is removed only if its on-disk hash still matches what we wrote (a
 // user-edited one is preserved + reported); every other entry (derived mirrors, generated env, runtime
