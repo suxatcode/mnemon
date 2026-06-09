@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/config"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
@@ -22,7 +21,7 @@ const (
 // SkillAdmissionRule admits an append-only skill declaration from one authenticated principal. It is
 // the skill descriptor over the generic kind.
 func SkillAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) rule.Rule {
-	return Builtins["skill"].Rule(principal, ref, config.CapabilityConfig{})
+	return Builtins["skill"].Rule(principal, ref, Limits{})
 }
 
 // RemoteSkillImportRule admits a remote skill commit for the sync import actor, merging non-conflicting

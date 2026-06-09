@@ -1,10 +1,10 @@
 package capability
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/config"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
 )
@@ -34,10 +34,15 @@ type Capability struct {
 	Limits       Limits
 }
 
-// Rule builds the capability's admission rule for one principal + resource ref. cfg may bound the
-// capability (e.g. MaxPayloadBytes) without changing the compiled kind.
-func (c Capability) Rule(principal contract.ActorID, ref contract.ResourceRef, cfg config.CapabilityConfig) rule.Rule {
-	return appendItemRule(c, principal, ref)
+// Rule builds the capability's admission rule for one principal + resource ref. limits bounds the
+// capability (MaxPayloadBytes; 0 = unbounded — the 1 MiB channel body cap still applies upstream)
+// without changing the compiled kind.
+//
+// Deviation from the locked Phase-2 signature Rule(..., cfg config.CapabilityConfig)
+// (plan-control-plane.md:241): the same plan locks capability as a rule/projection/contract-only
+// leaf (:51,:61); the leaf wins, and the assembler maps config.CapabilityConfig -> Limits.
+func (c Capability) Rule(principal contract.ActorID, ref contract.ResourceRef, limits Limits) rule.Rule {
+	return appendItemRule(c, principal, ref, limits)
 }
 
 // Builtins is the trusted registry the assembler selects from (select-only, fail-closed on unknown id).
@@ -80,11 +85,18 @@ func noteHeader(items []Item) map[string]any {
 // appendItemRule is the ONE generic kind: decode the candidate to an Item, stamp trusted id/actor/seq,
 // append it to the resource's item list, and propose a write carrying the item list + the capability's
 // header fields + updated_by. It only acts on events from its own principal.
-func appendItemRule(c Capability, principal contract.ActorID, ref contract.ResourceRef) rule.Rule {
+func appendItemRule(c Capability, principal contract.ActorID, ref contract.ResourceRef, limits Limits) rule.Rule {
 	return rule.NewNativeRule("local-"+c.Name+"-admission:"+string(principal), principal, c.ProposedType, ObservedTypeAndAliases(c.ObservedType),
 		func(in rule.RuleInput) (contract.RuleDecision, error) {
 			if in.Event.Actor != principal {
 				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+			}
+			if limits.MaxPayloadBytes > 0 {
+				raw, merr := json.Marshal(in.Event.Payload)
+				if merr != nil || len(raw) > limits.MaxPayloadBytes {
+					return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{fmt.Sprintf(
+						"%s candidate denied: payload exceeds max_payload_bytes %d", c.Name, limits.MaxPayloadBytes)}}, nil
+				}
 			}
 			item, err := c.Decode(in.Event.Payload)
 			if err != nil {

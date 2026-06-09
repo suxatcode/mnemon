@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/config"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
@@ -25,7 +24,7 @@ const (
 // MemoryAdmissionRule admits a memory write candidate from one authenticated principal, proposing an
 // append to the principal's memory resource. It is the memory descriptor over the generic kind.
 func MemoryAdmissionRule(principal contract.ActorID, ref contract.ResourceRef) rule.Rule {
-	return Builtins["memory"].Rule(principal, ref, config.CapabilityConfig{})
+	return Builtins["memory"].Rule(principal, ref, Limits{})
 }
 
 // RemoteMemoryImportRule admits a remote memory commit for the sync import actor, merging non-conflicting

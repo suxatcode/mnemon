@@ -50,7 +50,7 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding) (runtime.Runti
 			if !b.Allows(channel.VerbObserve) || !allowsAnyObservedType(b, observed) {
 				continue
 			}
-			rules = append(rules, cap.Rule(b.Principal, ref, cc))
+			rules = append(rules, cap.Rule(b.Principal, ref, capability.Limits{MaxPayloadBytes: cc.MaxPayloadBytes}))
 			allow[b.Principal] = appendKind(allow[b.Principal], cap.ResourceKind)
 		}
 	}
