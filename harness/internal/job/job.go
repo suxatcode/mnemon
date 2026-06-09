@@ -38,6 +38,9 @@ type Runner interface {
 	Run(JobSpec) (Result, error)
 }
 
+// FakeRunner is a TEST DOUBLE shared by the runtime test suites (cross-package, so it cannot
+// live in a _test.go file); it is unreferenced by production code and linker-pruned from the
+// product binary.
 // FakeRunner is the deterministic test runner: it records the idempotency key it saw and returns a fixed
 // ProposalCandidate plus an effect id derived from the key (so a retried key yields the same effect id).
 type FakeRunner struct {

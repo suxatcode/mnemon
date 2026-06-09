@@ -11,7 +11,6 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/job"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
-	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
 	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
@@ -84,8 +83,7 @@ func OpenRuntime(storePath string, cfg RuntimeConfig) (*Runtime, error) {
 	}
 	// Absolutize so the store ref + the single-writer lockfile are keyed on the CANONICAL path: a
 	// relative and an absolute form of the same store must not be treated as two disjoint owners
-	// (otherwise the S11 lock cannot catch a split). Callers that want CWD-independent resolution use
-	// DiscoverProjectStore to pick the path before calling here.
+	// (otherwise the S11 lock cannot catch a split).
 	if abs, err := filepath.Abs(storePath); err == nil {
 		storePath = abs
 	}
@@ -125,18 +123,6 @@ func (r *Runtime) API() channel.ServerAPI { return r.api }
 // StorePath is the canonical store path this runtime owns (status/diagnostic evidence).
 func (r *Runtime) StorePath() string { return r.storePath }
 
-// BindingKind reports the principal's bound actor kind, when a binding is configured.
-func (r *Runtime) BindingKind(principal contract.ActorID) (contract.ActorKind, bool) {
-	if r.bindings == nil {
-		return "", false
-	}
-	b, ok := r.bindings.Binding(principal)
-	if !ok {
-		return "", false
-	}
-	return b.ActorKind, true
-}
-
 // Tick drives one governed cycle. The runtime owns the SINGLE dispatch-cursor driver — no surface
 // drives Tick independently against the store.
 func (r *Runtime) Tick() ([]contract.Decision, error) { return r.cs.Tick() }
@@ -145,12 +131,6 @@ func (r *Runtime) Tick() ([]contract.Decision, error) { return r.cs.Tick() }
 // read-after-decision helper for the OWNING surface (read-only — never a second writer).
 func (r *Runtime) Resource(ref contract.ResourceRef) (contract.Version, map[string]any, error) {
 	return r.store.GetResource(ref)
-}
-
-// Projection serves a scoped view straight from the store for the owning surface's read-after-write
-// checks (the wire path is API().PullProjection, which adds the principal/scope enforcement).
-func (r *Runtime) Projection(sub contract.Subscription) projection.Projection {
-	return projection.ScopedView(r.store, sub)
 }
 
 // PendingEvents exposes the durable event log past seq for the owning surface (e.g. recovering a

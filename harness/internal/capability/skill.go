@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
@@ -220,8 +219,4 @@ func skillDeclarationsFromFields(fields map[string]any) []skillDeclaration {
 		}
 	}
 	return declarations
-}
-
-func skillDeclarationID(actor contract.ActorID, ingestSeq int64) string {
-	return "local/" + sanitizeEntryIDPart(string(actor)) + "/" + strconv.FormatInt(ingestSeq, 10)
 }

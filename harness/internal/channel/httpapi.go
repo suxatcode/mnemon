@@ -300,28 +300,6 @@ func (c *Client) SyncPull(reqBody contract.SyncPullRequest) (contract.SyncPullRe
 	return out, nil
 }
 
-func (c *Client) SyncStatus() (contract.SyncStatusResponse, error) {
-	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/sync/status", nil)
-	if err != nil {
-		return contract.SyncStatusResponse{}, err
-	}
-	c.setAuth(req)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return contract.SyncStatusResponse{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return contract.SyncStatusResponse{}, fmt.Errorf("sync status failed: %s: %s", resp.Status, string(b))
-	}
-	var out contract.SyncStatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return contract.SyncStatusResponse{}, err
-	}
-	return out, nil
-}
-
 func (c *Client) postJSON(path string, in, out any) error {
 	body, err := json.Marshal(in)
 	if err != nil {

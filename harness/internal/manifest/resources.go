@@ -114,14 +114,6 @@ func LoadLoop(fsys fs.FS, loop string) (LoopManifest, error) {
 	return manifest, nil
 }
 
-func LoadHost(fsys fs.FS, host string) (HostManifest, error) {
-	var manifest HostManifest
-	if err := readManifest(fsys, path.Join("hosts", host, "host.json"), &manifest); err != nil {
-		return HostManifest{}, err
-	}
-	return manifest, nil
-}
-
 func LoadBinding(fsys fs.FS, host, loop string) (BindingManifest, error) {
 	var manifest BindingManifest
 	if err := readManifest(fsys, path.Join("bindings", host+"."+loop+".json"), &manifest); err != nil {

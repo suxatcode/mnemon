@@ -50,7 +50,7 @@ type bindingRef struct {
 
 // LoadBindingFile reads + validates the channel-binding manifest at path and assembles the bindings
 // and bearer-token map. Relative credential_ref token paths resolve against root (the project root,
-// e.g. server.DiscoverProjectRoot()); absolute ones are used verbatim. It validates each entry
+// absolute ones are used verbatim. It validates each entry
 // (principal, known actor kind / verbs / transport, http endpoint non-empty), the schema version,
 // and cross-entry uniqueness (principal, idempotency namespace, bearer token).
 func LoadBindingFile(root, path string) (LoadedBindings, error) {
