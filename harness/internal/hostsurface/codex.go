@@ -366,7 +366,9 @@ func (p codexProjector) prepareLoopState(loop manifest.LoopManifest) error {
 }
 
 func (p codexProjector) writeRuntimeEnv(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
-	return p.writeFile(p.displayJoin(binding.RuntimeSurface, "env.sh"), p.runtimeEnvContent(loop, binding), 0o755)
+	// Route through projectManaged so env.sh is hash-recorded: a pre-existing/edited one is preserved
+	// on install and on uninstall, like every other managed runtime-surface file.
+	return p.projectManagedBytes(p.runtimeEnvContent(loop, binding), p.displayJoin(binding.RuntimeSurface, "env.sh"), 0o755)
 }
 
 func (p codexProjector) projectRuntimeMirrors(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
@@ -374,7 +376,9 @@ func (p codexProjector) projectRuntimeMirrors(loop manifest.LoopManifest, bindin
 		return nil
 	}
 	for _, runtimeFile := range loop.Assets.RuntimeFiles {
-		if err := p.copyFile(p.loopAsset(loop, runtimeFile), p.displayJoin(binding.RuntimeSurface, runtimeFile), 0o644); err != nil {
+		// Hash-recorded too: seeds the mirror on first install, preserves a live (prime-regenerated) or
+		// user-edited mirror on re-setup and uninstall instead of clobbering/deleting it.
+		if err := p.projectManaged(p.loopAsset(loop, runtimeFile), p.displayJoin(binding.RuntimeSurface, runtimeFile), 0o644); err != nil {
 			return err
 		}
 	}

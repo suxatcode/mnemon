@@ -369,7 +369,9 @@ func (p claudeProjector) writeRuntimeEnv(loop manifest.LoopManifest, binding man
 		)
 	}
 	content := strings.Join(lines, "\n") + "\n"
-	return p.writeFile(pathJoin(binding.RuntimeSurface, "env.sh"), []byte(content), 0o755)
+	// Route through projectManaged so env.sh is hash-recorded: a pre-existing/edited one is preserved
+	// on install and on uninstall, like every other managed runtime-surface file.
+	return p.projectManagedBytes([]byte(content), pathJoin(binding.RuntimeSurface, "env.sh"), 0o755)
 }
 
 func (p claudeProjector) projectSkills(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
