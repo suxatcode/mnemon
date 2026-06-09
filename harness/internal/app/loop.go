@@ -73,12 +73,12 @@ func (h *Harness) Refresh(ctx context.Context, out, errw io.Writer, projectRoot,
 	switch host {
 	case "codex":
 		rep, err := hostsurface.RunCodexProjectorReport(ctx, hostsurface.CodexOptions{
-			ProjectRoot: projectRoot, Loops: loops, HostArgs: hostArgs, RefreshOnly: true, Stdout: out, Stderr: errw,
+			ProjectRoot: projectRoot, Loops: loops, HostArgs: hostArgs, Stdout: out, Stderr: errw,
 		})
 		return rep.Conflicts, err
 	case "claude-code":
 		rep, err := hostsurface.RunClaudeProjectorReport(ctx, hostsurface.ClaudeOptions{
-			ProjectRoot: projectRoot, Loops: loops, HostArgs: hostArgs, RefreshOnly: true, Stdout: out, Stderr: errw,
+			ProjectRoot: projectRoot, Loops: loops, HostArgs: hostArgs, Stdout: out, Stderr: errw,
 		})
 		return rep.Conflicts, err
 	default:

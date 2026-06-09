@@ -14,7 +14,6 @@ var (
 	refreshLoops       []string
 	refreshMemory      bool
 	refreshSkills      bool
-	refreshOnly        bool
 )
 
 // refresh re-projects the managed definition files (GUIDE, hooks, skill defs) for a host loop without
@@ -54,7 +53,6 @@ func init() {
 	refreshCmd.Flags().StringArrayVar(&refreshLoops, "loop", nil, "integration id; may be repeated")
 	refreshCmd.Flags().BoolVar(&refreshMemory, "memory", false, "refresh memory Agent Integration")
 	refreshCmd.Flags().BoolVar(&refreshSkills, "skills", false, "refresh skill Agent Integration")
-	refreshCmd.Flags().BoolVar(&refreshOnly, "refresh", true, "preserve user-modified definition files (no-clobber)")
 	refreshCmd.GroupID = groupSpine
 	rootCmd.AddCommand(refreshCmd)
 }

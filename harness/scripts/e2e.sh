@@ -90,9 +90,50 @@ run_host() {
 	echo "    host=$host OK"
 }
 
+# run_skill exercises the SKILL loop end-to-end (the memory arm above covers the memory loop): setup
+# --skills, observe a skill candidate, tick, pull.
+run_skill() {
+	CUR_HOST="codex-skill"
+	local principal="codex@project" addr="http://127.0.0.1:8787"
+	local proj="$WORK/proj-skill"
+	mkdir -p "$proj"
+	echo "=== E2E skill loop (codex) ==="
+	(
+		cd "$proj"
+		local tok=".mnemon/harness/channel/credentials/codex-project.token"
+		"$MH" setup --host codex --skills --principal "$principal" --control-url "$addr" >/dev/null
+		"$MH" local run >"$WORK/run-skill.log" 2>&1 &
+		local runpid=$!
+		echo "$runpid" >"$PIDFILE"
+		local up=0 i
+		for i in $(seq 1 60); do
+			if "$MH" control status --addr "$addr" --principal "$principal" --token-file "$tok" >/dev/null 2>&1; then
+				up=1
+				break
+			fi
+			sleep 0.1
+		done
+		[ "$up" = 1 ] || { cat "$WORK/run-skill.log"; exit 1; }
+
+		local out
+		out="$("$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
+			--type skill.write_candidate_observed --external-id s1 \
+			--payload '{"skill_id":"e2e-skill","name":"E2E Skill","status":"active","source":"user","confidence":"high"}')"
+		case "$out" in *ticked=true*) ;; *) echo "skill observe: $out"; exit 1 ;; esac
+		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
+		case "$out" in *resources=1*) ;; *) echo "skill pull: $out"; exit 1 ;; esac
+
+		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
+		rm -f "$PIDFILE"
+	) || fail "skill flow failed (see $WORK/run-skill.log)"
+	sleep 0.3
+	echo "    skill loop OK"
+}
+
 # Both hosts run sequentially (the server is stopped between them), so they share the default
 # local-run bind addr; the port is the same for both.
 run_host codex codex@project 8787 .codex
 run_host claude-code claude@project 8787 .claude
+run_skill
 
 echo "E2E PASS (codex + claude-code)"

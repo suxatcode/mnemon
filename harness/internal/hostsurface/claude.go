@@ -23,7 +23,6 @@ type ClaudeOptions struct {
 	ProjectRoot string
 	Loops       []string
 	HostArgs    []string
-	RefreshOnly bool // refresh (re-projection): never adopt an unknown differing file; preserve user edits
 	Stdout      io.Writer
 	Stderr      io.Writer
 }
@@ -84,7 +83,7 @@ func newClaudeProjector(opts ClaudeOptions) (claudeProjector, []string, error) {
 			paths:       claudeProjectorPaths(hostOptions),
 			stdout:      opts.Stdout,
 			stderr:      opts.Stderr,
-			managed:     newManagedState(opts.RefreshOnly),
+			managed:     newManagedState(),
 		},
 		hostOptions: hostOptions,
 	}, loops, nil
@@ -121,7 +120,7 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 	return nil
 }
 
-// RunClaudeProjectorReport installs (or, with opts.RefreshOnly, refreshes) the Claude Code projection
+// RunClaudeProjectorReport installs/re-projects the Claude Code projection under the no-clobber policy
 // and returns the managed files it preserved because the user edited them.
 func RunClaudeProjectorReport(ctx context.Context, opts ClaudeOptions) (Report, error) {
 	projector, loops, err := newClaudeProjector(opts)
@@ -272,6 +271,7 @@ func (p claudeProjector) installLoop(ctx context.Context, loop manifest.LoopMani
 }
 
 func (p claudeProjector) uninstallLoop(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
+	p.beginManaged(loop.Name) // load recorded ownership so uninstall preserves user-edited/foreign skills
 	if loop.Name == "memory" || loop.Name == "skill" {
 		if err := p.unpatchSettings(loop.Name); err != nil {
 			return err
@@ -279,7 +279,7 @@ func (p claudeProjector) uninstallLoop(loop manifest.LoopManifest, binding manif
 	}
 	hostSkillsDir := p.installedHostSkillsDir(loop.Name, binding)
 	for _, skill := range loop.Assets.Skills {
-		if err := os.RemoveAll(p.resolve(pathJoin(hostSkillsDir, skillID(skill)))); err != nil {
+		if err := p.removeManagedSkill(pathJoin(hostSkillsDir, skillID(skill), "SKILL.md")); err != nil {
 			return err
 		}
 	}

@@ -25,7 +25,6 @@ type CodexOptions struct {
 	ProjectRoot string
 	Loops       []string
 	HostArgs    []string
-	RefreshOnly bool // refresh (re-projection): never adopt an unknown differing file; preserve user edits
 	Stdout      io.Writer
 	Stderr      io.Writer
 }
@@ -116,7 +115,7 @@ func RunCodexProjector(ctx context.Context, action string, opts CodexOptions) er
 	return nil
 }
 
-// RunCodexProjectorReport installs (or, with opts.RefreshOnly, refreshes) the Codex projection and
+// RunCodexProjectorReport installs/re-projects the Codex projection under the no-clobber policy and
 // returns the managed files it preserved because the user edited them.
 func RunCodexProjectorReport(ctx context.Context, opts CodexOptions) (Report, error) {
 	projector, loops, err := newCodexProjector("install", opts)
@@ -177,7 +176,7 @@ func newCodexProjector(action string, opts CodexOptions) (codexProjector, []stri
 			paths:       codexProjectorPaths(hostOptions),
 			stdout:      opts.Stdout,
 			stderr:      opts.Stderr,
-			managed:     newManagedState(opts.RefreshOnly),
+			managed:     newManagedState(),
 		},
 		hostOptions: hostOptions,
 	}, loops, nil
@@ -298,6 +297,7 @@ func (p codexProjector) uninstallLoop(loop manifest.LoopManifest) error {
 	if err != nil {
 		return err
 	}
+	p.beginManaged(loop.Name) // load recorded ownership so uninstall preserves user-edited/foreign skills
 	if p.codexHooksEnabled(loop.Name) {
 		if err := p.unpatchHooks(loop.Name); err != nil {
 			return err
@@ -310,7 +310,7 @@ func (p codexProjector) uninstallLoop(loop manifest.LoopManifest) error {
 		}
 	}
 	for _, skill := range loop.Assets.Skills {
-		if err := os.RemoveAll(p.resolve(p.displayJoin(hostSkillsDir, skillID(skill)))); err != nil {
+		if err := p.removeManagedSkill(p.displayJoin(hostSkillsDir, skillID(skill), "SKILL.md")); err != nil {
 			return err
 		}
 	}
