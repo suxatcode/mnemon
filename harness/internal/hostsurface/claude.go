@@ -39,6 +39,7 @@ type claudeHostOptions struct {
 	compact           bool
 	purgeMemory       bool
 	purgeLibrary      bool
+	dryRun            bool
 }
 
 type claudeProjector struct {
@@ -97,6 +98,15 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 	if err != nil {
 		return err
 	}
+	if projector.hostOptions.dryRun {
+		// Truthful minimal report: nothing is written. The classifier-driven per-file diff
+		// (would write / would preserve) is the planned upgrade for both hosts.
+		for _, loopName := range loops {
+			projector.printf("claude-code/%s: dry-run: managed definition files would be projected under %s (per-file diff: --host codex only for now); no changes written\n",
+				loopName, projector.paths.configDir)
+		}
+		return nil
+	}
 	for _, loopName := range loops {
 		loop, err := manifest.LoadLoop(assets.FS, loopName)
 		if err != nil {
@@ -126,6 +136,13 @@ func RunClaudeProjectorReport(ctx context.Context, opts ClaudeOptions) (Report, 
 	projector, loops, err := newClaudeProjector(opts)
 	if err != nil {
 		return Report{}, err
+	}
+	if projector.hostOptions.dryRun {
+		for _, loopName := range loops {
+			projector.printf("claude-code/%s: dry-run: managed definition files would be projected under %s (per-file diff: --host codex only for now); no changes written\n",
+				loopName, projector.paths.configDir)
+		}
+		return Report{}, nil
 	}
 	for _, loopName := range loops {
 		loop, err := manifest.LoadLoop(assets.FS, loopName)
@@ -187,6 +204,8 @@ func parseClaudeHostOptions(args []string) (claudeHostOptions, error) {
 			parsed.purgeMemory = true
 		case "--purge-library":
 			parsed.purgeLibrary = true
+		case "--dry-run":
+			parsed.dryRun = true
 		default:
 			return parsed, fmt.Errorf("unsupported Claude Code host option: %s", arg)
 		}
