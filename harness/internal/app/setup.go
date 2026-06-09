@@ -134,8 +134,8 @@ func (h *Harness) Setup(ctx context.Context, out, errw io.Writer, opts SetupOpti
 		}
 		res.Changes = append(res.Changes, "wrote bearer token file "+tokenFile)
 	}
-	if err := channel.UpsertBinding(bindingFile, binding, tokenRel); err != nil {
-		return res, fmt.Errorf("setup: upsert binding: %w", err)
+	if err := channel.MergeBinding(bindingFile, binding, tokenRel); err != nil {
+		return res, fmt.Errorf("setup: merge binding: %w", err)
 	}
 	res.Changes = append(res.Changes, "upserted channel binding for "+opts.Principal+" in "+bindingFile)
 	if err := writeLocalConfig(configFile, opts); err != nil {
@@ -223,6 +223,11 @@ func (h *Harness) channelBinding(opts SetupOptions) channel.ChannelBinding {
 }
 
 func writeTokenFile(path string) error {
+	// Idempotent: keep an existing token so a running Local Mnemon (which holds it in memory) does not
+	// get locked out by a rerun rotating it.
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
 	buf := make([]byte, 24)
 	if _, err := rand.Read(buf); err != nil {
 		return fmt.Errorf("generate token: %w", err)
@@ -234,12 +239,23 @@ func writeTokenFile(path string) error {
 }
 
 func writeLocalConfig(path string, opts SetupOptions) error {
+	// Union the enabled loops with any already recorded, so installing skill after memory leaves the
+	// config naming BOTH loops (additive setup).
+	loops := opts.Loops
+	if prev, err := os.ReadFile(path); err == nil {
+		var existing struct {
+			Loops []string `json:"loops"`
+		}
+		if json.Unmarshal(prev, &existing) == nil {
+			loops = unionLoops(existing.Loops, opts.Loops)
+		}
+	}
 	doc := map[string]any{
 		"schema_version": 1,
 		"mode":           "local",
 		"endpoint":       opts.ControlURL,
 		"principal":      opts.Principal,
-		"loops":          opts.Loops,
+		"loops":          loops,
 		"binding_file":   filepath.ToSlash(filepath.Join(".mnemon", "harness", "channel", "bindings.json")),
 		"store_path":     filepath.ToSlash(runtime.DefaultStorePath),
 	}
@@ -273,6 +289,20 @@ func writeLocalEnv(path string, opts SetupOptions, tokenRel string) error {
 
 func exportLine(key, value string) string {
 	return fmt.Sprintf("export %s=%q\n", key, value)
+}
+
+func unionLoops(a, b []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(a)+len(b))
+	for _, ls := range [][]string{a, b} {
+		for _, l := range ls {
+			if !seen[l] {
+				seen[l] = true
+				out = append(out, l)
+			}
+		}
+	}
+	return out
 }
 
 // SetupStatus reports the public setup state without exposing local transport

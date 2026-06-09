@@ -214,6 +214,78 @@ func toEntry(b ChannelBinding, credentialRef string) bindingFileEntry {
 // (schema_version 1) when absent and PRESERVING every other entry + their order — so `setup` manages
 // exactly its own principal and never clobbers a user-added or sibling-loop binding. credentialRef is
 // the token-file ref to record (project-relative or absolute, "" for header auth).
+// MergeBinding upserts b into the binding file, UNIONing the verbs / observed types / subscription
+// scope with any existing binding for the same principal — so installing skill after memory keeps the
+// memory grant rather than replacing it. The existing credential ref is kept when credentialRef is
+// empty (an idempotent token). It is the additive variant of UpsertBinding (which replaces).
+func MergeBinding(path string, b ChannelBinding, credentialRef string) error {
+	if err := b.Validate(); err != nil {
+		return err
+	}
+	doc, err := readBindingDocOrEmpty(path)
+	if err != nil {
+		return err
+	}
+	for i := range doc.Bindings {
+		if doc.Bindings[i].Principal == string(b.Principal) {
+			if existing, err := doc.Bindings[i].toBinding(); err == nil {
+				b.AllowedVerbs = unionVerbs(existing.AllowedVerbs, b.AllowedVerbs)
+				b.AllowedObservedTypes = unionStrings(existing.AllowedObservedTypes, b.AllowedObservedTypes)
+				b.SubscriptionScope = unionRefs(existing.SubscriptionScope, b.SubscriptionScope)
+			}
+			if credentialRef == "" {
+				credentialRef = doc.Bindings[i].CredentialRef
+			}
+			doc.Bindings[i] = toEntry(b, credentialRef)
+			return writeBindingDoc(path, doc)
+		}
+	}
+	doc.Bindings = append(doc.Bindings, toEntry(b, credentialRef))
+	return writeBindingDoc(path, doc)
+}
+
+func unionVerbs(a, b []Verb) []Verb {
+	seen := map[Verb]bool{}
+	out := make([]Verb, 0, len(a)+len(b))
+	for _, vs := range [][]Verb{a, b} {
+		for _, v := range vs {
+			if !seen[v] {
+				seen[v] = true
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
+func unionStrings(a, b []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(a)+len(b))
+	for _, ss := range [][]string{a, b} {
+		for _, s := range ss {
+			if !seen[s] {
+				seen[s] = true
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
+func unionRefs(a, b []contract.ResourceRef) []contract.ResourceRef {
+	seen := map[contract.ResourceRef]bool{}
+	out := make([]contract.ResourceRef, 0, len(a)+len(b))
+	for _, rs := range [][]contract.ResourceRef{a, b} {
+		for _, r := range rs {
+			if !seen[r] {
+				seen[r] = true
+				out = append(out, r)
+			}
+		}
+	}
+	return out
+}
+
 func UpsertBinding(path string, b ChannelBinding, credentialRef string) error {
 	if err := b.Validate(); err != nil {
 		return err
