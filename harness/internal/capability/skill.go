@@ -84,15 +84,6 @@ func RemoteSkillImportRule(principal contract.ActorID) rule.Rule {
 		})
 }
 
-type skillCandidate struct {
-	SkillID    string
-	Name       string
-	Status     string
-	Content    string
-	Source     string
-	Confidence string
-}
-
 type skillDeclaration struct {
 	ID         string `json:"id"`
 	SkillID    string `json:"skill_id"`
@@ -103,40 +94,6 @@ type skillDeclaration struct {
 	Confidence string `json:"confidence"`
 	Actor      string `json:"actor"`
 	IngestSeq  int64  `json:"ingest_seq"`
-}
-
-func decodeSkillCandidate(payload map[string]any) (skillCandidate, error) {
-	skillID := strings.TrimSpace(stringField(payload, "skill_id"))
-	if skillID == "" {
-		return skillCandidate{}, fmt.Errorf("skill candidate denied: missing skill_id")
-	}
-	if !validSkillID(skillID) {
-		return skillCandidate{}, fmt.Errorf("skill candidate denied: invalid skill_id")
-	}
-	name := strings.TrimSpace(stringField(payload, "name"))
-	if name == "" {
-		name = skillID
-	}
-	status := strings.TrimSpace(stringField(payload, "status"))
-	if status == "" {
-		status = "active"
-	}
-	if status != "active" && status != "stale" && status != "archived" {
-		return skillCandidate{}, fmt.Errorf("skill candidate denied: invalid status")
-	}
-	source := strings.TrimSpace(stringField(payload, "source"))
-	if source == "" {
-		return skillCandidate{}, fmt.Errorf("skill candidate denied: missing source")
-	}
-	confidence := strings.TrimSpace(stringField(payload, "confidence"))
-	if confidence == "" {
-		return skillCandidate{}, fmt.Errorf("skill candidate denied: missing confidence")
-	}
-	content := strings.TrimSpace(stringField(payload, "content"))
-	if containsSecretLikeContent(content) || containsPromptInjectionShape(content) {
-		return skillCandidate{}, fmt.Errorf("skill candidate denied: unsafe content")
-	}
-	return skillCandidate{SkillID: skillID, Name: name, Status: status, Content: content, Source: source, Confidence: confidence}, nil
 }
 
 func decodeRemoteSkillCommit(payload map[string]any) (contract.LocalCommit, error) {

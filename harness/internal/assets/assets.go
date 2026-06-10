@@ -6,5 +6,5 @@ package assets
 
 import "embed"
 
-//go:embed loops hosts bindings
+//go:embed loops hosts bindings capabilities
 var FS embed.FS

@@ -118,13 +118,6 @@ func remoteMemoryEntryID(commit contract.LocalCommit) string {
 	return "remote/" + sanitizeEntryIDPart(commit.OriginReplicaID) + "/" + sanitizeEntryIDPart(commit.LocalDecisionID)
 }
 
-type memoryCandidate struct {
-	Content    string
-	Source     string
-	Confidence string
-	Tags       []string
-}
-
 type memoryEntry struct {
 	ID         string   `json:"id"`
 	Content    string   `json:"content"`
@@ -133,28 +126,6 @@ type memoryEntry struct {
 	Tags       []string `json:"tags,omitempty"`
 	Actor      string   `json:"actor"`
 	IngestSeq  int64    `json:"ingest_seq"`
-}
-
-func decodeMemoryCandidate(payload map[string]any) (memoryCandidate, error) {
-	content := strings.TrimSpace(stringField(payload, "content"))
-	if content == "" {
-		return memoryCandidate{}, fmt.Errorf("memory candidate denied: empty content")
-	}
-	if containsSecretLikeContent(content) {
-		return memoryCandidate{}, fmt.Errorf("memory candidate denied: secret-like content")
-	}
-	if containsPromptInjectionShape(content) {
-		return memoryCandidate{}, fmt.Errorf("memory candidate denied: prompt-injection-shaped content")
-	}
-	source := strings.TrimSpace(stringField(payload, "source"))
-	if source == "" {
-		return memoryCandidate{}, fmt.Errorf("memory candidate denied: missing source")
-	}
-	confidence := strings.TrimSpace(stringField(payload, "confidence"))
-	if confidence == "" {
-		return memoryCandidate{}, fmt.Errorf("memory candidate denied: missing confidence")
-	}
-	return memoryCandidate{Content: content, Source: source, Confidence: confidence, Tags: stringSliceField(payload, "tags")}, nil
 }
 
 func stringField(payload map[string]any, key string) string {

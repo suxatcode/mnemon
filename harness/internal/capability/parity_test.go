@@ -1,83 +1,36 @@
 package capability
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/fs"
 	"reflect"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
 )
 
-// testSpecs returns the spec form of the three builtins. Task 3 switches this helper to decode the
-// EMBEDDED assets/capabilities/*.json files (single source — inline literals and embedded files can
-// never drift), and deletes the handwritten side of the dual net below; the golden assertions stay
-// forever as the protocol pin.
+// testSpecs decodes the EMBEDDED assets/capabilities/*.json (single source with production — test
+// and runtime can never drift). The handwritten dual-net side served the Task-2/3 migration and is
+// deleted; the inline golden assertions below are the permanent protocol pin.
 func testSpecs(t *testing.T) map[string]CapabilitySpec {
 	t.Helper()
-	return map[string]CapabilitySpec{
-		"memory": {
-			SchemaVersion: 1, Name: "memory",
-			ObservedType: MemoryWriteCandidateObserved, ProposedType: MemoryWriteProposed,
-			ResourceKind: "memory", ItemsField: "entries",
-			Fields: []FieldSpec{
-				{Name: "content", Validators: []ValidatorRef{
-					{ID: "required", Params: map[string]string{"missing_style": "empty"}},
-					{ID: "safety:secret"}, {ID: "safety:injection"},
-				}},
-				{Name: "source", Validators: []ValidatorRef{{ID: "required", Params: map[string]string{"missing_style": "missing"}}}},
-				{Name: "confidence", Validators: []ValidatorRef{{ID: "required", Params: map[string]string{"missing_style": "missing"}}}},
-				{Name: "tags", Validators: []ValidatorRef{{ID: "list:strings"}}},
-			},
-			Render: RenderSpec{Content: &ContentRender{Member: "memory-entry-list"}},
-		},
-		"skill": {
-			SchemaVersion: 1, Name: "skill",
-			ObservedType: SkillWriteCandidateObserved, ProposedType: SkillWriteProposed,
-			ResourceKind: "skill", ItemsField: "declarations",
-			Fields: []FieldSpec{
-				{Name: "skill_id", Validators: []ValidatorRef{
-					{ID: "required", Params: map[string]string{"missing_style": "missing"}},
-					{ID: "format:skill-id"},
-				}},
-				{Name: "name", Validators: []ValidatorRef{{ID: "default-from", Params: map[string]string{"field": "skill_id"}}}},
-				{Name: "status", Validators: []ValidatorRef{
-					{ID: "default", Params: map[string]string{"value": "active"}},
-					{ID: "enum", Params: map[string]string{"values": "active|stale|archived", "message": "invalid status"}},
-				}},
-				{Name: "source", Validators: []ValidatorRef{{ID: "required", Params: map[string]string{"missing_style": "missing"}}}},
-				{Name: "confidence", Validators: []ValidatorRef{{ID: "required", Params: map[string]string{"missing_style": "missing"}}}},
-				{Name: "content", Validators: []ValidatorRef{{ID: "safety:unsafe"}}},
-			},
-			Render: RenderSpec{Static: map[string]string{"name": "project"}},
-		},
-		"note": {
-			SchemaVersion: 1, Name: "note",
-			ObservedType: "note.write_candidate.observed", ProposedType: "note.write.proposed",
-			ResourceKind: "note", ItemsField: "items",
-			Fields: []FieldSpec{{Name: "text", Validators: []ValidatorRef{
-				{ID: "required", Params: map[string]string{"missing_style": "empty"}},
-				{ID: "safety:unsafe"},
-			}}},
-			Render: RenderSpec{Content: &ContentRender{Member: "bullet-list",
-				Params: map[string]string{"title": "# Notes", "field": "text"}}},
-		},
+	out := map[string]CapabilitySpec{}
+	for _, id := range []string{"memory", "skill", "note"} {
+		raw, err := fs.ReadFile(assets.FS, "capabilities/"+id+".json")
+		if err != nil {
+			t.Fatalf("read embedded spec %s: %v", id, err)
+		}
+		var spec CapabilitySpec
+		if err := json.Unmarshal(raw, &spec); err != nil {
+			t.Fatalf("parse embedded spec %s: %v", id, err)
+		}
+		out[id] = spec
 	}
-}
-
-// handwrittenDescriptors references the pre-data-ization functions DIRECTLY (never via Builtins —
-// Task 3 repoints Builtins at the spec-compiled form, which would silently turn this net into
-// spec-vs-spec). Deleted together with those functions in Task 3.
-func handwrittenDescriptors() map[string]Capability {
-	return map[string]Capability{
-		"memory": {Name: "memory", ObservedType: MemoryWriteCandidateObserved, ProposedType: MemoryWriteProposed,
-			ResourceKind: "memory", ItemsField: "entries", Decode: decodeMemoryItem, Header: memoryHeader},
-		"skill": {Name: "skill", ObservedType: SkillWriteCandidateObserved, ProposedType: SkillWriteProposed,
-			ResourceKind: "skill", ItemsField: "declarations", Decode: decodeSkillItem, Header: skillHeader},
-		"note": {Name: "note", ObservedType: "note.write_candidate.observed", ProposedType: "note.write.proposed",
-			ResourceKind: "note", ItemsField: "items", Decode: decodeNoteItem, Header: noteHeader},
-	}
+	return out
 }
 
 const parityActor = contract.ActorID("codex@project")
@@ -234,18 +187,16 @@ func parityViews(cap Capability) map[string]projection.Projection {
 	}
 }
 
-// 双网:每个用例 × 每个视图 —— (a) 手写 vs spec 编译的完整 RuleDecision DeepEqual;
-// (b) 内联 golden(verdict / Reasons[0] 字节值 / 新 Item 精确键值)。空虚保护:accept 必
-// Propose、deny 必有 Reasons。Task 3 删除手写侧,golden 永存。
-func TestSpecParityAndGoldens(t *testing.T) {
-	hand := handwrittenDescriptors()
+// Golden 协议钉(原 Task-2 双网的存续侧):每个用例 × 每个派发视图,断言 verdict、
+// Reasons[0] 字节值、新 Item 精确键值与 Op 分支。空虚保护内建:accept 必 Propose、
+// deny 必有 Reasons、直通必无产物。
+func TestSpecGoldens(t *testing.T) {
 	specs := testSpecs(t)
 	for id, spec := range specs {
 		compiled, err := FromSpec(spec)
 		if err != nil {
 			t.Fatalf("%s: FromSpec: %v", id, err)
 		}
-		h := hand[id]
 		for _, c := range parityCases() {
 			if c.cap != id {
 				continue
@@ -257,13 +208,9 @@ func TestSpecParityAndGoldens(t *testing.T) {
 			for viewName, view := range parityViews(compiled) {
 				ev := contract.Event{Type: compiled.ObservedType, Actor: actor, IngestSeq: 7, Payload: c.payload}
 				ref := contract.ResourceRef{Kind: compiled.ResourceKind, ID: "project"}
-				dHand, errH := h.Rule(parityActor, ref, Limits{}).Evaluate(rule.RuleInput{Event: ev, View: view})
 				dSpec, errS := compiled.Rule(parityActor, ref, Limits{}).Evaluate(rule.RuleInput{Event: ev, View: view})
-				if (errH == nil) != (errS == nil) {
-					t.Fatalf("%s/%s/%s: error divergence hand=%v spec=%v", id, c.name, viewName, errH, errS)
-				}
-				if !reflect.DeepEqual(dHand, dSpec) {
-					t.Fatalf("%s/%s/%s: decision divergence\nhand: %#v\nspec: %#v", id, c.name, viewName, dHand, dSpec)
+				if errS != nil {
+					t.Fatalf("%s/%s/%s: evaluate: %v", id, c.name, viewName, errS)
 				}
 				assertGolden(t, fmt.Sprintf("%s/%s/%s", id, c.name, viewName), compiled, c, viewName, dSpec)
 			}

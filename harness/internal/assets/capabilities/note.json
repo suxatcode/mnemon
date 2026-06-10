@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "name": "note",
+  "observed_type": "note.write_candidate.observed",
+  "proposed_type": "note.write.proposed",
+  "resource_kind": "note",
+  "items_field": "items",
+  "fields": [
+    {
+      "name": "text",
+      "validators": [
+        {
+          "id": "required",
+          "params": {
+            "missing_style": "empty"
+          }
+        },
+        {
+          "id": "safety:unsafe"
+        }
+      ]
+    }
+  ],
+  "render": {
+    "content": {
+      "member": "bullet-list",
+      "params": {
+        "title": "# Notes",
+        "field": "text"
+      }
+    }
+  }
+}

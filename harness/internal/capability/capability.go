@@ -45,43 +45,6 @@ func (c Capability) Rule(principal contract.ActorID, ref contract.ResourceRef, l
 	return appendItemRule(c, principal, ref, limits)
 }
 
-// Builtins is the trusted registry the assembler selects from (select-only, fail-closed on unknown id).
-var Builtins = map[string]Capability{
-	"memory": {
-		Name: "memory", ObservedType: MemoryWriteCandidateObserved, ProposedType: MemoryWriteProposed,
-		ResourceKind: "memory", ItemsField: "entries", Decode: decodeMemoryItem, Header: memoryHeader,
-	},
-	"skill": {
-		Name: "skill", ObservedType: SkillWriteCandidateObserved, ProposedType: SkillWriteProposed,
-		ResourceKind: "skill", ItemsField: "declarations", Decode: decodeSkillItem, Header: skillHeader,
-	},
-	// note is a 3rd capability that reuses the generic kind via DATA only — no new rule code. It exists
-	// to prove a new capability stands up by descriptor + config alone (Phase 2 acceptance).
-	"note": {
-		Name: "note", ObservedType: "note.write_candidate.observed", ProposedType: "note.write.proposed",
-		ResourceKind: "note", ItemsField: "items", Decode: decodeNoteItem, Header: noteHeader,
-	},
-}
-
-func decodeNoteItem(payload map[string]any) (Item, error) {
-	text := strings.TrimSpace(stringField(payload, "text"))
-	if text == "" {
-		return nil, fmt.Errorf("note candidate denied: empty text")
-	}
-	if containsSecretLikeContent(text) || containsPromptInjectionShape(text) {
-		return nil, fmt.Errorf("note candidate denied: unsafe content")
-	}
-	return Item{"text": text}, nil
-}
-
-func noteHeader(items []Item) map[string]any {
-	lines := []string{"# Notes"}
-	for _, it := range items {
-		lines = append(lines, "- "+itemString(it, "text"))
-	}
-	return map[string]any{"content": strings.Join(lines, "\n")}
-}
-
 // appendItemRule is the ONE generic kind: decode the candidate to an Item, stamp trusted id/actor/seq,
 // append it to the resource's item list, and propose a write carrying the item list + the capability's
 // header fields + updated_by. It only acts on events from its own principal.
@@ -150,22 +113,6 @@ func itemID(actor contract.ActorID, ingestSeq int64) string {
 
 // ---- memory descriptor data ----
 
-func decodeMemoryItem(payload map[string]any) (Item, error) {
-	c, err := decodeMemoryCandidate(payload)
-	if err != nil {
-		return nil, err
-	}
-	item := Item{"content": c.Content, "source": c.Source, "confidence": c.Confidence}
-	if len(c.Tags) > 0 {
-		item["tags"] = c.Tags
-	}
-	return item, nil
-}
-
-func memoryHeader(items []Item) map[string]any {
-	return map[string]any{"content": renderMemoryItems(items)}
-}
-
 func renderMemoryItems(items []Item) string {
 	lines := []string{"# Local Memory"}
 	for _, it := range items {
@@ -179,21 +126,6 @@ func renderMemoryItems(items []Item) string {
 }
 
 // ---- skill descriptor data ----
-
-func decodeSkillItem(payload map[string]any) (Item, error) {
-	c, err := decodeSkillCandidate(payload)
-	if err != nil {
-		return nil, err
-	}
-	return Item{
-		"skill_id": c.SkillID, "name": c.Name, "status": c.Status,
-		"content": c.Content, "source": c.Source, "confidence": c.Confidence,
-	}, nil
-}
-
-func skillHeader(items []Item) map[string]any {
-	return map[string]any{"name": "project"}
-}
 
 func itemString(it Item, key string) string {
 	if s, ok := it[key].(string); ok {
