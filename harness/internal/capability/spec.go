@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
@@ -160,6 +161,13 @@ func decodeSpec(raw []byte) (CapabilitySpec, error) {
 	var spec CapabilitySpec
 	if err := dec.Decode(&spec); err != nil {
 		return CapabilitySpec{}, err
+	}
+	// Exactly ONE JSON value: Decoder.Decode reads the first value and would silently ignore
+	// anything after it ({spec}{garbage} would pass) — LOOSER than the frozen fail-closed
+	// contract allows. Require io.EOF on a second read.
+	var trailing json.RawMessage
+	if err := dec.Decode(&trailing); err != io.EOF {
+		return CapabilitySpec{}, fmt.Errorf("trailing data after capability spec (want a single JSON object)")
 	}
 	return spec, nil
 }

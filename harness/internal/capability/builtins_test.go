@@ -70,6 +70,17 @@ func TestSpecDecodeRejectsUnknownJSONFields(t *testing.T) {
 			t.Fatalf("%s: want unknown-field rejection, got %v", c.name, err)
 		}
 	}
+	// 尾随数据同属语法层 fail-closed:{spec}{...} 与 {spec} garbage 都拒绝整个 spec。
+	for _, c := range []struct{ name, body string }{
+		{"trailing object", base + ` {}`},
+		{"trailing garbage", base + ` xx`},
+	} {
+		m := fstest.MapFS{"capabilities/x.json": &fstest.MapFile{Data: []byte(c.body)}}
+		if _, err := loadBuiltins(m); err == nil || !strings.Contains(err.Error(), "trailing data") {
+			t.Fatalf("%s: want trailing-data rejection, got %v", c.name, err)
+		}
+	}
+
 	// 基线:未注入 typo 的 base 必须可解析(防本测试自身的假阳性)。
 	m := fstest.MapFS{"capabilities/note.json": &fstest.MapFile{Data: []byte(base)}}
 	if _, err := loadBuiltins(m); err != nil {
