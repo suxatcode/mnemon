@@ -231,4 +231,12 @@ var (
 // coordination is the host-lifecycle teamwork-topology kind (P2.2 route 3/3): an approved
 // coordination op is recorded as a governed coordination resource so the mutation flows
 // through the kernel single-writer before the host emits its mirror topology events.
+// DefaultModes is the ONE canonical mode set the platform runs under when nothing selects
+// otherwise: the live server's zero-config default AND replay's reconciliation policy reference
+// THIS — a divergence between the two silently breaks I6 (replay under different conflict
+// semantics can accept what live rejected; exactly the historical replay-rebase defect).
+func DefaultModes() Modes {
+	return Modes{Conflict: ConflictReject, Isolation: IsolationProjectionReadSet, Authz: AuthzStrict}
+}
+
 var KindCatalog = map[ResourceKind]bool{"memory": true, "goal": true, "skill": true, "lease": true, "budget": true, "receipt": true, "coordination": true, "note": true, "decision": true}

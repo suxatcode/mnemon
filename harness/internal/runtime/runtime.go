@@ -66,7 +66,7 @@ func (cfg RuntimeConfig) withDefaults() RuntimeConfig {
 		cfg.Now = func() string { return time.Now().UTC().Format(time.RFC3339) }
 	}
 	if cfg.Modes == (contract.Modes{}) {
-		cfg.Modes = contract.Modes{Conflict: contract.ConflictReject, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict}
+		cfg.Modes = contract.DefaultModes() // single source with replay.canonicalModes (I6)
 	}
 	if cfg.Subs == nil {
 		cfg.Subs = map[contract.ActorID]contract.Subscription{}

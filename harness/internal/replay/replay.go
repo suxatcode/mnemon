@@ -18,9 +18,11 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/store"
 )
 
-// canonicalModes is the fixed policy replay reconciles under; it matches the server's loop modes so a replay
-// reproduces the live decisions deterministically.
-var canonicalModes = contract.Modes{Conflict: contract.ConflictRebase, Isolation: contract.IsolationProjectionReadSet, Authz: contract.AuthzStrict}
+// canonicalModes is the fixed policy replay reconciles under. It SHARES contract.DefaultModes()
+// with the live server's zero-config default (one source of truth, pinned by
+// TestReplayModesMatchServerDefault) — replay under different conflict semantics could accept
+// what live rejected, silently breaking I6.
+var canonicalModes = contract.DefaultModes()
 
 func isProposal(ev contract.Event) bool { return strings.HasSuffix(ev.Type, ".proposed") }
 
