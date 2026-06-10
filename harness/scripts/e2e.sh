@@ -195,7 +195,7 @@ run_note() {
 # Both hosts run sequentially (the server is stopped between them), so they share the default
 # local-run bind addr; the port is the same for both.
 run_host codex codex@project 8787 .codex
-run_host claude-code claude@project 8787 .claude
+run_host claude-code claude@project 8899 .claude
 run_skill codex codex@project
 run_skill claude-code claude@project
 run_note

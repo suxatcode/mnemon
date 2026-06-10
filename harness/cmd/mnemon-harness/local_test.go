@@ -109,3 +109,22 @@ func restoreLocalFlags(t *testing.T) {
 	localStorePath = ""
 	localBindingsPath = ""
 }
+
+// setup 写入的 endpoint 必须驱动 local run 的监听地址(显式 --addr 优先;
+// endpoint 缺失/不可解析时回落默认)——否则非默认端口下 hooks/bindings
+// 指向的地址无人监听,破坏"一次 setup + local run"承诺。
+func TestListenAddrFromEndpoint(t *testing.T) {
+	cases := []struct {
+		name, endpoint, fallback, want string
+	}{
+		{"derives host:port", "http://127.0.0.1:9001", "127.0.0.1:8787", "127.0.0.1:9001"},
+		{"empty endpoint falls back", "", "127.0.0.1:8787", "127.0.0.1:8787"},
+		{"unparsable falls back", "::not-a-url::", "127.0.0.1:8787", "127.0.0.1:8787"},
+		{"schemeless host:port falls back (no host parsed)", "127.0.0.1:9001", "127.0.0.1:8787", "127.0.0.1:8787"},
+	}
+	for _, c := range cases {
+		if got := listenAddrFromEndpoint(c.endpoint, c.fallback); got != c.want {
+			t.Fatalf("%s: listenAddrFromEndpoint(%q,%q) = %q, want %q", c.name, c.endpoint, c.fallback, got, c.want)
+		}
+	}
+}

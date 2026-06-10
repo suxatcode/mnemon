@@ -7,6 +7,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/app"
 	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -34,9 +35,13 @@ var localRunCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		addr := localAddr
+		if !cmd.Flags().Changed("addr") {
+			addr = listenAddrFromEndpoint(boot.Config.Endpoint, localAddr)
+		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Local Mnemon: ready")
 		fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: disconnected")
-		return app.RunLocalHTTPServerWithBindings(cmd.Context(), localAddr, boot.StorePath, boot.Loaded, app.ServeOptions{
+		return app.RunLocalHTTPServerWithBindings(cmd.Context(), addr, boot.StorePath, boot.Loaded, app.ServeOptions{
 			Loops:       boot.Config.Loops,
 			Hosts:       boot.Config.Hosts,
 			ProjectRoot: projectRoot(),
@@ -101,6 +106,20 @@ func resolveProjectPath(root, path string) string {
 		return filepath.Clean(path)
 	}
 	return filepath.Join(root, path)
+}
+
+// listenAddrFromEndpoint derives the listen address from the setup-written channel endpoint
+// (e.g. "http://127.0.0.1:9001" -> "127.0.0.1:9001"), so a bare `local run` listens where
+// setup pointed the hooks/bindings. An empty/unparsable endpoint falls back to fallback.
+func listenAddrFromEndpoint(endpoint, fallback string) string {
+	if endpoint == "" {
+		return fallback
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Host == "" {
+		return fallback
+	}
+	return u.Host
 }
 
 const localNotSetupMessage = "Local Mnemon is not set up.\nRun: mnemon-harness setup --host codex --memory --skills"
