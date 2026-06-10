@@ -60,3 +60,42 @@ func TestIngestRejectsOutOfScopeResourceRef(t *testing.T) {
 		t.Fatalf("the in-scope observation must reach the inner API exactly once; reached %d", inner.ingested)
 	}
 }
+
+// ClampRefs 语义对齐:空 scope binding 显式命名 refs 必须被拒(fail-closed)——
+// 此前 len(scope)==0 时整个检查被跳过。唯一例外:未命名 refs 的观察不受约束。
+func TestIngestEmptyScopeRejectsExplicitRefs(t *testing.T) {
+	binding := HostAgentBinding("codex@project", "http://127.0.0.1:8787", nil) // 空 scope
+	binding.AllowedObservedTypes = []string{"memory.write_candidate.observed"}
+	bs, err := NewBindingSet(binding)
+	if err != nil {
+		t.Fatalf("binding set: %v", err)
+	}
+	inner := &stubAPI{}
+	api := NewAuthorizedAPI(inner, bs)
+
+	if _, _, err := api.Ingest("codex@project", contract.ObservationEnvelope{
+		Event: contract.Event{
+			Type:         "memory.write_candidate.observed",
+			ResourceRefs: []contract.ResourceRef{{Kind: "memory", ID: "project"}},
+			Payload:      map[string]any{"content": "x"},
+		},
+	}); err == nil {
+		t.Fatal("an empty-scope binding must reject every explicitly named ref")
+	}
+	if inner.ingested != 0 {
+		t.Fatal("rejected observation must not cross the trust boundary")
+	}
+
+	// 例外不变:同一 binding,未命名 refs → 不受约束,放行。
+	if _, _, err := api.Ingest("codex@project", contract.ObservationEnvelope{
+		Event: contract.Event{
+			Type:    "memory.write_candidate.observed",
+			Payload: map[string]any{"content": "x"},
+		},
+	}); err != nil {
+		t.Fatalf("an observation naming no refs must stay unconstrained: %v", err)
+	}
+	if inner.ingested != 1 {
+		t.Fatal("the unconstrained observation must reach the inner API")
+	}
+}
