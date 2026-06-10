@@ -144,7 +144,8 @@ run_skill() {
 	echo "    skill loop ($host) OK"
 }
 
-# run_note proves the platform claim on the PRODUCT path: a capability whose descriptor +
+# run_note proves the platform claim on the PRODUCT path (note AND the 4th capability decision):
+# a capability whose descriptor +
 # KindCatalog entry exist in code (note) stands up via CONFIG EDIT ALONE — no new Go in app/cmd.
 # setup fail-closes `--loop note` (note has no host assets, correctly), so the stanza does what a
 # platform operator would: edit the setup-written config.json loops list + bindings.json scope.
@@ -164,11 +165,14 @@ run_note() {
 		import json
 		cfg = json.load(open(".mnemon/harness/local/config.json"))
 		cfg["loops"].append("note")
+		cfg["loops"].append("decision")
 		json.dump(cfg, open(".mnemon/harness/local/config.json", "w"), indent=2)
 		doc = json.load(open(".mnemon/harness/channel/bindings.json"))
 		b = doc["bindings"][0]
 		b["allowed_observed_types"].append("note.write_candidate.observed")
 		b["subscription_scope"].append({"kind": "note", "id": "project"})
+		b["allowed_observed_types"].append("decision.write_candidate.observed")
+		b["subscription_scope"].append({"kind": "decision", "id": "project"})
 		json.dump(doc, open(".mnemon/harness/channel/bindings.json", "w"), indent=2)
 		PYEOF
 
@@ -198,6 +202,15 @@ run_note() {
 		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
 		post="${out##*digest=}"; post="${post%% *}"
 		[ -n "$pre" ] && [ -n "$post" ] && [ "$pre" != "$post" ] || { echo "note write did not change the scoped digest (pre=$pre post=$post)"; exit 1; }
+
+		# 阶段二:第四能力 decision —— spec 文件 + KindCatalog/SchemaGuard 一行,零新增行为代码。
+		out="$("$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
+			--type decision.write_candidate.observed --external-id d1 \
+			--payload '{"text":"decision stands up from a spec file"}')"
+		case "$out" in *ticked=true*) ;; *) echo "decision observe: $out"; exit 1 ;; esac
+		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
+		post2="${out##*digest=}"; post2="${post2%% *}"
+		[ -n "$post2" ] && [ "$post2" != "$post" ] || { echo "decision write did not change the scoped digest"; exit 1; }
 
 		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
 		rm -f "$PIDFILE"

@@ -27,6 +27,9 @@ func DefaultSchemaGuard() SchemaGuard {
 		// note is the Phase-2 3rd capability proving config-only assembly; the generic kind renders
 		// items into content. Must stay in lockstep with contract.KindCatalog (kind_catalog_test).
 		"note": {"content"},
+		// decision is the stage-2 4th capability: a spec file + this line is its ENTIRE Go footprint
+		// (the L2 one-line registration the platform promises). Lockstep with contract.KindCatalog.
+		"decision": {"content"},
 	}}
 }
 func (g SchemaGuard) Validate(kind contract.ResourceKind, fields map[string]any) error {
