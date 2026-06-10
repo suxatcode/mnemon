@@ -1,0 +1,147 @@
+package replay
+
+import (
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
+	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+)
+
+const gateActor = contract.ActorID("codex@project")
+
+func gateRuntime(t *testing.T) *runtime.Runtime {
+	t.Helper()
+	ref := contract.ResourceRef{Kind: "memory", ID: "project"}
+	rt, err := runtime.OpenRuntime(filepath.Join(t.TempDir(), "g.db"), runtime.RuntimeConfig{
+		Rules:     rule.NewRuleSet(capability.MemoryAdmissionRule(gateActor, ref)),
+		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{gateActor: {"memory"}}},
+		Subs:      map[contract.ActorID]contract.Subscription{gateActor: {Actor: gateActor, Refs: []contract.ResourceRef{ref}}},
+	})
+	if err != nil {
+		t.Fatalf("open runtime: %v", err)
+	}
+	t.Cleanup(func() { rt.Close() })
+	return rt
+}
+
+// 每步 = 一批 ingest + 一次 Tick(冲突步刻意单 tick 双事件:两提案对同一派发时视图铸造,
+// 第二个必 read-stale —— cutover parity 时确立的判例)。
+type gateStep struct {
+	name          string
+	envs          []contract.ObservationEnvelope
+	wantDecisions int
+}
+
+func memoryEnv(extID, content string) contract.ObservationEnvelope {
+	return contract.ObservationEnvelope{
+		ExternalID: extID,
+		Event: contract.Event{Type: "memory.write_candidate.observed",
+			Payload: map[string]any{"content": content, "source": "user", "confidence": "high"}},
+	}
+}
+
+func deterministicScript() []gateStep {
+	return []gateStep{
+		{name: "accept create", envs: []contract.ObservationEnvelope{memoryEnv("m1", "first fact")}, wantDecisions: 1},
+		{name: "accept update", envs: []contract.ObservationEnvelope{memoryEnv("m2", "second fact")}, wantDecisions: 1},
+		// deny → 0 决策 + 1 条 *.diagnostic(rule deny 不产 kernel 决策;两侧对齐已经经验探针确认)
+		{name: "deny secret", envs: []contract.ObservationEnvelope{memoryEnv("bad", "password=hunter2")}, wantDecisions: 0},
+		// 单 tick 双事件:第二个提案基于同一派发时视图 → read-stale 冲突,Reject 默认下 Rejected
+		{name: "read-stale conflict", envs: []contract.ObservationEnvelope{
+			memoryEnv("c1", "third fact"), memoryEnv("c2", "racing fact"),
+		}, wantDecisions: 2},
+	}
+}
+
+// I6 制度化(kernel 半边):真实场景(接受/deny/冲突)的 live 决策序列,与对同一事件日志的
+// Replay 在掩码动态字段后逐字段一致。范围注记:脚本不含 kernel-authz 拒绝——replay 以
+// permissiveAuthority 归约,authz 拒绝按设计不在复现范围(decision-contract-v1.md)。
+func TestReplayReproducesLiveDecisions(t *testing.T) {
+	rt := gateRuntime(t)
+	var live []contract.Decision
+	for _, step := range deterministicScript() {
+		for _, env := range step.envs {
+			if _, _, err := rt.API().Ingest(gateActor, env); err != nil {
+				t.Fatalf("%s: ingest %s: %v", step.name, env.ExternalID, err)
+			}
+		}
+		ds, err := rt.Tick()
+		if err != nil {
+			t.Fatalf("%s: tick: %v", step.name, err)
+		}
+		if len(ds) != step.wantDecisions {
+			t.Fatalf("%s: want %d decisions, got %d (%#v)", step.name, step.wantDecisions, len(ds), ds)
+		}
+		live = append(live, ds...)
+	}
+
+	events, err := rt.PendingEvents(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 日志连续性:把静默错位变成具名失败(决策 IngestSeq 引用日志位置,对齐依赖于此)。
+	for i, ev := range events {
+		if ev.IngestSeq != int64(i+1) {
+			t.Fatalf("event log must be contiguous: events[%d].IngestSeq=%d", i, ev.IngestSeq)
+		}
+	}
+	// deny 类显式在场:日志含该步的持久 *.diagnostic。
+	var sawDiagnostic bool
+	for _, ev := range events {
+		if strings.HasSuffix(ev.Type, ".diagnostic") {
+			sawDiagnostic = true
+		}
+	}
+	if !sawDiagnostic {
+		t.Fatal("the deny step must leave a durable *.diagnostic in the log")
+	}
+
+	replayed := Replay(events, rule.RuleSet{})
+	if len(replayed) != len(live) {
+		t.Fatalf("decision count: live=%d replay=%d", len(live), len(replayed))
+	}
+	for i := range live {
+		l, r := maskDynamic(live[i]), maskDynamic(replayed[i])
+		if !reflect.DeepEqual(l, r) {
+			t.Fatalf("decision %d diverged after masking:\nlive:   %#v\nreplay: %#v", i, l, r)
+		}
+	}
+	// 场景覆盖自检:序列里必须真的含 accepted 与 rejected(conflict)两类。
+	var accepted, rejected int
+	for _, d := range live {
+		switch d.Status {
+		case contract.Accepted:
+			accepted++
+		case contract.Rejected:
+			rejected++
+		}
+	}
+	if accepted < 3 || rejected < 1 {
+		t.Fatalf("scenario must cover accepts and a conflict reject; got accepted=%d rejected=%d", accepted, rejected)
+	}
+}
+
+// 红可证:掩码比较器必须检出最小篡改(状态/版本/Reason/序号)。
+func TestMaskedComparatorDetectsTampering(t *testing.T) {
+	base := contract.Decision{Status: contract.Accepted, Reason: "", IngestSeq: 3,
+		NewVersions: []contract.ResourceVersion{{Ref: contract.ResourceRef{Kind: "memory", ID: "p"}, Version: 2}}}
+	for name, mutate := range map[string]func(*contract.Decision){
+		"status flip":       func(d *contract.Decision) { d.Status = contract.Rejected },
+		"version rewrite":   func(d *contract.Decision) { d.NewVersions[0].Version = 9 },
+		"reason rewrite":    func(d *contract.Decision) { d.Reason = "looks fine" },
+		"ingestseq rewrite": func(d *contract.Decision) { d.IngestSeq = 4 },
+	} {
+		tampered := base
+		tampered.NewVersions = append([]contract.ResourceVersion(nil), base.NewVersions...)
+		mutate(&tampered)
+		if reflect.DeepEqual(maskDynamic(base), maskDynamic(tampered)) {
+			t.Fatalf("%s: masked comparator failed to detect the tampering", name)
+		}
+	}
+}
