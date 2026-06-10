@@ -192,8 +192,9 @@ run_note() {
 	echo "    note via config alone OK"
 }
 
-# Both hosts run sequentially (the server is stopped between them), so they share the default
-# local-run bind addr; the port is the same for both.
+# Both hosts run sequentially (the server is stopped between them). codex stays on the default
+# port (covering the bare default path); claude-code deliberately runs on a NON-default port to
+# pin the stage-0 promise that a bare `local run` listens where setup's --control-url pointed.
 run_host codex codex@project 8787 .codex
 run_host claude-code claude@project 8899 .claude
 run_skill codex codex@project
