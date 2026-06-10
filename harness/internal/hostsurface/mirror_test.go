@@ -28,11 +28,18 @@ func TestWriteMemoryMirrorConcurrentWritersNeverTear(t *testing.T) {
 	projA, projB := mirrorProj("A"), mirrorProj("B")
 
 	for round := 0; round < 30; round++ {
+		errs := make(chan error, 2)
 		var wg sync.WaitGroup
 		wg.Add(2)
-		go func() { defer wg.Done(); _ = WriteMemoryMirror(path, projA) }()
-		go func() { defer wg.Done(); _ = WriteMemoryMirror(path, projB) }()
+		go func() { defer wg.Done(); errs <- WriteMemoryMirror(path, projA) }()
+		go func() { defer wg.Done(); errs <- WriteMemoryMirror(path, projB) }()
 		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatalf("round %d: concurrent writer failed: %v", round, err)
+			}
+		}
 
 		body, err := os.ReadFile(path)
 		if err != nil {
