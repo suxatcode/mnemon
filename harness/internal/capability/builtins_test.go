@@ -50,3 +50,29 @@ func TestLoadBuiltinsErrorPaths(t *testing.T) {
 		}
 	}
 }
+
+// 冻结协议面在语法层同样 fail-closed:任何层级的未知 JSON 键(顶层/字段对象/校验器对象/
+// 渲染对象)都拒绝整个 spec——typo 永不静默降级为缺省行为。外部目录(阶段五)依赖同一解码器。
+func TestSpecDecodeRejectsUnknownJSONFields(t *testing.T) {
+	base := `{"schema_version":1,"name":"note","observed_type":"note.write_candidate.observed",
+"proposed_type":"note.write.proposed","resource_kind":"note","items_field":"items",
+"fields":[{"name":"text","validators":[{"id":"required","params":{"missing_style":"empty"}}]}],
+"render":{"content":{"member":"bullet-list","params":{"title":"# Notes","field":"text"}}}}`
+	cases := []struct{ name, body string }{
+		{"top-level unknown", strings.Replace(base, `"items_field":"items",`, `"items_field":"items","typo_field":true,`, 1)},
+		{"field-object unknown", strings.Replace(base, `{"name":"text",`, `{"name":"text","requierd":true,`, 1)},
+		{"validator-object unknown", strings.Replace(base, `{"id":"required",`, `{"id":"required","prams":{},`, 1)},
+		{"render-object unknown", strings.Replace(base, `"render":{"content"`, `"render":{"contnet":{},"content"`, 1)},
+	}
+	for _, c := range cases {
+		m := fstest.MapFS{"capabilities/x.json": &fstest.MapFile{Data: []byte(c.body)}}
+		if _, err := loadBuiltins(m); err == nil || !strings.Contains(err.Error(), "unknown field") {
+			t.Fatalf("%s: want unknown-field rejection, got %v", c.name, err)
+		}
+	}
+	// 基线:未注入 typo 的 base 必须可解析(防本测试自身的假阳性)。
+	m := fstest.MapFS{"capabilities/note.json": &fstest.MapFile{Data: []byte(base)}}
+	if _, err := loadBuiltins(m); err != nil {
+		t.Fatalf("baseline spec must load: %v", err)
+	}
+}

@@ -114,7 +114,9 @@ func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string,
 // background re-projection until a setup rerun records the hosts map.
 //
 // Mirror scope reconciliation: only the memory loop carries a runtime mirror today; the
-// loop-declared generic version replaces this helper when stage-2's render catalog lands.
+// loop-declared generic version replaces this helper when loop packages carry mirror
+// declarations (stage 3 final form / stage 5 external packages — the stage-2 render catalog
+// is the building block, not the trigger).
 func serveReproject(rt *runtime.Runtime, loaded channel.LoadedBindings, hosts map[string][]string, projectRoot, mirrorMode string) func(refs []contract.ResourceRef) error {
 	if len(hosts) == 0 {
 		return nil

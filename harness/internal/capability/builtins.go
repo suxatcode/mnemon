@@ -1,7 +1,6 @@
 package capability
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"path"
@@ -47,8 +46,8 @@ func loadBuiltins(fsys fs.FS) (map[string]Capability, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read capability spec %s: %w", name, err)
 		}
-		var spec CapabilitySpec
-		if err := json.Unmarshal(raw, &spec); err != nil {
+		spec, err := decodeSpec(raw)
+		if err != nil {
 			return nil, fmt.Errorf("parse capability spec %s: %w", name, err)
 		}
 		cap, err := FromSpec(spec)

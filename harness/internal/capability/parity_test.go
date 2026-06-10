@@ -1,7 +1,6 @@
 package capability
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"reflect"
@@ -24,8 +23,8 @@ func testSpecs(t *testing.T) map[string]CapabilitySpec {
 		if err != nil {
 			t.Fatalf("read embedded spec %s: %v", id, err)
 		}
-		var spec CapabilitySpec
-		if err := json.Unmarshal(raw, &spec); err != nil {
+		spec, err := decodeSpec(raw)
+		if err != nil {
 			t.Fatalf("parse embedded spec %s: %v", id, err)
 		}
 		out[id] = spec

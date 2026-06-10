@@ -1,6 +1,8 @@
 package capability
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -146,6 +148,20 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 		Decode:       compileDecode(spec),
 		Header:       compileHeader(spec),
 	}, nil
+}
+
+// decodeSpec is the ONE way a CapabilitySpec is read from JSON: DisallowUnknownFields makes the
+// frozen protocol surface fail-closed at the SYNTAX level too — an unknown key anywhere (top
+// level, field object, validator object, render object) rejects the spec instead of silently
+// compiling a typo into default behavior. Production loading and the golden tests share it.
+func decodeSpec(raw []byte) (CapabilitySpec, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var spec CapabilitySpec
+	if err := dec.Decode(&spec); err != nil {
+		return CapabilitySpec{}, err
+	}
+	return spec, nil
 }
 
 type paramSchema struct{ required, optional []string }
