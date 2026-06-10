@@ -53,6 +53,33 @@ func TestSetupRecordsHostsInLocalConfig(t *testing.T) {
 	}
 }
 
+// setup 重跑不得覆盖用户手选的 mirror_mode(setup 无该 flag,覆盖即静默推翻用户决策);
+// 全新安装写出显式缺省 prime-refresh。
+func TestSetupPreservesMirrorModeAcrossReruns(t *testing.T) {
+	root := t.TempDir()
+	setupHost(t, root, "codex")
+	cfgPath := filepath.Join(root, ".mnemon", "harness", "local", "config.json")
+	raw, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"mirror_mode": "prime-refresh"`) {
+		t.Fatalf("fresh setup must write the explicit default; got:\n%s", raw)
+	}
+	edited := strings.Replace(string(raw), `"mirror_mode": "prime-refresh"`, `"mirror_mode": "manual"`, 1)
+	if err := os.WriteFile(cfgPath, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	setupHost(t, root, "codex") // rerun
+	raw, err = os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"mirror_mode": "manual"`) {
+		t.Fatalf("setup rerun must preserve the user-chosen manual mode; got:\n%s", raw)
+	}
+}
+
 // Plan 3.6 acceptance shape: boot over a real setup, admit a write, then ONE driver tick
 // out-of-band — it drains the invalidation, re-projects the host surface under no-clobber
 // (a user edit is preserved), prunes the acked rows, and no second store opener exists.

@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/app"
 	"github.com/mnemon-dev/mnemon/harness/internal/capability"
+	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
 )
 
 func TestLocalStatusReportsProductBoundary(t *testing.T) {
@@ -126,5 +127,33 @@ func TestListenAddrFromEndpoint(t *testing.T) {
 		if got := listenAddrFromEndpoint(c.endpoint, c.fallback); got != c.want {
 			t.Fatalf("%s: listenAddrFromEndpoint(%q,%q) = %q, want %q", c.name, c.endpoint, c.fallback, got, c.want)
 		}
+	}
+}
+
+// mirror_mode 驱动 driver 的镜像再生:缺省 prime-refresh(写入即见);
+// manual 退回仅 prime 再生;unknown 值 fail-closed。
+func TestReadLocalConfigMirrorMode(t *testing.T) {
+	root := t.TempDir()
+	write := func(body string) {
+		p := filepath.Join(root, ".mnemon", "harness", "local")
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(p, "config.json"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`{"schema_version":1,"mode":"local"}`) // 旧安装:缺省
+	cfg, err := readLocalConfig(root)
+	if err != nil || cfg.MirrorMode != "prime-refresh" {
+		t.Fatalf("absent mirror_mode must default to prime-refresh; got %q err=%v", cfg.MirrorMode, err)
+	}
+	write(`{"schema_version":1,"mode":"local","mirror_mode":"manual"}`)
+	if cfg, err = readLocalConfig(root); err != nil || cfg.MirrorMode != "manual" {
+		t.Fatalf("manual must round-trip; got %q err=%v", cfg.MirrorMode, err)
+	}
+	write(`{"schema_version":1,"mode":"local","mirror_mode":"bogus"}`)
+	if _, err = readLocalConfig(root); err == nil {
+		t.Fatal("unknown mirror_mode must fail closed")
 	}
 }

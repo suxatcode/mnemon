@@ -288,6 +288,22 @@ func existingConfigHosts(path string) map[string][]string {
 	return existing.Hosts
 }
 
+// existingConfigMirrorMode preserves a user-chosen mirror_mode across setup reruns (setup has no
+// flag for it; clobbering a hand-edited "manual" back to the default would be a silent override).
+func existingConfigMirrorMode(path string) string {
+	prev, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var existing struct {
+		MirrorMode string `json:"mirror_mode"`
+	}
+	if json.Unmarshal(prev, &existing) != nil {
+		return ""
+	}
+	return existing.MirrorMode
+}
+
 func writeLocalConfig(path string, opts SetupOptions, loops []string) error {
 	// hosts records which loops are PROJECTED per host — the background driver's re-projection
 	// authority (loops alone cannot say which host surfaces exist). Old installs without the key
@@ -297,6 +313,10 @@ func writeLocalConfig(path string, opts SetupOptions, loops []string) error {
 		hosts = map[string][]string{}
 	}
 	hosts[opts.Host] = unionLoops(hosts[opts.Host], opts.Loops)
+	mirrorMode := existingConfigMirrorMode(path)
+	if mirrorMode == "" {
+		mirrorMode = "prime-refresh"
+	}
 	doc := map[string]any{
 		"schema_version": 1,
 		"mode":           "local",
@@ -304,6 +324,7 @@ func writeLocalConfig(path string, opts SetupOptions, loops []string) error {
 		"principal":      opts.Principal,
 		"loops":          loops,
 		"hosts":          hosts,
+		"mirror_mode":    mirrorMode,
 		"binding_file":   filepath.ToSlash(filepath.Join(".mnemon", "harness", "channel", "bindings.json")),
 		"store_path":     filepath.ToSlash(runtime.DefaultStorePath),
 	}

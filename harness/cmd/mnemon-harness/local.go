@@ -45,6 +45,7 @@ var localRunCmd = &cobra.Command{
 			Loops:       boot.Config.Loops,
 			Hosts:       boot.Config.Hosts,
 			ProjectRoot: projectRoot(),
+			MirrorMode:  boot.Config.MirrorMode,
 		}, io.Discard)
 	},
 }
@@ -139,7 +140,8 @@ type localConfig struct {
 	Endpoint      string              `json:"endpoint"`
 	Principal     string              `json:"principal"`
 	Loops         []string            `json:"loops"`
-	Hosts         map[string][]string `json:"hosts"` // per-host projected loops; absent on old installs (no background re-projection)
+	Hosts         map[string][]string `json:"hosts"`       // per-host projected loops; absent on old installs (no background re-projection)
+	MirrorMode    string              `json:"mirror_mode"` // "manual" | "prime-refresh"; absent defaults to prime-refresh
 	BindingFile   string              `json:"binding_file"`
 	StorePath     string              `json:"store_path"`
 }
@@ -192,6 +194,13 @@ func readLocalConfig(root string) (localConfig, error) {
 	}
 	if cfg.SchemaVersion != 1 {
 		return localConfig{}, fmt.Errorf("Local Mnemon config schema_version %d unsupported (want 1)", cfg.SchemaVersion)
+	}
+	switch cfg.MirrorMode {
+	case "":
+		cfg.MirrorMode = "prime-refresh"
+	case "manual", "prime-refresh":
+	default:
+		return localConfig{}, fmt.Errorf("Local Mnemon config mirror_mode %q unsupported (manual|prime-refresh)", cfg.MirrorMode)
 	}
 	return cfg, nil
 }

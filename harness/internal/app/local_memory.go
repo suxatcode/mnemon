@@ -77,6 +77,7 @@ type ServeOptions struct {
 	Loops       []string
 	Hosts       map[string][]string
 	ProjectRoot string
+	MirrorMode  string // "manual" | "prime-refresh" (driver-side mirror regeneration gate)
 }
 
 // RunLocalHTTPServerWithBindings serves Local Mnemon from a binding manifest. It is the product boot
