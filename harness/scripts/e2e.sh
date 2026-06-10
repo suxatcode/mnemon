@@ -75,6 +75,20 @@ run_host() {
 		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
 		case "$out" in *resources=1*) ;; *) echo "negative pull leaked: $out"; exit 1 ;; esac
 
+		# 阶段一:写入即见 —— 不跑任何 prime,driver 在 invalidation 后自动再生镜像。
+		"$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
+			--type memory.write_candidate_observed --external-id m2 \
+			--payload '{"content":"E2E driver mirror '"$host"'","source":"user","confidence":"high"}' >/dev/null
+		local mirror="$configdir/mnemon-memory/MEMORY.md" seen=0
+		for i in $(seq 1 100); do
+			if grep -q "E2E driver mirror $host" "$mirror" 2>/dev/null; then
+				seen=1
+				break
+			fi
+			sleep 0.1
+		done
+		[ "$seen" = 1 ] || { echo "driver did not regenerate the mirror within 10s"; exit 1; }
+
 		# refresh no-clobber: hand-edit a projected GUIDE, refresh, assert the edit is preserved + reported
 		local guide="$configdir/mnemon-memory/GUIDE.md"
 		printf '# E2E USER EDIT\n\n%s' "$(cat "$guide")" >"$guide.tmp" && mv "$guide.tmp" "$guide"
