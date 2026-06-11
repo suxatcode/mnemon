@@ -134,20 +134,6 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 		}
 	}
 
-	jobs, err := loopJobSpecs(v.fsys, data, loopDir)
-	if err != nil {
-		return fmt.Errorf("loop manifest invalid jobs: %s: %w", manifest, err)
-	}
-	controllers, err := loopControllers(data)
-	if err != nil {
-		return fmt.Errorf("loop manifest invalid controllers: %s: %w", manifest, err)
-	}
-	for _, controller := range controllers {
-		if _, ok := jobs[controller.Enqueue]; !ok {
-			return fmt.Errorf("loop controller %s references missing job %s: %s", controller.Name, controller.Enqueue, manifest)
-		}
-	}
-
 	hostAdapters, err := stringMapField(data, "host_adapters")
 	if err != nil {
 		return fmt.Errorf("loop manifest invalid host_adapters: %s: %w", manifest, err)
@@ -273,24 +259,17 @@ func (v *harnessValidator) validateBinding(manifest string) (string, error) {
 		}
 		return "", fmt.Errorf("stat binding loop reference: %w", err)
 	}
-	loopDir := path.Join("loops", loop)
-	switch schemaVersion {
-	case 1:
-		if err := validateBindingV1(v.fsys, data, loopDir); err != nil {
-			return "", fmt.Errorf("binding manifest invalid v1 shape: %s: %w", manifest, err)
-		}
-	case 2:
-		if err := validateBindingV2(v.fsys, data, loopDir); err != nil {
-			return "", fmt.Errorf("binding manifest invalid v2 shape: %s: %w", manifest, err)
-		}
-	default:
-		return "", fmt.Errorf("binding manifest schema_version must be 1 or 2: %s", manifest)
+	if schemaVersion != 1 {
+		return "", fmt.Errorf("binding manifest schema_version must be 1: %s", manifest)
+	}
+	if err := validateBindingV1(data); err != nil {
+		return "", fmt.Errorf("binding manifest invalid v1 shape: %s: %w", manifest, err)
 	}
 	v.lines = append(v.lines, fmt.Sprintf("ok binding %s", name))
 	return name, nil
 }
 
-func validateBindingV1(fsys fs.FS, data map[string]json.RawMessage, loopDir string) error {
+func validateBindingV1(data map[string]json.RawMessage) error {
 	for _, field := range []string{"projection_path", "runtime_surface", "lifecycle_mapping", "reconcile"} {
 		if !hasField(data, field) {
 			return fmt.Errorf("missing %s", field)
@@ -311,54 +290,6 @@ func validateBindingV1(fsys fs.FS, data map[string]json.RawMessage, loopDir stri
 	}
 	if _, err := stringSlice(rawReconcile); err != nil {
 		return fmt.Errorf("reconcile: %w", err)
-	}
-	return validateRunnerBindings(fsys, data, loopDir)
-}
-
-func validateBindingV2(fsys fs.FS, data map[string]json.RawMessage, loopDir string) error {
-	spec, err := objectField(data, "spec")
-	if err != nil {
-		return err
-	}
-	scope, err := requiredString(spec, "scope", "binding spec", "")
-	if err != nil {
-		return err
-	}
-	if scope != BindingScopeProject {
-		return fmt.Errorf("spec.scope must be %s", BindingScopeProject)
-	}
-	if _, err := boolField(spec, "enabled"); err != nil {
-		return fmt.Errorf("spec.enabled: %w", err)
-	}
-	hookMode, err := requiredString(spec, "hook_mode", "binding spec", "")
-	if err != nil {
-		return err
-	}
-	if !oneOf(hookMode, "native", "prompt", "manual", "none") {
-		return fmt.Errorf("spec.hook_mode %q is not allowed", hookMode)
-	}
-	projection, err := objectField(spec, "projection")
-	if err != nil {
-		return fmt.Errorf("spec.projection: %w", err)
-	}
-	if _, err := requiredString(projection, "path", "binding spec.projection", ""); err != nil {
-		return err
-	}
-	if _, err := requiredString(projection, "runtime_surface", "binding spec.projection", ""); err != nil {
-		return err
-	}
-	if _, err := stringMapField(spec, "lifecycle_mapping"); err != nil {
-		return fmt.Errorf("spec.lifecycle_mapping: %w", err)
-	}
-	rawReconcile, ok := spec["reconcile"]
-	if !ok {
-		return errors.New("spec missing reconcile")
-	}
-	if _, err := stringSlice(rawReconcile); err != nil {
-		return fmt.Errorf("spec.reconcile: %w", err)
-	}
-	if err := validateRunnerBindings(fsys, spec, loopDir); err != nil {
-		return fmt.Errorf("spec.runner_bindings: %w", err)
 	}
 	return nil
 }
@@ -422,108 +353,6 @@ func loopAssetPaths(assets map[string]json.RawMessage) ([]string, error) {
 		paths = append(paths, values...)
 	}
 	return paths, nil
-}
-
-func loopJobSpecs(fsys fs.FS, data map[string]json.RawMessage, loopDir string) (map[string]JobSpec, error) {
-	raw, ok := data["jobs"]
-	if !ok {
-		return map[string]JobSpec{}, nil
-	}
-	var jobs map[string]JobSpec
-	if err := json.Unmarshal(raw, &jobs); err != nil {
-		return nil, err
-	}
-	if jobs == nil {
-		return nil, errors.New("jobs must be an object")
-	}
-	for name, spec := range jobs {
-		if name == "" {
-			return nil, errors.New("job name must be non-empty")
-		}
-		if spec.Type != "deterministic" && spec.Type != "semantic" {
-			return nil, fmt.Errorf("job %s type must be deterministic or semantic", name)
-		}
-		if spec.Spec != "" {
-			if _, err := fs.Stat(fsys, path.Join(loopDir, spec.Spec)); err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					return nil, fmt.Errorf("job %s references missing spec asset: %s", name, spec.Spec)
-				}
-				return nil, fmt.Errorf("stat job %s spec asset %s: %w", name, spec.Spec, err)
-			}
-		}
-		if spec.MaxTurns < 0 {
-			return nil, fmt.Errorf("job %s max_turns must not be negative", name)
-		}
-	}
-	return jobs, nil
-}
-
-func loopControllers(data map[string]json.RawMessage) ([]LoopController, error) {
-	raw, ok := data["controllers"]
-	if !ok {
-		return nil, nil
-	}
-	var controllers []LoopController
-	if err := json.Unmarshal(raw, &controllers); err != nil {
-		return nil, err
-	}
-	for _, controller := range controllers {
-		if controller.Name == "" {
-			return nil, errors.New("controller name must be non-empty")
-		}
-		if len(controller.Watches) == 0 {
-			return nil, fmt.Errorf("controller %s must watch at least one event type", controller.Name)
-		}
-		for _, watch := range controller.Watches {
-			if watch == "" {
-				return nil, fmt.Errorf("controller %s has empty watch event type", controller.Name)
-			}
-		}
-		if controller.Enqueue == "" {
-			return nil, fmt.Errorf("controller %s enqueue must be non-empty", controller.Name)
-		}
-	}
-	return controllers, nil
-}
-
-func validateRunnerBindings(fsys fs.FS, data map[string]json.RawMessage, loopDir string) error {
-	raw, ok := data["runner_bindings"]
-	if !ok {
-		return nil
-	}
-	var bindings map[string]RunnerBinding
-	if err := json.Unmarshal(raw, &bindings); err != nil {
-		return err
-	}
-	if bindings == nil {
-		return errors.New("runner_bindings must be an object")
-	}
-	for name, binding := range bindings {
-		if name == "" {
-			return errors.New("runner binding name must be non-empty")
-		}
-		switch binding.Mode {
-		case "app_server":
-			if binding.Runner == "" {
-				return fmt.Errorf("runner binding %s app_server mode requires runner", name)
-			}
-		case "native_subagent":
-			if binding.Agent == "" {
-				return fmt.Errorf("runner binding %s native_subagent mode requires agent", name)
-			}
-		default:
-			return fmt.Errorf("runner binding %s mode must be app_server or native_subagent", name)
-		}
-		if binding.PromptFrom != "" {
-			if _, err := fs.Stat(fsys, path.Join(loopDir, binding.PromptFrom)); err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					return fmt.Errorf("runner binding %s references missing prompt asset: %s", name, binding.PromptFrom)
-				}
-				return fmt.Errorf("stat runner binding %s prompt asset %s: %w", name, binding.PromptFrom, err)
-			}
-		}
-	}
-	return nil
 }
 
 func readManifest(fsys fs.FS, name string, target any) error {

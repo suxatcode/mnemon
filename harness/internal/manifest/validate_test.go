@@ -57,7 +57,9 @@ func TestValidateHarnessRejectsDuplicateBindingName(t *testing.T) {
 	}
 }
 
-func TestValidateHarnessAcceptsBindingSchemaV2(t *testing.T) {
+// The speculative v2 binding format never shipped an instance; P1 clearcut removed it. Any
+// non-v1 schema_version must be rejected so validate and LoadBinding agree (fail-closed).
+func TestValidateHarnessRejectsNonV1BindingSchema(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
 	writeFile(t, filepath.Join(root, "bindings", "codex.memory.json"), `{
@@ -65,54 +67,12 @@ func TestValidateHarnessAcceptsBindingSchemaV2(t *testing.T) {
   "name": "codex.memory",
   "host": "codex",
   "loop": "memory",
-  "spec": {
-    "scope": "project",
-    "enabled": true,
-    "hook_mode": "native",
-    "projection": {
-      "path": ".codex",
-      "runtime_surface": ".codex/mnemon-memory"
-    },
-    "lifecycle_mapping": {
-      "prime": "SessionStart",
-      "remind": "UserPromptSubmit"
-    },
-    "reconcile": ["read", "write", "no-op"]
-  }
-}`)
-
-	result, err := ValidateFS(os.DirFS(root))
-	if err != nil {
-		t.Fatalf("ValidateHarness returned error: %v", err)
-	}
-	if got := strings.Join(result.Lines, "\n"); !strings.Contains(got, "ok binding codex.memory") {
-		t.Fatalf("expected v2 binding in output:\n%s", got)
-	}
-}
-
-func TestValidateHarnessRejectsBindingSchemaV2MissingHookMode(t *testing.T) {
-	root := t.TempDir()
-	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
-	writeFile(t, filepath.Join(root, "bindings", "codex.memory.json"), `{
-  "schema_version": 2,
-  "name": "codex.memory",
-  "host": "codex",
-  "loop": "memory",
-  "spec": {
-    "scope": "project",
-    "enabled": true,
-    "projection": {
-      "path": ".codex",
-      "runtime_surface": ".codex/mnemon-memory"
-    },
-    "lifecycle_mapping": {},
-    "reconcile": []
-  }
+  "spec": {}
 }`)
 
 	_, err := ValidateFS(os.DirFS(root))
-	if err == nil || !strings.Contains(err.Error(), "missing hook_mode") {
-		t.Fatalf("expected missing hook_mode error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "schema_version must be 1") {
+		t.Fatalf("expected schema_version rejection, got %v", err)
 	}
 }
 

@@ -11,12 +11,5 @@
     "nudge": "Stop",
     "compact": "PreCompact"
   },
-  "runner_bindings": {
-    "skill.curator": {
-      "mode": "app_server",
-      "runner": "codex-app-server",
-      "prompt_from": "subagents/curator.md"
-    }
-  },
   "reconcile": ["observe", "curate", "propose", "manage", "no-op"]
 }

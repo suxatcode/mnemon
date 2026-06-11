@@ -71,12 +71,6 @@
       "review decisions"
     ]
   },
-  "lifecycle_events": [
-    "prime",
-    "remind",
-    "nudge",
-    "compact"
-  ],
   "assets": {
     "guide": "GUIDE.md",
     "env": "env.sh",
@@ -89,41 +83,6 @@
     "subagents": [
       "subagents/curator.md"
     ]
-  },
-  "state": {
-    "canonical": [
-      "harness/local/governed.db: events",
-      "harness/local/governed.db: resources",
-      "harness/local/governed.db: decisions"
-    ],
-    "loop_runtime": [
-      "skills/active",
-      "skills/stale",
-      "skills/archived",
-      "skills/.usage.jsonl",
-      "proposals"
-    ]
-  },
-  "controllers": [
-    {
-      "name": "skill.curator.on_usage",
-      "watches": [
-        "skill.usage_observed"
-      ],
-      "enqueue": "skill.curator",
-      "reason": "Skill usage evidence may need curator review."
-    }
-  ],
-  "jobs": {
-    "skill.curator": {
-      "type": "semantic",
-      "spec": "subagents/curator.md",
-      "preferred_runner": "host-subagent",
-      "fallback_runner": "codex-app-server",
-      "governance": "report-or-proposal",
-      "prompt": "Run the skill curator job from subagents/curator.md and return structured evidence for any proposed skill lifecycle changes.",
-      "max_turns": 3
-    }
   },
   "host_adapters": {
     "claude-code": "../../hosts/claude-code",

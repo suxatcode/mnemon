@@ -63,12 +63,6 @@
       "write outcomes"
     ]
   },
-  "lifecycle_events": [
-    "prime",
-    "remind",
-    "nudge",
-    "compact"
-  ],
   "assets": {
     "guide": "GUIDE.md",
     "env": "env.sh",
@@ -81,18 +75,6 @@
     ],
     "subagents": []
   },
-  "state": {
-    "canonical": [
-      "harness/local/governed.db: events",
-      "harness/local/governed.db: resources",
-      "harness/local/governed.db: decisions"
-    ],
-    "loop_runtime": [
-      "MEMORY.md"
-    ]
-  },
-  "controllers": [],
-  "jobs": {},
   "host_adapters": {
     "claude-code": "../../hosts/claude-code",
     "codex": "../../hosts/codex"
