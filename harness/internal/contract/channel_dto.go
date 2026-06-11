@@ -1,5 +1,7 @@
 package contract
 
+import "fmt"
+
 // Channel-facing DTOs shared across the channel/runtime/app layers. They live in contract (zero
 // deps) so the channel port and the runtime that satisfies it can both name them without a back-edge.
 
@@ -19,6 +21,57 @@ const (
 // The runtime uses it to skip re-recording sync commits for sync-imported decisions; the app sync glue
 // drives the import runtime under it.
 const SyncImportActor = ActorID("sync@local")
+
+// The three Remote Workspace sync wire verbs (sync-abi-v1 §1). They live in contract because the ABI
+// names them: the channel binding layer and the standalone hub (syncserver/mnemond) must agree on the
+// strings without either importing the other. Deliberately untyped so channel can alias them into its
+// Verb space unchanged.
+const (
+	SyncVerbPush   = "sync.push"
+	SyncVerbPull   = "sync.pull"
+	SyncVerbStatus = "sync.status"
+)
+
+// ReplicaGrant is the replica-credential scope record both hub forms share (sync-abi-v1 §2 dual-form
+// rule): a co-hosted hub derives it from a replica-agent channel binding entry; mnemond derives it
+// from a replicas.json entry. Same fields, same semantics. Token is the optional bearer credential
+// (resolved from credential_ref); it is empty when the transport authenticates another way (e.g. the
+// co-hosted hub's binding authenticator already resolved the principal).
+type ReplicaGrant struct {
+	Principal ActorID
+	Token     string
+	Scopes    []ResourceRef
+}
+
+// SyncableResourceKinds names the resource kinds Remote Workspace sync carries (sync-abi-v1 §4). It
+// is shared by the hub's push validation (syncserver) AND the local decision sink that produces sync
+// commits (runtime), so the accept surface and the produce surface can never drift.
+var SyncableResourceKinds = map[ResourceKind]bool{
+	"memory": true,
+	"skill":  true,
+}
+
+// ClampRefs clamps a requested ref set to a principal's granted scope — the team-scale authorization
+// ceiling, implemented ONCE for pull / sync / status (hand-rolled copies had already diverged on
+// empty-scope handling). channel.ChannelBinding.ClampRefs and the syncserver hub both delegate here.
+// Empty requested defaults to the full scope; any explicit ref outside the scope is an error; an
+// EMPTY scope denies every explicit ref (fail closed). The ingest path keeps its documented exception
+// (an observation naming no refs is unconstrained) at its own call site.
+func ClampRefs(principal ActorID, scope, requested []ResourceRef) ([]ResourceRef, error) {
+	if len(requested) == 0 {
+		return append([]ResourceRef(nil), scope...), nil
+	}
+	allowed := make(map[ResourceRef]bool, len(scope))
+	for _, ref := range scope {
+		allowed[ref] = true
+	}
+	for _, ref := range requested {
+		if !allowed[ref] {
+			return nil, fmt.Errorf("ref %s/%s is outside principal %q binding scope", ref.Kind, ref.ID, principal)
+		}
+	}
+	return append([]ResourceRef(nil), requested...), nil
+}
 
 // ChannelStatus is the principal's channel status surface (digest + scope counts + sync state).
 type ChannelStatus struct {
@@ -60,9 +113,16 @@ type SyncPullResponse struct {
 	NextCursor  string             `json:"next_cursor"`
 }
 
+// SyncStatusResponse carries the hub-side sync evidence. The three Hub* counters are the v1
+// ADDITIVE extension (sync-abi-v1 §3): total commits accepted into the hub log, total commits
+// returned across pulls, and the last next_cursor served to each replica principal. A pre-counter
+// hub omits them; clients treat absent as zero.
 type SyncStatusResponse struct {
-	Principal       ActorID `json:"principal"`
-	RemoteWorkspace string  `json:"remote_workspace"`
+	Principal          ActorID           `json:"principal"`
+	RemoteWorkspace    string            `json:"remote_workspace"`
+	HubCommitsReceived int64             `json:"hub_commits_received"`
+	HubCommitsServed   int64             `json:"hub_commits_served"`
+	HubReplicaCursors  map[string]string `json:"hub_replica_cursors,omitempty"`
 }
 
 type SyncCommitResult struct {

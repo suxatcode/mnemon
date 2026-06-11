@@ -1,138 +1,58 @@
 package runtime
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/mnemon-dev/mnemon/harness/internal/syncserver"
 )
 
+// The runtime's sync verbs are the CO-HOSTED hub form: the same syncserver adjudication mnemond
+// hosts standalone, authorized here by adapting the channel bindings to replica grants (the
+// dual-form rule, sync-abi-v1 §2). Zero hub logic lives in the runtime anymore — only the adapter.
+
 func (r *Runtime) SyncPush(principal contract.ActorID, req contract.SyncPushRequest) (contract.SyncPushResponse, error) {
-	if _, err := r.requireSyncBinding(principal, channel.VerbSyncPush); err != nil {
-		return contract.SyncPushResponse{}, err
-	}
-	replicaID := strings.TrimSpace(req.ReplicaID)
-	if replicaID == "" {
-		return contract.SyncPushResponse{}, fmt.Errorf("sync push requires replica_id")
-	}
-	var resp contract.SyncPushResponse
-	for _, commit := range req.Commits {
-		if commit.OriginReplicaID != replicaID {
-			return contract.SyncPushResponse{}, fmt.Errorf("sync push replica_id %q does not match commit origin %q", replicaID, commit.OriginReplicaID)
-		}
-		if diagnostic := validateSyncCommit(commit); diagnostic != "" {
-			resp.Rejected = append(resp.Rejected, syncResult(commit, "rejected", diagnostic))
-			continue
-		}
-		rec, err := r.store.RecordRemoteSyncCommit(string(principal), commit, r.cs.now())
-		if err != nil {
-			return contract.SyncPushResponse{}, err
-		}
-		switch rec.Status {
-		case "accepted":
-			resp.Accepted = append(resp.Accepted, syncResult(rec.Commit, "accepted", ""))
-			resp.NextCursor = strconv.FormatInt(rec.RemoteSeq, 10)
-		case "conflict":
-			resp.Conflicts = append(resp.Conflicts, syncResult(commit, "conflict", rec.Diagnostic))
-		default:
-			resp.Rejected = append(resp.Rejected, syncResult(commit, rec.Status, rec.Diagnostic))
-		}
-	}
-	return resp, nil
+	return r.syncHub().Push(principal, req)
 }
 
 func (r *Runtime) SyncPull(principal contract.ActorID, req contract.SyncPullRequest) (contract.SyncPullResponse, error) {
-	b, err := r.requireSyncBinding(principal, channel.VerbSyncPull)
-	if err != nil {
-		return contract.SyncPullResponse{}, err
-	}
-	replicaID := strings.TrimSpace(req.ReplicaID)
-	if replicaID == "" {
-		return contract.SyncPullResponse{}, fmt.Errorf("sync pull requires replica_id")
-	}
-	cursor := int64(0)
-	if strings.TrimSpace(req.RemoteCursor) != "" {
-		cursor, err = strconv.ParseInt(req.RemoteCursor, 10, 64)
-		if err != nil {
-			return contract.SyncPullResponse{}, fmt.Errorf("parse remote_cursor: %w", err)
-		}
-	}
-	scopes, err := clampSyncScopes(b, req.Scopes)
-	if err != nil {
-		return contract.SyncPullResponse{}, err
-	}
-	records, next, err := r.store.RemoteSyncCommitsAfter(cursor, replicaID, scopes, 100)
-	if err != nil {
-		return contract.SyncPullResponse{}, err
-	}
-	resp := contract.SyncPullResponse{NextCursor: strconv.FormatInt(next, 10)}
-	for _, rec := range records {
-		resp.Commits = append(resp.Commits, rec.Commit)
-	}
-	return resp, nil
+	return r.syncHub().Pull(principal, req)
 }
 
 func (r *Runtime) SyncStatus(principal contract.ActorID) (contract.SyncStatusResponse, error) {
-	if _, err := r.requireSyncBinding(principal, channel.VerbSyncStatus); err != nil {
-		return contract.SyncStatusResponse{}, err
-	}
-	return contract.SyncStatusResponse{Principal: principal, RemoteWorkspace: "connected"}, nil
+	return r.syncHub().Status(principal)
 }
 
-func (r *Runtime) requireSyncBinding(principal contract.ActorID, verb channel.Verb) (channel.ChannelBinding, error) {
-	if r.bindings == nil {
-		return channel.ChannelBinding{}, fmt.Errorf("sync requires a replica-agent binding")
-	}
-	b, ok := r.bindings.Binding(principal)
-	if !ok {
-		return channel.ChannelBinding{}, fmt.Errorf("no channel binding for principal %q", principal)
-	}
-	if b.ActorKind != contract.KindReplicaAgent {
-		return channel.ChannelBinding{}, fmt.Errorf("principal %q is not a replica-agent", principal)
-	}
-	if !b.Allows(verb) {
-		return channel.ChannelBinding{}, fmt.Errorf("principal %q is not bound to %s", principal, verb)
-	}
-	return b, nil
+// syncHub builds the hub view over the runtime's open store. It is stateless (adjudication and
+// counters are durable in the store), so a per-call construction is correct and cheap.
+func (r *Runtime) syncHub() *syncserver.Server {
+	return syncserver.New(r.store, bindingGrants{bindings: r.bindings}, r.cs.now)
 }
 
-func validateSyncCommit(commit contract.LocalCommit) string {
-	switch {
-	case strings.TrimSpace(commit.OriginReplicaID) == "":
-		return "origin_replica_id is required"
-	case strings.TrimSpace(commit.LocalDecisionID) == "":
-		return "local_decision_id is required"
-	case strings.TrimSpace(string(commit.ResourceRef.Kind)) == "" || strings.TrimSpace(string(commit.ResourceRef.ID)) == "":
-		return "resource_ref is required"
-	case !syncableResourceKinds[commit.ResourceRef.Kind]:
-		return fmt.Sprintf("resource kind %q is not syncable", commit.ResourceRef.Kind)
-	case commit.Fields == nil:
-		return "fields are required"
-	case strings.TrimSpace(commit.FieldsDigest) == "":
-		return "fields_digest is required"
-	case commit.FieldsDigest != syncCommitFieldsDigest(commit.Fields):
-		return "fields_digest does not match fields"
-	default:
-		return ""
-	}
+// bindingGrants adapts the runtime's channel bindings to the syncserver Grants seam with the EXACT
+// pre-extraction requireSyncBinding semantics (zero behavior change): a grant exists iff the
+// principal has a binding, the binding's kind is replica-agent, and it allows the verb. The grant
+// scope is the binding's SubscriptionScope.
+type bindingGrants struct {
+	bindings *channel.BindingSet
 }
 
-func syncResult(commit contract.LocalCommit, status, diagnostic string) contract.SyncCommitResult {
-	return contract.SyncCommitResult{
-		OriginReplicaID: commit.OriginReplicaID,
-		LocalDecisionID: commit.LocalDecisionID,
-		ResourceRef:     commit.ResourceRef,
-		Status:          status,
-		Diagnostic:      diagnostic,
+func (g bindingGrants) Grant(principal contract.ActorID, verb string) (contract.ReplicaGrant, bool) {
+	if g.bindings == nil {
+		return contract.ReplicaGrant{}, false
 	}
+	b, ok := g.bindings.Binding(principal)
+	if !ok || b.ActorKind != contract.KindReplicaAgent || !b.Allows(channel.Verb(verb)) {
+		return contract.ReplicaGrant{}, false
+	}
+	return contract.ReplicaGrant{Principal: principal, Scopes: b.SubscriptionScope}, true
 }
 
-// clampSyncScopes delegates to the binding's ONE scope clamp (channel.ChannelBinding.ClampRefs).
+// clampSyncScopes delegates to the binding's ONE scope clamp (channel.ChannelBinding.ClampRefs,
+// itself a delegate of contract.ClampRefs — the implementation the extracted hub shares). The live
+// sync pull path now clamps inside syncserver.Pull against the adapted grant scope (= this binding
+// scope), so this helper remains as the runtime-level pin of the binding-clamp semantics.
 // TIGHTENING vs the prior hand-rolled copy: an empty-scope replica binding used to pass explicit
 // requested refs through unchecked — and this was the only enforcement on the sync path before
 // SQL. ClampRefs denies explicit refs under an empty scope (fail closed).
@@ -142,10 +62,4 @@ func clampSyncScopes(binding channel.ChannelBinding, requested []contract.Resour
 		return nil, fmt.Errorf("sync scope: %w", err)
 	}
 	return scopes, nil
-}
-
-func syncCommitFieldsDigest(fields map[string]any) string {
-	b, _ := json.Marshal(fields)
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
 }

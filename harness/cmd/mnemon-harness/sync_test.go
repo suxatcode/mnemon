@@ -275,7 +275,7 @@ func TestSyncConnectWritesRemoteConfigWithoutLeakingToken(t *testing.T) {
 	restoreSyncFlags(t)
 	root := t.TempDir()
 	syncRoot = root
-	syncRemoteURL = "http://remote.example.test"
+	syncRemoteURL = "https://remote.example.test"
 	syncRemoteToken = "secret-workspace-token"
 	var out bytes.Buffer
 	cmd := mustTestCommand(t)
@@ -307,7 +307,7 @@ func TestSyncConnectWritesRemoteConfigWithoutLeakingToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve current remote: %v", err)
 	}
-	if remote.ID != "team" || remote.Endpoint != "http://remote.example.test" || remote.Token != "secret-workspace-token" {
+	if remote.ID != "team" || remote.Endpoint != "https://remote.example.test" || remote.Token != "secret-workspace-token" {
 		t.Fatalf("current remote not resolved: %+v", remote)
 	}
 }
@@ -357,6 +357,8 @@ func restoreSyncFlags(t *testing.T) {
 	oldRemoteURL := syncRemoteURL
 	oldRemoteToken := syncRemoteToken
 	oldRemoteTokenFile := syncRemoteTokenFile
+	oldCAFile := syncCAFile
+	oldAllowInsecure := syncAllowInsecure
 	t.Cleanup(func() {
 		syncRoot = oldRoot
 		syncStorePath = oldStorePath
@@ -365,6 +367,8 @@ func restoreSyncFlags(t *testing.T) {
 		syncRemoteURL = oldRemoteURL
 		syncRemoteToken = oldRemoteToken
 		syncRemoteTokenFile = oldRemoteTokenFile
+		syncCAFile = oldCAFile
+		syncAllowInsecure = oldAllowInsecure
 	})
 	syncRoot = "."
 	syncStorePath = ""
@@ -373,6 +377,8 @@ func restoreSyncFlags(t *testing.T) {
 	syncRemoteURL = ""
 	syncRemoteToken = ""
 	syncRemoteTokenFile = ""
+	syncCAFile = ""
+	syncAllowInsecure = false
 }
 
 func syncStatusForTest(storePath string) (contract.ChannelStatus, error) {

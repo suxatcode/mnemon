@@ -28,6 +28,8 @@ import (
 // An empty loops list (the hidden `local run --bindings` path, which has no localConfig) derives
 // enablement from the binding scope kinds ∩ catalog. catalog selects the capability universe
 // (nil = capability.Builtins); the serve path passes the boot-resolved external-merged catalog.
+// The assembled policy is then merged with the sync-import half (withSyncImport), so the SERVING
+// runtime can import pulled commits in-process (v1.1 #2) without a second runtime boot.
 func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings, loops []string, catalog map[string]capability.Capability) (*runtime.Runtime, error) {
 	if len(loops) == 0 {
 		loops = loopsFromBindings(loaded.Bindings, catalog)
@@ -36,7 +38,52 @@ func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings, loops []s
 	if err != nil {
 		return nil, err
 	}
-	return runtime.OpenRuntime(storePath, rc)
+	return runtime.OpenRuntime(storePath, withSyncImport(rc, loaded.Bindings))
+}
+
+// withSyncImport merges the sync-import half into an assembled runtime policy (v1.1 #2): sync@local
+// gets the two import rules + the skipped-kind deny rule, kernel authority for the syncable kinds,
+// and a subscription covering the binding scope's syncable refs (the import rules read the current
+// resource through this view to merge against). Co-existence is by construction: the added rules
+// Handle only the remote.* / sync.* observation types AND gate on the sync principal, so host-agent
+// events never match them and host rules never see the import events — pinned by a test.
+func withSyncImport(rc runtime.RuntimeConfig, bindings []channel.ChannelBinding) runtime.RuntimeConfig {
+	rules := append(append([]rule.Rule(nil), rc.Rules.Rules()...),
+		capability.RemoteMemoryImportRule(contract.SyncImportActor),
+		capability.RemoteSkillImportRule(contract.SyncImportActor),
+		capability.SyncImportSkippedRule(contract.SyncImportActor))
+	rc.Rules = rule.NewRuleSet(rules...)
+	if rc.Subs == nil {
+		rc.Subs = map[contract.ActorID]contract.Subscription{}
+	}
+	rc.Subs[contract.SyncImportActor] = contract.Subscription{Actor: contract.SyncImportActor, Refs: syncableScopeRefs(bindings)}
+	if rc.Authority.Allow == nil {
+		rc.Authority.Allow = map[contract.ActorID][]contract.ResourceKind{}
+	}
+	rc.Authority.Allow[contract.SyncImportActor] = []contract.ResourceKind{"memory", "skill"}
+	return rc
+}
+
+// syncableScopeRefs collects the deduped binding-scope refs of syncable kinds — the resources a
+// pulled commit may target on this replica (the same canonical refs the host loops govern).
+func syncableScopeRefs(bindings []channel.ChannelBinding) []contract.ResourceRef {
+	seen := map[contract.ResourceRef]bool{}
+	var refs []contract.ResourceRef
+	for _, b := range bindings {
+		for _, ref := range b.SubscriptionScope {
+			if contract.SyncableResourceKinds[ref.Kind] && !seen[ref] {
+				seen[ref] = true
+				refs = append(refs, ref)
+			}
+		}
+	}
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].Kind != refs[j].Kind {
+			return refs[i].Kind < refs[j].Kind
+		}
+		return refs[i].ID < refs[j].ID
+	})
+	return refs
 }
 
 // LocalRuntimeConfigFromBindings derives Local Mnemon's policy from the installed Agent Integration
@@ -89,6 +136,9 @@ type ServeOptions struct {
 	ProjectRoot    string
 	MirrorMode     string // "manual" | "prime-refresh" (driver-side mirror regeneration gate)
 	IgnoreExternal bool   // boot the embedded-only catalog, naming each ignored external package on stderr
+	// AllowInsecureRemote is the sync worker's T2 downgrade override (v1.1 #3): permit a plaintext
+	// non-loopback remote endpoint. Default false — fail closed.
+	AllowInsecureRemote bool
 }
 
 // RunLocalHTTPServerWithBindings serves Local Mnemon from a binding manifest. It is the product boot
@@ -114,6 +164,13 @@ func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string,
 			}
 		}()
 	}
+	// The sync worker runs on its OWN goroutine/cadence (never inside driver.Tick — a slow remote
+	// must not stall the governed loop; the client is timeout-bounded regardless, v1.1 #2/#10). It
+	// self-gates on remotes.json presence: no remote configured = zero sync activity (I13).
+	go RunSyncWorker(ctx, rt, SyncWorkerOptions{
+		ProjectRoot:         opts.ProjectRoot,
+		AllowInsecureRemote: opts.AllowInsecureRemote,
+	}, os.Stderr)
 	return runtime.ServeRuntime(ctx, addr, rt, channel.NewBindingAuthenticator(loaded), out)
 }
 
@@ -294,13 +351,19 @@ func OpenSyncImportRuntime(storePath string, refs []contract.ResourceRef) (*runt
 
 // SyncImportRuntimeConfig is the sync-import policy. Remote import is memory/skill-only by design:
 // the two import rules carry genuinely different merge semantics and are NOT derived from the
-// capability descriptors — revisit when a third capability gains a remote producer.
+// capability descriptors — revisit when a third capability gains a remote producer. The skipped-kind
+// deny rule (v1.1 #4) keeps any OTHER pulled kind a durable diagnostic instead of a silent drop —
+// the same three-rule set withSyncImport merges into the serving runtime, so the offline and
+// in-process import paths share one policy.
 func SyncImportRuntimeConfig(refs []contract.ResourceRef) runtime.RuntimeConfig {
 	return runtime.RuntimeConfig{
 		Subs: map[contract.ActorID]contract.Subscription{
 			contract.SyncImportActor: {Actor: contract.SyncImportActor, Refs: refs},
 		},
-		Rules: rule.NewRuleSet(capability.RemoteMemoryImportRule(contract.SyncImportActor), capability.RemoteSkillImportRule(contract.SyncImportActor)),
+		Rules: rule.NewRuleSet(
+			capability.RemoteMemoryImportRule(contract.SyncImportActor),
+			capability.RemoteSkillImportRule(contract.SyncImportActor),
+			capability.SyncImportSkippedRule(contract.SyncImportActor)),
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{
 			contract.SyncImportActor: {"memory", "skill"},
 		}},

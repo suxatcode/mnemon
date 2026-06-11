@@ -27,9 +27,11 @@ const (
 	VerbPull             Verb = "pull"
 	VerbStatus           Verb = "status"
 	VerbEvolutionPropose Verb = "evolution-propose"
-	VerbSyncPush         Verb = "sync.push"
-	VerbSyncPull         Verb = "sync.pull"
-	VerbSyncStatus       Verb = "sync.status"
+	// The sync verb STRINGS are ABI surface owned by contract (sync-abi-v1 §1); these aliases keep
+	// the channel's Verb space complete without channel becoming the wire-name authority.
+	VerbSyncPush   Verb = contract.SyncVerbPush
+	VerbSyncPull   Verb = contract.SyncVerbPull
+	VerbSyncStatus Verb = contract.SyncVerbStatus
 )
 
 // ChannelBinding is the manifest that scopes ONE principal's access to the channel (D6). The
@@ -122,19 +124,11 @@ func (b ChannelBinding) scopeSet() map[contract.ResourceRef]bool {
 
 // ClampRefs clamps a requested ref set to the binding's SubscriptionScope — the team-scale
 // authorization ceiling, implemented ONCE for pull / sync / status (hand-rolled copies had already
-// diverged on empty-scope handling). Empty requested defaults to the full scope; any explicit ref
-// outside the scope is an error; an EMPTY scope denies every explicit ref (fail closed). The ingest
-// path keeps its documented exception (an observation naming no refs is unconstrained) at its own
-// call site.
+// diverged on empty-scope handling). The one implementation is contract.ClampRefs — shared with the
+// standalone hub (syncserver), which cannot import channel — and this method DELEGATES to it: empty
+// requested defaults to the full scope; any explicit ref outside the scope is an error; an EMPTY
+// scope denies every explicit ref (fail closed). The ingest path keeps its documented exception (an
+// observation naming no refs is unconstrained) at its own call site.
 func (b ChannelBinding) ClampRefs(requested []contract.ResourceRef) ([]contract.ResourceRef, error) {
-	if len(requested) == 0 {
-		return append([]contract.ResourceRef(nil), b.SubscriptionScope...), nil
-	}
-	allowed := b.scopeSet()
-	for _, ref := range requested {
-		if !allowed[ref] {
-			return nil, fmt.Errorf("ref %s/%s is outside principal %q binding scope", ref.Kind, ref.ID, b.Principal)
-		}
-	}
-	return append([]contract.ResourceRef(nil), requested...), nil
+	return contract.ClampRefs(b.Principal, b.SubscriptionScope, requested)
 }

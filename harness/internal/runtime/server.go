@@ -27,11 +27,6 @@ const (
 	decisionSinkCursor   = "decision_sink" // tracks decisions whose S2/S7 side-effects are produced (recoverable)
 )
 
-var syncableResourceKinds = map[contract.ResourceKind]bool{
-	"memory": true,
-	"skill":  true,
-}
-
 var _ channel.ServerAPI = (*ControlServer)(nil)
 
 // ControlServer is the one single-writer governed loop. Tick is its deterministic, restart-safe driver.
@@ -457,8 +452,10 @@ func (cs *ControlServer) processDecisionSideEffects() error {
 					if err := tx.EnqueueOutbox(store.OutboxRow{ID: key, Kind: "invalidation", EventSeq: d.IngestSeq, Target: "projection", Payload: string(payload), IdempotencyKey: key}); err != nil {
 						return err
 					}
+					// contract.SyncableResourceKinds: the produce surface shares the hub's accept
+					// set (sync-abi-v1 §4), so the two can never drift.
 					if d.Actor != contract.SyncImportActor {
-						if err := tx.RecordSyncCommitsTx(d, syncableResourceKinds); err != nil {
+						if err := tx.RecordSyncCommitsTx(d, contract.SyncableResourceKinds); err != nil {
 							return err
 						}
 					}

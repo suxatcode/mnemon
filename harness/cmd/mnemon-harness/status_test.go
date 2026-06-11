@@ -118,7 +118,7 @@ func TestProductStatusReportsConnectedRemoteWorkspace(t *testing.T) {
 	setupProductIntegration(t, projectRoot)
 	restoreSyncFlags(t)
 	syncRoot = projectRoot
-	syncRemoteURL = "http://remote.example.test"
+	syncRemoteURL = "https://remote.example.test"
 	syncRemoteToken = "secret-status-token"
 	connectCmd, _ := testCommand()
 	if err := runSyncConnect(connectCmd, []string{"team"}); err != nil {

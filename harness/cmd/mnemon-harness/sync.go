@@ -1,13 +1,10 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -27,6 +24,8 @@ var (
 	syncRemoteURL       string
 	syncRemoteToken     string
 	syncRemoteTokenFile string
+	syncCAFile          string
+	syncAllowInsecure   bool
 	syncOnce            bool
 	syncBackground      bool
 	syncInterval        time.Duration
@@ -70,6 +69,8 @@ func init() {
 	syncCmd.PersistentFlags().StringVar(&syncRemoteURL, "remote-url", "", "Remote Workspace sync endpoint")
 	syncCmd.PersistentFlags().StringVar(&syncRemoteToken, "token", "", "Remote Workspace sync token")
 	syncCmd.PersistentFlags().StringVar(&syncRemoteTokenFile, "token-file", "", "Remote Workspace sync token file")
+	syncCmd.PersistentFlags().StringVar(&syncCAFile, "ca-file", "", "PEM bundle pinning the Remote Workspace TLS root (e.g. the mnemond --dev-selfsigned cert)")
+	syncCmd.PersistentFlags().BoolVar(&syncAllowInsecure, "allow-insecure-remote", false, "explicitly allow a plaintext http:// Remote Workspace endpoint with a non-loopback host (T2: fail-closed by default)")
 	_ = syncCmd.PersistentFlags().MarkHidden("store")
 	_ = syncCmd.PersistentFlags().MarkHidden("remotes")
 	_ = syncCmd.PersistentFlags().MarkHidden("token-file")
@@ -94,10 +95,16 @@ func runSyncConnect(cmd *cobra.Command, args []string) error {
 	if endpoint == "" {
 		return fmt.Errorf("--remote-url is required")
 	}
+	// T2 downgrade gate at WRITE time (v1.1 #3): a plaintext non-loopback endpoint never enters
+	// remotes.json unless explicitly overridden — the worker and the manual verbs then re-validate
+	// at client construction.
+	if err := channel.ValidateSyncEndpoint(endpoint, syncAllowInsecure); err != nil {
+		return err
+	}
 	if strings.TrimSpace(syncRemoteToken) == "" && strings.TrimSpace(syncRemoteTokenFile) == "" {
 		return fmt.Errorf("--token or --token-file is required")
 	}
-	if err := upsertSyncRemote(resolvedSyncRemotesPath(), syncProjectRoot(), workspace, endpoint, syncRemoteToken, syncRemoteTokenFile); err != nil {
+	if err := upsertSyncRemote(resolvedSyncRemotesPath(), syncProjectRoot(), workspace, endpoint, syncRemoteToken, syncRemoteTokenFile, syncCAFile); err != nil {
 		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Remote Workspace: connected %s\n", workspace)
@@ -196,10 +203,13 @@ func syncPushOnce() (syncPushResult, error) {
 	if err != nil {
 		return syncPushResult{}, err
 	}
-	client := channel.NewClientWithToken(remote.Endpoint, remote.Token)
+	client, err := syncClientFor(remote)
+	if err != nil {
+		return syncPushResult{}, err
+	}
 	resp, err := client.SyncPush(contract.SyncPushRequest{
 		ReplicaID: batch.ReplicaID,
-		BatchID:   syncBatchID(batch.ReplicaID, batch.Commits),
+		BatchID:   remotesync.PushBatchID(batch.ReplicaID, batch.Commits),
 		Commits:   batch.Commits,
 	})
 	if err != nil {
@@ -221,7 +231,11 @@ func syncPullOnce() (syncPullResult, error) {
 	if err != nil {
 		return syncPullResult{}, err
 	}
-	resp, err := channel.NewClientWithToken(remote.Endpoint, remote.Token).SyncPull(contract.SyncPullRequest{
+	client, err := syncClientFor(remote)
+	if err != nil {
+		return syncPullResult{}, err
+	}
+	resp, err := client.SyncPull(contract.SyncPullRequest{
 		ReplicaID:    state.ReplicaID,
 		RemoteCursor: state.RemoteCursor,
 	})
@@ -238,18 +252,17 @@ type syncRemoteConfig struct {
 	ID       string
 	Endpoint string
 	Token    string
+	CAFile   string
 }
 
-type syncRemotesDoc struct {
-	SchemaVersion int               `json:"schema_version"`
-	Current       string            `json:"current,omitempty"`
-	Remotes       []syncRemoteEntry `json:"remotes"`
-}
-
-type syncRemoteEntry struct {
-	ID            string `json:"id"`
-	Endpoint      string `json:"endpoint"`
-	CredentialRef string `json:"credential_ref"`
+// syncClientFor builds the bounded sync client for one resolved remote: bearer token, optional
+// pinned TLS root, and the T2 downgrade gate (--allow-insecure-remote is the only override).
+func syncClientFor(remote syncRemoteConfig) (*channel.Client, error) {
+	return channel.NewSyncClient(remote.Endpoint, channel.SyncClientConfig{
+		Token:         remote.Token,
+		CAFile:        remote.CAFile,
+		AllowInsecure: syncAllowInsecure,
+	})
 }
 
 func resolveSyncRemote() (syncRemoteConfig, error) {
@@ -262,50 +275,41 @@ func resolveSyncRemote() (syncRemoteConfig, error) {
 		if err != nil {
 			return syncRemoteConfig{}, err
 		}
-		return syncRemoteConfig{ID: syncRemoteID, Endpoint: syncRemoteURL, Token: token}, nil
+		return syncRemoteConfig{ID: syncRemoteID, Endpoint: syncRemoteURL, Token: token, CAFile: resolvedSyncCAFile("")}, nil
 	}
-	entry, err := loadSyncRemoteEntry(resolvedSyncRemotesPath(), syncRemoteID)
+	entry, err := remotesync.LoadRemoteEntry(resolvedSyncRemotesPath(), syncRemoteID)
 	if err != nil {
 		return syncRemoteConfig{}, err
 	}
-	token, err := resolveSyncToken(syncRemoteToken, resolveSyncPath(entry.CredentialRef))
+	if strings.TrimSpace(entry.CredentialRef) == "" && strings.TrimSpace(syncRemoteToken) == "" && strings.TrimSpace(syncRemoteTokenFile) == "" {
+		return syncRemoteConfig{}, fmt.Errorf("Remote Workspace %q has no credential_ref", entry.ID)
+	}
+	tokenFile := ""
+	if strings.TrimSpace(entry.CredentialRef) != "" {
+		tokenFile = resolveSyncPath(entry.CredentialRef)
+	}
+	token, err := resolveSyncToken(syncRemoteToken, tokenFile)
 	if err != nil {
 		return syncRemoteConfig{}, err
 	}
-	return syncRemoteConfig{ID: entry.ID, Endpoint: entry.Endpoint, Token: token}, nil
+	return syncRemoteConfig{ID: entry.ID, Endpoint: entry.Endpoint, Token: token, CAFile: resolvedSyncCAFile(entry.CAFile)}, nil
 }
 
-func loadSyncRemoteEntry(path, id string) (syncRemoteEntry, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return syncRemoteEntry{}, fmt.Errorf("read Remote Workspace config: %w", err)
+// resolvedSyncCAFile picks the pinned-root file: the --ca-file flag overrides the remotes.json
+// entry; relative paths resolve against the project root (the same resolution connect writes).
+func resolvedSyncCAFile(entryCAFile string) string {
+	caFile := strings.TrimSpace(syncCAFile)
+	if caFile == "" {
+		caFile = strings.TrimSpace(entryCAFile)
 	}
-	var doc syncRemotesDoc
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return syncRemoteEntry{}, fmt.Errorf("parse Remote Workspace config: %w", err)
+	if caFile == "" {
+		return ""
 	}
-	if doc.SchemaVersion != 1 {
-		return syncRemoteEntry{}, fmt.Errorf("Remote Workspace config schema_version %d unsupported (want 1)", doc.SchemaVersion)
-	}
-	if id == "default" && strings.TrimSpace(doc.Current) != "" {
-		id = strings.TrimSpace(doc.Current)
-	}
-	for _, remote := range doc.Remotes {
-		if remote.ID == id {
-			if strings.TrimSpace(remote.Endpoint) == "" {
-				return syncRemoteEntry{}, fmt.Errorf("Remote Workspace %q has no endpoint", id)
-			}
-			if strings.TrimSpace(remote.CredentialRef) == "" && strings.TrimSpace(syncRemoteToken) == "" && strings.TrimSpace(syncRemoteTokenFile) == "" {
-				return syncRemoteEntry{}, fmt.Errorf("Remote Workspace %q has no credential_ref", id)
-			}
-			return remote, nil
-		}
-	}
-	return syncRemoteEntry{}, fmt.Errorf("Remote Workspace %q not found in %s", id, path)
+	return resolveSyncPath(caFile)
 }
 
-func upsertSyncRemote(path, root, id, endpoint, token, tokenFile string) error {
-	doc := syncRemotesDoc{SchemaVersion: 1}
+func upsertSyncRemote(path, root, id, endpoint, token, tokenFile, caFile string) error {
+	doc := remotesync.RemotesDoc{SchemaVersion: 1}
 	if raw, err := os.ReadFile(path); err == nil && len(strings.TrimSpace(string(raw))) > 0 {
 		if err := json.Unmarshal(raw, &doc); err != nil {
 			return fmt.Errorf("parse Remote Workspace config: %w", err)
@@ -320,7 +324,7 @@ func upsertSyncRemote(path, root, id, endpoint, token, tokenFile string) error {
 	if err != nil {
 		return err
 	}
-	entry := syncRemoteEntry{ID: id, Endpoint: endpoint, CredentialRef: credentialRef}
+	entry := remotesync.RemoteEntry{ID: id, Endpoint: endpoint, CredentialRef: credentialRef, CAFile: normalizeSyncFileRef(caFile)}
 	replaced := false
 	for i := range doc.Remotes {
 		if doc.Remotes[i].ID == id {
@@ -341,6 +345,16 @@ func upsertSyncRemote(path, root, id, endpoint, token, tokenFile string) error {
 		return err
 	}
 	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+// normalizeSyncFileRef records a file reference the way credential refs are recorded: absolute
+// verbatim, relative cleaned to slash form (resolved against the project root at read time).
+func normalizeSyncFileRef(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if ref == "" || filepath.IsAbs(ref) {
+		return ref
+	}
+	return filepath.ToSlash(filepath.Clean(ref))
 }
 
 func syncCredentialRef(root, id, token, tokenFile string) (string, error) {
@@ -392,22 +406,6 @@ func resolveSyncToken(token, tokenFile string) (string, error) {
 		return "", fmt.Errorf("Remote Workspace sync token is required")
 	}
 	return token, nil
-}
-
-func syncBatchID(replicaID string, commits []contract.LocalCommit) string {
-	keys := make([]string, 0, len(commits))
-	for _, c := range commits {
-		keys = append(keys, strings.Join([]string{
-			c.OriginReplicaID,
-			c.LocalDecisionID,
-			string(c.ResourceRef.Kind),
-			string(c.ResourceRef.ID),
-			c.FieldsDigest,
-		}, "\x00"))
-	}
-	sort.Strings(keys)
-	sum := sha256.Sum256([]byte(replicaID + "\x00" + strings.Join(keys, "\x00")))
-	return "push-" + hex.EncodeToString(sum[:12])
 }
 
 func resolvedSyncStorePath() string {

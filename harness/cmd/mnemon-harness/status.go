@@ -122,7 +122,7 @@ func currentRemoteWorkspace(projectRoot string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	var doc syncRemotesDoc
+	var doc remotesync.RemotesDoc
 	if err := json.Unmarshal(raw, &doc); err != nil || doc.SchemaVersion != 1 {
 		return "", false
 	}

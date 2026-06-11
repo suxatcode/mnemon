@@ -769,6 +769,36 @@ LIMIT ?`, args...)
 	return out, next, rows.Err()
 }
 
+// RemoteSyncCommitCount is the hub's "commits received" counter: the total commits accepted into the
+// append-only sync_remote_commits log (rejected/conflicted commits are never inserted).
+func (s *Store) RemoteSyncCommitCount() (int64, error) {
+	var n int64
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sync_remote_commits`).Scan(&n)
+	return n, err
+}
+
+// CursorsByPrefix reads every durable cursor whose name starts with prefix, keyed by the name REMAINDER
+// (the per-replica suffix). The hub's status surface uses it for the last-served-cursor-per-replica
+// counter; it is read-only bookkeeping, never an ordering source.
+func (s *Store) CursorsByPrefix(prefix string) (map[string]int64, error) {
+	// substr-compare, not LIKE: the sync cursor prefixes contain "_" (a LIKE single-char wildcard).
+	rows, err := s.db.Query(`SELECT name, seq FROM cursors WHERE substr(name, 1, ?) = ?`, len(prefix), prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int64{}
+	for rows.Next() {
+		var name string
+		var seq int64
+		if err := rows.Scan(&name, &seq); err != nil {
+			return nil, err
+		}
+		out[strings.TrimPrefix(name, prefix)] = seq
+	}
+	return out, rows.Err()
+}
+
 func scanRemoteSyncCommit(row rowScanner) (RemoteSyncCommitRecord, error) {
 	var rec RemoteSyncCommitRecord
 	var actor, kind, id, fieldsJSON string
