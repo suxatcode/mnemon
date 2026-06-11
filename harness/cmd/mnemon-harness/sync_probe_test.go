@@ -25,7 +25,7 @@ func TestSyncBackgroundRefusesWhenLocalMnemonHoldsStore(t *testing.T) {
 	t.Cleanup(func() { syncStorePath, syncBackground, syncInterval = prevPath, prevBg, prevInt })
 
 	err = runSyncBackground(&cobra.Command{}, nil)
-	if err == nil || !strings.Contains(err.Error(), "offline-only") {
-		t.Fatalf("background sync must refuse while Local Mnemon holds the store; got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "sync worker") {
+		t.Fatalf("background sync must refuse while Local Mnemon holds the store and point at the in-process sync worker; got %v", err)
 	}
 }

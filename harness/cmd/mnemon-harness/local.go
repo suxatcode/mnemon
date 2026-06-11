@@ -49,7 +49,7 @@ var localRunCmd = &cobra.Command{
 			return err
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Local Mnemon: ready")
-		fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: disconnected")
+		fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: "+remoteWorkspaceStatus(projectRoot()))
 		return app.RunLocalHTTPServerWithBindings(cmd.Context(), addr, boot.StorePath, boot.Loaded, app.ServeOptions{
 			Loops:               boot.Config.Loops,
 			Hosts:               boot.Config.Hosts,
@@ -96,7 +96,7 @@ func runLocalStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(cmd.OutOrStdout(), "Local Mnemon: ready")
 	fmt.Fprintf(cmd.OutOrStdout(), "Store: %s\n", resolvedLocalStorePath())
 	fmt.Fprintln(cmd.OutOrStdout(), "Mode: local")
-	fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: disconnected")
+	fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: "+remoteWorkspaceStatus(projectRoot()))
 	return nil
 }
 

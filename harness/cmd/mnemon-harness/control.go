@@ -135,9 +135,10 @@ var controlStatusCmd = &cobra.Command{
 			enc.SetIndent("", "  ")
 			return enc.Encode(st)
 		}
+		// No Remote Workspace line here: channel status has no remote data source (no --root,
+		// ServerAPI only) — `mnemon-harness status` owns that report.
 		fmt.Fprintf(cmd.OutOrStdout(), "Agent Integration: %s\n", st.Principal)
 		fmt.Fprintf(cmd.OutOrStdout(), "Local Mnemon: ready (resources=%d, digest=%s)\n", st.Resources, st.Digest)
-		fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: disconnected")
 		fmt.Fprintf(cmd.OutOrStdout(), "Sync: %d pending, %d synced, %d conflicts (local accepted, remote pending)\n", st.SyncPending, st.SyncSynced, st.SyncConflicts)
 		return nil
 	},

@@ -112,12 +112,13 @@ func runSyncConnect(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// ensureSyncStoreAvailable refuses an offline sync (one-shot or background) cleanly when a co-hosted
+// ensureSyncStoreAvailable refuses a manual sync (one-shot or background) cleanly when a co-hosted
 // Local Mnemon (`local run`) holds the single-writer lock, instead of failing with a raw lock error.
-// Offline/manual: stop `local run` to sync, until co-hosted in-process sync lands.
+// While the service runs, its in-process sync worker owns sync; the manual verbs cover the
+// service-stopped path.
 func ensureSyncStoreAvailable() error {
 	if err := remotesync.ProbeAvailable(resolvedSyncStorePath()); err != nil {
-		return fmt.Errorf("sync is offline-only for now: the local store is busy (is `mnemon-harness local run` running?) — stop it to sync: %w", err)
+		return fmt.Errorf("the local store is busy (is `mnemon-harness local run` running?) — its in-process sync worker already syncs a connected Remote Workspace; stop it to sync manually: %w", err)
 	}
 	return nil
 }

@@ -24,7 +24,7 @@ func TestLocalStatusReportsProductBoundary(t *testing.T) {
 	got := output.String()
 	for _, want := range []string{
 		"Local Mnemon: ready",
-		"Remote Workspace: disconnected",
+		"Remote Workspace: not connected",
 		"Mode: local",
 		filepath.Join(root, runtime.DefaultStorePath),
 	} {

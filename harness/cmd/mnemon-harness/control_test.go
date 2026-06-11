@@ -58,10 +58,15 @@ func TestControlTokenFileAuth(t *testing.T) {
 	if !strings.Contains(buf.String(), "codex@project") {
 		t.Fatalf("status output must name the token-resolved principal; got %q", buf.String())
 	}
-	for _, want := range []string{"Local Mnemon: ready", "Remote Workspace: disconnected", "local accepted, remote pending"} {
+	for _, want := range []string{"Local Mnemon: ready", "local accepted, remote pending"} {
 		if !strings.Contains(buf.String(), want) {
 			t.Fatalf("status output must include %q; got %q", want, buf.String())
 		}
+	}
+	// Channel status has no Remote Workspace data source (no --root, ServerAPI only):
+	// it must not assert a connection state it cannot know.
+	if strings.Contains(buf.String(), "Remote Workspace") {
+		t.Fatalf("control status must not claim a Remote Workspace state; got %q", buf.String())
 	}
 
 	// wrong token => authenticated rejection.
