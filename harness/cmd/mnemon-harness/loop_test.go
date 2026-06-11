@@ -59,13 +59,6 @@ func writeLoopValidateFixture(t *testing.T, root string) {
 	writeLoopValidateFile(t, filepath.Join(loopDir, "loop.json"), `{
   "schema_version": 2,
   "name": "memory",
-  "control_model": {
-    "state": [],
-    "intent": "fixture",
-    "reality": [],
-    "reconcile": []
-  },
-  "entity_profiles": {},
   "surfaces": {
     "projection": [],
     "observation": []

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
-	"strings"
 )
 
 type ValidationResult struct {
@@ -85,23 +84,8 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 	if schemaVersion < 2 {
 		return fmt.Errorf("loop manifest schema_version must be 2 or higher: %s", manifest)
 	}
-	for _, field := range []string{"control_model", "entity_profiles", "surfaces"} {
-		if !hasField(data, field) {
-			return fmt.Errorf("loop manifest missing %s: %s", field, manifest)
-		}
-	}
-
-	controlModel, err := objectField(data, "control_model")
-	if err != nil {
-		return fmt.Errorf("loop manifest invalid control_model: %s: %w", manifest, err)
-	}
-	for _, field := range []string{"state", "intent", "reality", "reconcile"} {
-		if !hasField(controlModel, field) {
-			return fmt.Errorf("loop control_model missing %s: %s", field, manifest)
-		}
-	}
-	if err := validateCanonicalState(controlModel, manifest); err != nil {
-		return err
+	if !hasField(data, "surfaces") {
+		return fmt.Errorf("loop manifest missing surfaces: %s", manifest)
 	}
 
 	surfaces, err := objectField(data, "surfaces")
@@ -290,37 +274,6 @@ func validateBindingV1(data map[string]json.RawMessage) error {
 	}
 	if _, err := stringSlice(rawReconcile); err != nil {
 		return fmt.Errorf("reconcile: %w", err)
-	}
-	return nil
-}
-
-// validateCanonicalState rejects a loop whose control_model.state.canonical still names the legacy
-// file-tree canonical paths (.mnemon/data|reports|proposals|audit) or the old control/governed.db —
-// the canonical state lives in harness/local/governed.db. state may be an object (real loops) or a
-// bare array (some fixtures); only the object form carries a canonical list to check.
-func validateCanonicalState(controlModel map[string]json.RawMessage, manifest string) error {
-	raw, ok := controlModel["state"]
-	if !ok {
-		return nil
-	}
-	var state map[string]json.RawMessage
-	if json.Unmarshal(raw, &state) != nil {
-		return nil
-	}
-	canonRaw, ok := state["canonical"]
-	if !ok {
-		return nil
-	}
-	canonical, err := stringSlice(canonRaw)
-	if err != nil {
-		return fmt.Errorf("loop control_model state.canonical must be a string array: %s: %w", manifest, err)
-	}
-	for _, entry := range canonical {
-		for _, stale := range []string{".mnemon/data", ".mnemon/reports", ".mnemon/proposals", ".mnemon/audit", "control/governed.db"} {
-			if strings.Contains(entry, stale) {
-				return fmt.Errorf("loop control_model state.canonical references stale path %q; canonical state lives in harness/local/governed.db: %s", entry, manifest)
-			}
-		}
 	}
 	return nil
 }

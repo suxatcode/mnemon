@@ -8,15 +8,13 @@ import (
 )
 
 type LoopManifest struct {
-	SchemaVersion  int               `json:"schema_version"`
-	Name           string            `json:"name"`
-	Version        string            `json:"version,omitempty"`
-	Description    string            `json:"description,omitempty"`
-	ControlModel   map[string]any    `json:"control_model,omitempty"`
-	EntityProfiles map[string]any    `json:"entity_profiles,omitempty"`
-	Surfaces       Surfaces          `json:"surfaces"`
-	Assets         LoopAssets        `json:"assets"`
-	HostAdapters   map[string]string `json:"host_adapters"`
+	SchemaVersion int               `json:"schema_version"`
+	Name          string            `json:"name"`
+	Version       string            `json:"version,omitempty"`
+	Description   string            `json:"description,omitempty"`
+	Surfaces      Surfaces          `json:"surfaces"`
+	Assets        LoopAssets        `json:"assets"`
+	HostAdapters  map[string]string `json:"host_adapters"`
 }
 
 type LoopAssets struct {

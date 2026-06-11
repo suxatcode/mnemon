@@ -364,8 +364,6 @@ func (p projectorCore) writeLoopStatus(loop manifest.LoopManifest, binding manif
 		"project_root":    p.projectRoot,
 		"projection_path": p.paths.configDir,
 		"state_path":      p.stateDir(loop.Name),
-		"control_model":   nonNilMap(loop.ControlModel),
-		"entity_profiles": nonNilMap(loop.EntityProfiles),
 		"surfaces":        loop.Surfaces,
 	}
 	return p.writeJSON(pathJoin(p.stateDir(loop.Name), "status.json"), status, 0o644)

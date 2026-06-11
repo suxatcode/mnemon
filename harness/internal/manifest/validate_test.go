@@ -76,35 +76,6 @@ func TestValidateHarnessRejectsNonV1BindingSchema(t *testing.T) {
 	}
 }
 
-func TestValidateRejectsStaleCanonicalState(t *testing.T) {
-	root := t.TempDir()
-	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
-	writeFile(t, filepath.Join(root, "loops", "memory", "loop.json"), `{
-  "schema_version": 2,
-  "name": "memory",
-  "control_model": {
-    "state": { "canonical": [".mnemon/data", ".mnemon/audit"] },
-    "intent": "fixture",
-    "reality": [],
-    "reconcile": []
-  },
-  "entity_profiles": {},
-  "surfaces": { "projection": [], "observation": [] },
-  "assets": {
-    "guide": "GUIDE.md",
-    "env": "env.sh",
-    "skills": [],
-    "subagents": []
-  },
-  "host_adapters": {}
-}`)
-
-	_, err := ValidateFS(os.DirFS(root))
-	if err == nil || !strings.Contains(err.Error(), "stale path") {
-		t.Fatalf("a loop naming the legacy file-tree canonical paths must be rejected; got %v", err)
-	}
-}
-
 func writeFixtureHarness(t *testing.T, root, skillPath string) {
 	t.Helper()
 	loopDir := filepath.Join(root, "loops", "memory")
@@ -133,13 +104,6 @@ func writeFixtureHarness(t *testing.T, root, skillPath string) {
 	writeFile(t, filepath.Join(loopDir, "loop.json"), `{
   "schema_version": 2,
   "name": "memory",
-  "control_model": {
-    "state": [],
-    "intent": "fixture",
-    "reality": [],
-    "reconcile": []
-  },
-  "entity_profiles": {},
   "surfaces": {
     "projection": [],
     "observation": []

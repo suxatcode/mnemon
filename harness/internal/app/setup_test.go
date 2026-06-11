@@ -43,8 +43,7 @@ func writeMemoryFixture(t *testing.T, root string) {
 	}
 	write(filepath.Join(loopDir, "loop.json"), `{
   "schema_version": 2, "name": "memory",
-  "control_model": {"state": [], "intent": "fixture", "reality": [], "reconcile": []},
-  "entity_profiles": {}, "surfaces": {"projection": [], "observation": []},
+  "surfaces": {"projection": [], "observation": []},
   "assets": {"guide": "GUIDE.md", "env": "env.sh", "runtime_files": ["MEMORY.md"],
     "skills": ["skills/memory-get/SKILL.md"], "subagents": []},
   "host_adapters": {"codex": "../../hosts/codex"}}`)

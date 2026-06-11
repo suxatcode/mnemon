@@ -3,56 +3,6 @@
   "name": "skill",
   "version": "0.1.0",
   "description": "Manages active, stale, and archived skills through evidence, curator review, and approved lifecycle changes.",
-  "control_model": {
-    "state": [
-      "active skills",
-      "stale skills",
-      "archived skills",
-      "usage evidence",
-      "proposals",
-      "reports",
-      "skill status"
-    ],
-    "intent": "Keep the right skills visible to the host while preserving stale and archived skills for review, recovery, and design memory.",
-    "reality": [
-      "host skill surface",
-      "actual active projection",
-      "skill usage evidence",
-      "missing skills",
-      "misleading skills",
-      "curator findings",
-      "review decisions"
-    ],
-    "reconcile": [
-      "observe",
-      "curate",
-      "propose",
-      "manage",
-      "no-op"
-    ]
-  },
-  "entity_profiles": {
-    "template": "skill",
-    "controlled": [
-      "skill binding"
-    ],
-    "surface": [
-      "host skill surface",
-      "protocol skills",
-      "curator subagent"
-    ],
-    "evidence": [
-      "usage signals",
-      "curator findings",
-      "missing skill signals",
-      "stale skill signals"
-    ],
-    "governance": [
-      "proposals",
-      "reviews",
-      "audits"
-    ]
-  },
   "surfaces": {
     "projection": [
       "active skills",

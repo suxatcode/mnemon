@@ -60,8 +60,6 @@ type hostManifestLoop struct {
 	Projection       map[string]any      `json:"projection"`
 	Reality          map[string]any      `json:"reality"`
 	Reconcile        map[string]any      `json:"reconcile"`
-	ControlModel     map[string]any      `json:"control_model,omitempty"`
-	EntityProfiles   map[string]any      `json:"entity_profiles,omitempty"`
 	LifecycleMapping map[string]string   `json:"lifecycle_mapping"`
 	Surfaces         map[string]string   `json:"surfaces"`
 	Ownership        projectionOwnership `json:"ownership"`
@@ -446,10 +444,8 @@ func (p codexProjector) writeHostManifest(loop manifest.LoopManifest, binding ma
 			"surfaces": loop.Surfaces.Observation,
 		},
 		Reconcile: map[string]any{
-			"actions": loop.ControlModel["reconcile"],
+			"actions": binding.Reconcile,
 		},
-		ControlModel:     nonNilMap(loop.ControlModel),
-		EntityProfiles:   nonNilMap(loop.EntityProfiles),
 		LifecycleMapping: binding.LifecycleMapping,
 		Surfaces:         surfaces,
 		Ownership:        ownership,
@@ -535,13 +531,6 @@ func escapeDoubleQuoted(value string) string {
 
 func markdownCode(value string) string {
 	return "`" + strings.ReplaceAll(value, "`", "\\`") + "`"
-}
-
-func nonNilMap(value map[string]any) map[string]any {
-	if value == nil {
-		return map[string]any{}
-	}
-	return value
 }
 
 func nowUTC() string {

@@ -404,10 +404,8 @@ func (p claudeProjector) writeHostManifest(loop manifest.LoopManifest, binding m
 			"surfaces": loop.Surfaces.Observation,
 		},
 		Reconcile: map[string]any{
-			"actions": loop.ControlModel["reconcile"],
+			"actions": binding.Reconcile,
 		},
-		ControlModel:     nonNilMap(loop.ControlModel),
-		EntityProfiles:   nonNilMap(loop.EntityProfiles),
 		LifecycleMapping: binding.LifecycleMapping,
 		Surfaces: map[string]string{
 			"skills":  p.hostSkillsDir(loop.Name),

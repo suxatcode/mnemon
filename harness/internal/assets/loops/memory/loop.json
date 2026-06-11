@@ -3,52 +3,6 @@
   "name": "memory",
   "version": "0.1.0",
   "description": "Connects a prompt-facing memory mirror to Local Mnemon scoped memory reads and local memory candidates.",
-  "control_model": {
-    "state": [
-      "MEMORY.md",
-      "Local Mnemon store",
-      "reports",
-      "manifests",
-      "memory status"
-    ],
-    "intent": "Keep useful agent, user, and project continuity available across lifecycle boundaries.",
-    "reality": [
-      "host prompt",
-      "current task",
-      "memory mirror contents",
-      "scoped pull results",
-      "context pressure",
-      "consolidation state"
-    ],
-    "reconcile": [
-      "read",
-      "write",
-      "compact",
-      "no-op"
-    ]
-  },
-  "entity_profiles": {
-    "template": "memory",
-    "controlled": [
-      "memory binding"
-    ],
-    "surface": [
-      "MEMORY.md",
-      "Local Mnemon pull/observe",
-      "host hooks",
-      "protocol skills"
-    ],
-    "evidence": [
-      "recall usefulness",
-      "write results",
-      "context pressure",
-      "stale working memory"
-    ],
-    "governance": [
-      "memory proposals",
-      "memory audits"
-    ]
-  },
   "surfaces": {
     "projection": [
       "GUIDE.md",
