@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
@@ -75,6 +76,21 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 		if strings.TrimSpace(req.v) == "" {
 			return Capability{}, fmt.Errorf("capability spec %q: missing %s", spec.Name, req.name)
 		}
+	}
+	// Event-type grammar lock: the Shape section of capability-spec-v1 PROMISES
+	// <name>.write_candidate.observed / <name>.write.proposed — enforce it, or a spec with a
+	// free-form proposed_type compiles, its rule fires, the bridge mints the proposal as a
+	// trusted event, and the reconciler (which consumes ONLY *.proposed) silently skips the
+	// canonical write: bootable but irreducible. The name doubles as the event-family segment,
+	// so it must use the intake type charset (lowercase, digits, underscore — no dash).
+	if !specNamePattern.MatchString(spec.Name) {
+		return Capability{}, fmt.Errorf("capability spec %q: name must match %s (it is the event-family segment)", spec.Name, specNamePattern.String())
+	}
+	if want := spec.Name + ".write_candidate.observed"; spec.ObservedType != want {
+		return Capability{}, fmt.Errorf("capability spec %q: observed_type %q must be %q (frozen type grammar)", spec.Name, spec.ObservedType, want)
+	}
+	if want := spec.Name + ".write.proposed"; spec.ProposedType != want {
+		return Capability{}, fmt.Errorf("capability spec %q: proposed_type %q must be %q (frozen type grammar; the reconciler consumes only *.proposed)", spec.Name, spec.ProposedType, want)
 	}
 	if !contract.KindCatalog[contract.ResourceKind(spec.ResourceKind)] {
 		return Capability{}, fmt.Errorf("capability spec %q: resource_kind %q not in KindCatalog (fail-closed; register it in contract.KindCatalog + kernel.DefaultSchemaGuard first)", spec.Name, spec.ResourceKind)
@@ -189,6 +205,10 @@ func decodeSpec(raw []byte) (CapabilitySpec, error) {
 	}
 	return spec, nil
 }
+
+// specNamePattern pins capability names to the intake event-type segment charset (server-side
+// validateObservedType allows [a-z0-9._]) — a name is the event-family segment by frozen grammar.
+var specNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 type paramSchema struct{ required, optional []string }
 

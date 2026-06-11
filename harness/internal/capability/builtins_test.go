@@ -25,11 +25,6 @@ func TestLoadBuiltinsErrorPaths(t *testing.T) {
 "proposed_type":"note.write.proposed","resource_kind":"note","items_field":"items",
 "fields":[{"name":"text","validators":[{"id":"required","params":{"missing_style":"empty"}}]}],
 "render":{"content":{"member":"bullet-list","params":{"title":"# Notes","field":"text"}}}}`
-	dupName := strings.Replace(good, `"observed_type":"note.write_candidate.observed"`,
-		`"observed_type":"other.observed"`, 1)
-	dupName = strings.Replace(dupName, `"proposed_type":"note.write.proposed"`,
-		`"proposed_type":"other.proposed"`, 1)
-
 	cases := []struct {
 		name    string
 		files   map[string]string
@@ -37,8 +32,12 @@ func TestLoadBuiltinsErrorPaths(t *testing.T) {
 	}{
 		{"malformed json", map[string]string{"bad.json": `{nope`}, "parse capability spec"},
 		{"fromspec failure", map[string]string{"bad.json": `{"schema_version":1,"name":"x"}`}, "compile capability spec"},
-		{"duplicate name", map[string]string{"a.json": good, "b.json": dupName}, "duplicate capability name"},
-		{"duplicate observed type", map[string]string{"a.json": good, "b.json": strings.Replace(good, `"name":"note"`, `"name":"memo"`, 1)}, "already claimed"},
+		{"duplicate name", map[string]string{"a.json": good, "b.json": good}, "duplicate capability name"},
+		// type forgery (one spec claiming another family's events) is PRE-EMPTED by the frozen
+		// type grammar — types derive from the name, so a cross-family claim cannot compile;
+		// the registry's type axes remain as defense in depth (pinned via mergeExternal tests).
+		{"type forgery pre-empted by grammar", map[string]string{"a.json": good,
+			"b.json": strings.Replace(good, `"name":"note"`, `"name":"memo"`, 1)}, "frozen type grammar"},
 	}
 	for _, c := range cases {
 		m := fstest.MapFS{}

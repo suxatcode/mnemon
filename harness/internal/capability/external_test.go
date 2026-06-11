@@ -110,22 +110,19 @@ func TestLoadExternalFailClosedClasses(t *testing.T) {
 			map[string]string{"goalish/capability.json": extSpec("goalish", "goalish", "goal")},
 			[]string{".mnemon/loops/goalish", "directory == name == kind"}},
 		{"class11 reserved kernel-internal kind",
-			map[string]string{"lease/capability.json": extSpec("lease", "leasing", "lease")},
+			map[string]string{"lease/capability.json": extSpec("lease", "lease", "lease")},
 			[]string{".mnemon/loops/lease", `resource_kind "lease"`, "kernel-internal"}},
-		{"class5 externals sharing an observed type",
+		// class5 (external-external duplication) collapsed by the frozen type grammar: dir==name
+		// gives one directory per name, and both event types derive from the name — a package
+		// forging another's family cannot COMPILE (pinned here); the registry's merge axes stay
+		// pinned directly in TestMergeExternalRejectsTypeCollisions as defense in depth.
+		{"class5 cross-package type forgery pre-empted by grammar",
 			map[string]string{
-				"goal/capability.json": extSpec("goal", "goala", "goal"),
-				"note/capability.json": strings.Replace(extSpec("note", "noteb", "note"),
-					`"observed_type":"noteb.write_candidate.observed"`, `"observed_type":"goala.write_candidate.observed"`, 1),
+				"goal/capability.json": extSpec("goal", "goal", "goal"),
+				"note/capability.json": strings.Replace(extSpec("note", "note", "note"),
+					`"observed_type":"note.write_candidate.observed"`, `"observed_type":"goal.write_candidate.observed"`, 1),
 			},
-			[]string{".mnemon/loops/note", "already claimed"}},
-		{"class5 externals sharing a proposed type",
-			map[string]string{
-				"goal/capability.json": extSpec("goal", "goala", "goal"),
-				"note/capability.json": strings.Replace(extSpec("note", "noteb", "note"),
-					`"proposed_type":"noteb.write.proposed"`, `"proposed_type":"goala.write.proposed"`, 1),
-			},
-			[]string{".mnemon/loops/note", "already claimed"}},
+			[]string{".mnemon/loops/note", "frozen type grammar"}},
 	}
 	for _, c := range cases {
 		m := fstest.MapFS{}
@@ -247,11 +244,10 @@ func TestResolveCatalogRejectsShadowingOnEachAxis(t *testing.T) {
 		spec    string
 		wantErr string
 	}{
-		{"name", "memory", extSpec("memory", "memx", "memory"), "duplicate capability name"},
-		{"observed type", "goal", strings.Replace(extSpec("goal", "goalx", "goal"),
-			`"observed_type":"goalx.write_candidate.observed"`, `"observed_type":"memory.write_candidate.observed"`, 1), "already claimed"},
-		{"proposed type", "goal", strings.Replace(extSpec("goal", "goaly", "goal"),
-			`"proposed_type":"goaly.write.proposed"`, `"proposed_type":"memory.write.proposed"`, 1), "already claimed"},
+		// Only the name axis is constructible through the loader: the frozen type grammar
+		// derives both event types from the name, so observed/proposed collisions imply a name
+		// collision (those axes are pinned directly on the merge below, as defense in depth).
+		{"name", "memory", extSpec("memory", "memory", "memory"), "duplicate capability name"},
 	}
 	for _, c := range cases {
 		root := t.TempDir()
@@ -265,6 +261,26 @@ func TestResolveCatalogRejectsShadowingOnEachAxis(t *testing.T) {
 				t.Fatalf("axis %s: error %q must contain %q", c.axis, err.Error(), want)
 			}
 		}
+	}
+}
+
+// The merge's type axes, pinned directly (defense in depth): the frozen type grammar makes pure
+// observed/proposed collisions unreachable through LoadExternal, but the merge invariant must
+// hold on its own against hand-built capabilities.
+func TestMergeExternalRejectsTypeCollisions(t *testing.T) {
+	ext := func(name, family string) Capability {
+		return Capability{Name: name, ObservedType: family + ".write_candidate.observed",
+			ProposedType: name + ".write.proposed", ResourceKind: "goal"}
+	}
+	if _, err := mergeExternal(Builtins, map[string]Capability{"alt": ext("alt", "memory")}); err == nil ||
+		!strings.Contains(err.Error(), "already claimed") {
+		t.Fatalf("observed-type collision must fail the merge, got %v", err)
+	}
+	prop := Capability{Name: "alt2", ObservedType: "alt2.write_candidate.observed",
+		ProposedType: "memory.write.proposed", ResourceKind: "goal"}
+	if _, err := mergeExternal(Builtins, map[string]Capability{"alt2": prop}); err == nil ||
+		!strings.Contains(err.Error(), "already claimed") {
+		t.Fatalf("proposed-type collision must fail the merge, got %v", err)
 	}
 }
 

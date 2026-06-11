@@ -41,6 +41,13 @@ func TestFromSpecFailsClosed(t *testing.T) {
 	mutate("unknown render", func(s *CapabilitySpec) { s.Render.Content.Member = "html" }, "unknown render")
 	mutate("missing resource kind", func(s *CapabilitySpec) { s.ResourceKind = "" }, "missing resource_kind")
 	mutate("kind not in catalog", func(s *CapabilitySpec) { s.ResourceKind = "phantom" }, "not in KindCatalog")
+	mutate("dashed name", func(s *CapabilitySpec) { s.Name = "my-loop" }, "event-family segment")
+	mutate("foreign observed family", func(s *CapabilitySpec) {
+		s.ObservedType = "other.write_candidate.observed"
+	}, "frozen type grammar")
+	mutate("free-form proposed type", func(s *CapabilitySpec) {
+		s.ProposedType = "note.write.done"
+	}, "reconciler consumes only *.proposed")
 	mutate("bad schema version", func(s *CapabilitySpec) { s.SchemaVersion = 2 }, "schema_version 2 unsupported")
 	mutate("missing validator param", func(s *CapabilitySpec) { s.Fields[0].Validators[0].Params = nil }, "missing param")
 	mutate("unknown validator param", func(s *CapabilitySpec) {

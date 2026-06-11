@@ -21,6 +21,15 @@ lockstep line (the deliberate L2 gate).
 }
 ```
 
+## Type grammar (frozen, ENFORCED)
+
+`name` doubles as the event-family segment: it must match `^[a-z][a-z0-9_]*$` (the intake
+event-type charset — no dash), and FromSpec REQUIRES `observed_type == <name>.write_candidate.observed`
+and `proposed_type == <name>.write.proposed`. This is not advisory: a free-form proposed type
+would compile, fire, and mint a trusted event the reconciler (which consumes ONLY `*.proposed`)
+silently skips — bootable but irreducible. family ≡ name ≡ resource kind; for external packages
+directory ≡ name ≡ kind as well, so the package directory IS the event family by construction.
+
 ## Decode contract (frozen)
 
 - ONLY declared fields are processed; payload keys outside the declared set NEVER enter the
