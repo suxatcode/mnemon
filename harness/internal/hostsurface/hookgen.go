@@ -590,3 +590,30 @@ func DeclaredHookTimings(loop string) ([]string, error) {
 	}
 	return out, nil
 }
+
+// ValidateGeneratedHooks is the loop-validate-time gate for the generated hook surface: every
+// (host, loop) pair must render ALL its declared timings cleanly. This catches what schema
+// validation alone cannot — fragment files missing, host mechanics that no template combination
+// supports, wording overrides nothing consumes — BEFORE an install would fail closed at
+// projection time.
+func ValidateGeneratedHooks(hosts, loops []string) ([]string, error) {
+	var lines []string
+	for _, loop := range loops {
+		timings, err := DeclaredHookTimings(loop)
+		if err != nil {
+			return nil, fmt.Errorf("loop %s: %w", loop, err)
+		}
+		if len(timings) == 0 {
+			continue
+		}
+		for _, host := range hosts {
+			for _, timing := range timings {
+				if _, err := RenderHook(loop, host, timing); err != nil {
+					return nil, fmt.Errorf("render %s/%s/%s: %w", host, loop, timing, err)
+				}
+			}
+			lines = append(lines, fmt.Sprintf("hooks %s/%s: %d generated timings OK", host, loop, len(timings)))
+		}
+	}
+	return lines, nil
+}
