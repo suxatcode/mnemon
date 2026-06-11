@@ -1,11 +1,15 @@
-# Sync ABI v1 (v1 DRAFT — freezes when the dual-replica e2e passes)
+# Sync ABI v1 (v1, FROZEN)
+
+> Frozen 2026-06-12: the dual-replica e2e (run_sync_pair — push/pull roundtrip over TLS
+> with attribution, offline I13, authn baseline) passed; per the stage-6 precondition the ABI
+> freezes at stage close against TWO consumers (runtime co-hosted hub + mnemond), not one.
 
 The Remote Workspace sync wire: how a Local Mnemon replica pushes its accepted local commits to a
 hub, pulls other replicas' commits back, and how both sides keep the attribution chain intact. The
 hub is either a co-hosted Local Mnemon runtime (`mnemon-harness local run` serving `/sync/*`) or the
 standalone `mnemond` binary — ONE wire, two hostings.
 
-Status: **DRAFT**. Freeze condition: the dual-replica e2e (`run_sync_pair`) passes. Until then field
+Status: **FROZEN**. Freeze condition: the dual-replica e2e (`run_sync_pair`) passes. Until then field
 additions are allowed only additively; nothing here is load-bearing for external integrators yet.
 
 ## 1. Wire verbs
@@ -227,6 +231,6 @@ local store uses. Concurrent pushes from multiple replicas are serialized by the
 
 ## 10. Freeze
 
-This document freezes (DRAFT marker removed) when the dual-replica e2e (`run_sync_pair`: A pushes,
+This document freezes (FROZEN marker removed) when the dual-replica e2e (`run_sync_pair`: A pushes,
 B pulls, conflict attribution on both ledgers, offline leg, security leg) passes. Until then it is
 kept in lockstep with the implementation by the stage-6 tasks.
