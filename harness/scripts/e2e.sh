@@ -402,7 +402,7 @@ run_sync_pair() {
 		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
 		"$MH" sync connect hub --remote-url https://127.0.0.1:9787 \
 			--token-file "$hubdir/replica-a.token" --ca-file "$tlsdir/cert.pem" >/dev/null
-		"$MH" local run --sync-interval 300ms >"$WORK/run-sync-a.log" 2>&1 &
+		"$MH" local run --sync-interval 100ms >"$WORK/run-sync-a.log" 2>&1 &
 		echo $! >"$WORK/sync-a.pid"
 		local up=0 i
 		for i in $(seq 1 60); do
@@ -422,7 +422,7 @@ run_sync_pair() {
 		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8899 >/dev/null
 		"$MH" sync connect hub --remote-url https://127.0.0.1:9787 \
 			--token-file "$hubdir/replica-b.token" --ca-file "$tlsdir/cert.pem" >/dev/null
-		"$MH" local run --sync-interval 300ms >"$WORK/run-sync-b.log" 2>&1 &
+		"$MH" local run --sync-interval 100ms >"$WORK/run-sync-b.log" 2>&1 &
 		echo $! >"$WORK/sync-b.pid"
 		local up=0 i seen=0
 		for i in $(seq 1 60); do
@@ -438,7 +438,20 @@ run_sync_pair() {
 			fi
 			sleep 0.2
 		done
-		[ "$seen" = 1 ] || { echo "B never saw A's commit within 20s"; tail -5 "$WORK/run-sync-b.log"; exit 1; }
+		# Diagnosable-flake margin (LOW-11): assert the hub actually RECEIVED A's push, separately
+		# from B's pull arriving. A flake then reads as "push never arrived" (received=0) vs "pull
+		# never ran" (received>=1 but B unseen) instead of one opaque timeout. /sync/status accepts
+		# GET (frozen verb-method map); replica-a's token authorizes it over the pinned TLS cert.
+		local hubstatus
+		hubstatus="$(curl -sS --cacert "$tlsdir/cert.pem" \
+			-H "Authorization: Bearer $(tr -d '\n' <"$hubdir/replica-a.token")" \
+			https://127.0.0.1:9787/sync/status 2>/dev/null)"
+		case "$hubstatus" in
+			*'"hub_commits_received":0'*|'') echo "hub never received A's push (status: ${hubstatus:-<empty>})"; tail -5 "$WORK/run-sync-b.log"; exit 1 ;;
+			*'"hub_commits_received":'*) ;;
+			*) echo "unexpected hub status: $hubstatus"; exit 1 ;;
+		esac
+		[ "$seen" = 1 ] || { echo "B never saw A's commit within 20s (hub received the push: $hubstatus -> pull side failed)"; tail -5 "$WORK/run-sync-b.log"; exit 1; }
 		# attribution: the import preserves A's entries VERBATIM (faithful provenance) and the
 		# write itself is attributed to the sync importer; the full origin chain (replica id,
 		# decision id) lives in B's event log + decisions, pinned by sync_import Go tests.

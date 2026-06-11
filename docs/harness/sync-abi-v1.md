@@ -221,7 +221,12 @@ puller's import decision carries the same origin identity through the event payl
   protect it at rest; there is no per-request nonce in v1.
 - **Batch replay** is idempotent by design (§4) — replaying a captured push cannot duplicate or
   mutate hub state; replaying a pull yields data the credential was already entitled to.
-- mnemond emits one audit line per request to stdout: timestamp, principal, verb, result.
+- mnemond emits one audit line per request to stdout: timestamp, principal, verb, result. `result`
+  is the **request-level** outcome only — `unauthorized` (401), `bad_request` (400 — malformed JSON,
+  a missing/invalid field, or a disallowed HTTP method), `denied` (403 — no replica grant or an
+  out-of-scope clamp), or `ok`. The PER-COMMIT `accepted` / `rejected` / `conflict` verdicts ride
+  the `200` response body, never the audit line: a `sync.push` whose every commit is rejected still
+  audits `result=ok` because the request itself parsed and was authorized.
 
 ## 9. Hub store ownership
 

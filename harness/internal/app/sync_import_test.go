@@ -50,16 +50,48 @@ func TestRemoteMemoryImportConflictDiagnosesWithoutOverwrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}
+	byID := make(map[string]contract.Event, len(events))
+	for _, ev := range events {
+		byID[ev.ID] = ev
+	}
+	var diag contract.Event
 	var diagnosed bool
 	for _, ev := range events {
 		if ev.Type == "remote.diagnostic" || ev.Type == "memory.diagnostic" {
 			if reason, _ := ev.Payload["reason"].(string); strings.Contains(reason, "remote memory conflict") {
 				diagnosed = true
+				diag = ev
 			}
 		}
 	}
 	if !diagnosed {
 		t.Fatalf("conflict import must emit a durable diagnostic, events=%+v", events)
+	}
+
+	// MED-4 / v1.1: the origin attribution (origin_replica_id + local_decision_id) must be
+	// RECOVERABLE from the durable ledger on the B side — not just "a diagnostic fired". Walk the
+	// diagnostic's CausedBy to the remote.memory.commit_observed trigger and recover the identity
+	// from its payload.commit. (The commit round-trips through the event log as a JSON object.)
+	if diag.CausedBy == "" {
+		t.Fatalf("conflict diagnostic must carry a CausedBy lineage, got %+v", diag)
+	}
+	trigger, ok := byID[diag.CausedBy]
+	if !ok {
+		t.Fatalf("diagnostic CausedBy %q must resolve to a durable event", diag.CausedBy)
+	}
+	if trigger.Type != capability.RemoteMemoryCommitObserved {
+		t.Fatalf("diagnostic must be caused by the remote commit observation, got type %q", trigger.Type)
+	}
+	commit, ok := trigger.Payload["commit"].(map[string]any)
+	if !ok {
+		t.Fatalf("commit_observed payload must carry the commit, got %+v", trigger.Payload)
+	}
+	// contract.LocalCommit carries no JSON tags, so it round-trips with its Go field names.
+	origin, _ := commit["OriginReplicaID"].(string)
+	decision, _ := commit["LocalDecisionID"].(string)
+	wantDecision := "dec-shared-entry-remote-content-v2" // the conflicting commit's decision id
+	if origin != "remote-replica" || decision != wantDecision {
+		t.Fatalf("origin attribution must be recoverable from the caused-by commit: origin=%q decision=%q (want remote-replica / %s)", origin, decision, wantDecision)
 	}
 }
 

@@ -240,3 +240,68 @@ func TestConcurrentPushersBothLand(t *testing.T) {
 		t.Fatalf("both concurrent pushers must land all commits, got %d/20", n)
 	}
 }
+
+// MED-6: two goroutines race the SAME idempotency key (origin_replica_id, local_decision_id) with
+// DIFFERENT content. The UNIQUE key + adjudication must give a deterministic outcome — exactly one
+// accept and one conflict, never two accepts, never a panic, and exactly one durable row.
+func TestConcurrentPushSameKeyDifferentContentDeterministic(t *testing.T) {
+	mem := contract.ResourceRef{Kind: "memory", ID: "project"}
+	grants := GrantMap{"replica-a@team": {Principal: "replica-a@team", Scopes: []contract.ResourceRef{mem}}}
+	hub, st := openTestHub(t, grants)
+
+	push := func(content string) (contract.SyncPushResponse, error) {
+		commit := testCommit("local-a", "dec-shared", mem, map[string]any{"content": content})
+		return hub.Push("replica-a@team", contract.SyncPushRequest{
+			ReplicaID: "local-a", BatchID: "b-" + content, Commits: []contract.LocalCommit{commit}})
+	}
+
+	type result struct {
+		resp contract.SyncPushResponse
+		err  error
+	}
+	results := make(chan result, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); r, e := push("content-one"); results <- result{r, e} }()
+	go func() { defer wg.Done(); r, e := push("content-two"); results <- result{r, e} }()
+	wg.Wait()
+	close(results)
+
+	accepts, conflicts := 0, 0
+	for r := range results {
+		if r.err != nil {
+			t.Fatalf("same-key race must not fail transport: %v", r.err)
+		}
+		accepts += len(r.resp.Accepted)
+		conflicts += len(r.resp.Conflicts)
+		if len(r.resp.Rejected) != 0 {
+			t.Fatalf("same-key race must not reject (valid commits), got %+v", r.resp.Rejected)
+		}
+	}
+	if accepts != 1 || conflicts != 1 {
+		t.Fatalf("same-key different-content race must be exactly one accept + one conflict, got %d accept / %d conflict", accepts, conflicts)
+	}
+	if n, _ := st.RemoteSyncCommitCount(); n != 1 {
+		t.Fatalf("exactly one durable row must persist (no partial/double row), got %d", n)
+	}
+}
+
+// MED-7: Actor is documented attribution — an empty actor is rejected per-commit with a diagnostic.
+func TestPushRejectsEmptyActor(t *testing.T) {
+	mem := contract.ResourceRef{Kind: "memory", ID: "project"}
+	grants := GrantMap{"replica-a@team": {Principal: "replica-a@team", Scopes: []contract.ResourceRef{mem}}}
+	hub, st := openTestHub(t, grants)
+
+	commit := testCommit("local-a", "dec-noactor", mem, map[string]any{"content": "no actor"})
+	commit.Actor = "   " // whitespace-only is still empty after trim
+	resp, err := hub.Push("replica-a@team", contract.SyncPushRequest{ReplicaID: "local-a", BatchID: "b", Commits: []contract.LocalCommit{commit}})
+	if err != nil {
+		t.Fatalf("empty-actor commit must reject per-commit, not fail transport: %v", err)
+	}
+	if len(resp.Rejected) != 1 || !strings.Contains(resp.Rejected[0].Diagnostic, "actor is required") {
+		t.Fatalf("empty actor must be rejected with 'actor is required', got %+v", resp)
+	}
+	if n, _ := st.RemoteSyncCommitCount(); n != 0 {
+		t.Fatalf("a rejected commit must not persist, got %d rows", n)
+	}
+}

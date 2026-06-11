@@ -181,3 +181,50 @@ func TestClampSyncScopesEnforcesBindingScope(t *testing.T) {
 		t.Fatal("an empty-scope replica binding must deny explicit refs (fail closed)")
 	}
 }
+
+// HIGH-1 / LOW-9: an EMPTY-scope replica binding must be fully fail-closed on the co-hosted runtime
+// hub — Pull, Push, AND Status are all rejected (no grant), because an empty grant scope would reach
+// RemoteSyncCommitsAfter's serve-all SQL and bypass scope authorization (the standalone mnemond
+// path fail-closes empty scope at replicas.json load; this pins the dual-form parity on the runtime
+// side). A scoped replica binding works; an in-scope push is accepted; an empty-scope push is fully
+// rejected (the push==subscribe-scope contract).
+func TestEmptyScopeReplicaBindingFailsClosed(t *testing.T) {
+	mem := contract.ResourceRef{Kind: "memory", ID: "project"}
+
+	scoped := channel.ReplicaAgentBinding("scoped@peer", "http://x", []contract.ResourceRef{mem})
+	empty := channel.ReplicaAgentBinding("empty@peer", "http://x", nil)
+	rt, err := OpenRuntime(filepath.Join(t.TempDir(), "remote.db"), RuntimeConfig{
+		Bindings: []channel.ChannelBinding{scoped, empty},
+		Subs:     channel.SubsFromBindings([]channel.ChannelBinding{scoped, empty}),
+	})
+	if err != nil {
+		t.Fatalf("open remote runtime: %v", err)
+	}
+	defer rt.Close()
+
+	// The empty-scope replica is rejected on every sync verb (fail closed before any serve-all SQL).
+	if _, err := rt.SyncPull("empty@peer", contract.SyncPullRequest{ReplicaID: "local-empty"}); err == nil {
+		t.Fatal("empty-scope replica Pull must be rejected (would otherwise serve the entire hub log)")
+	}
+	if _, err := rt.SyncStatus("empty@peer"); err == nil {
+		t.Fatal("empty-scope replica Status must be rejected")
+	}
+	emptyCommit := syncAPITestCommit("local-empty", "dec-e", mem, map[string]any{"content": "empty-scope push"})
+	if _, err := rt.SyncPush("empty@peer", contract.SyncPushRequest{
+		ReplicaID: "local-empty", BatchID: "be", Commits: []contract.LocalCommit{emptyCommit},
+	}); err == nil {
+		t.Fatal("empty-scope replica Push must be fully rejected (push == subscribe scope)")
+	}
+
+	// The scoped replica still works end to end: an in-scope commit is accepted, then served.
+	inScope := syncAPITestCommit("local-scoped", "dec-s", mem, map[string]any{"content": "in-scope push"})
+	pushResp, err := rt.SyncPush("scoped@peer", contract.SyncPushRequest{
+		ReplicaID: "local-scoped", BatchID: "bs", Commits: []contract.LocalCommit{inScope},
+	})
+	if err != nil || len(pushResp.Accepted) != 1 {
+		t.Fatalf("scoped replica in-scope push must be accepted: %+v err=%v", pushResp, err)
+	}
+	if _, err := rt.SyncStatus("scoped@peer"); err != nil {
+		t.Fatalf("scoped replica Status must work: %v", err)
+	}
+}

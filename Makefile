@@ -10,7 +10,7 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: deps build install uninstall test unit vet harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
+.PHONY: deps build harness-build install uninstall test unit vet harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
 
 .DEFAULT_GOAL := help
 
@@ -21,6 +21,10 @@ deps: ## Download Go dependencies
 
 build: ## Build the mnemon binary
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
+
+harness-build: ## Build the harness binaries (mnemon-harness local plane + mnemond remote hub)
+	go build -ldflags "$(LDFLAGS)" -o mnemon-harness ./harness/cmd/mnemon-harness
+	go build -ldflags "$(LDFLAGS)" -o mnemond ./harness/cmd/mnemond
 
 # ── Install / Uninstall ─────────────────────────────────────────────
 

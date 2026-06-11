@@ -88,6 +88,20 @@ func TestLoadReplicasFailClosed(t *testing.T) {
 			t.Fatalf("%s: want error containing %q, got %v", tc.name, tc.want, err)
 		}
 	}
+
+	// MED-2: the credential token file holds the actual secret — a world-readable (0644) token file
+	// is refused even when replicas.json itself is correctly 0600.
+	credDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(credDir, "a.token"), []byte("tok-a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(credDir, "b.token"), []byte("tok-b\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	credPath := writeReplicas(t, credDir, twoReplicaDoc, 0o600)
+	if _, _, err := loadReplicas(credPath); err == nil || !strings.Contains(err.Error(), "world-readable") {
+		t.Fatalf("world-readable token file must be refused: %v", err)
+	}
 }
 
 func TestDevSelfsignedGeneratesUsablePair(t *testing.T) {

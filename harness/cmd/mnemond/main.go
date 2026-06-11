@@ -89,7 +89,15 @@ func serveHub(ctx context.Context, addr string, handler http.Handler, certFile, 
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Handler: handler}
+	// Timeouts harden the FIRST network-facing daemon against slowloris (a slow/idle peer holding a
+	// connection open indefinitely). The loopback-only local control server is left unchanged.
+	srv := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	scheme := "http"
 	if certFile != "" {
 		scheme = "https"

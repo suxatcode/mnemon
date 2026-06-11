@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/assembler"
@@ -157,10 +158,19 @@ func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string,
 	if err != nil {
 		return err
 	}
+	// Shutdown ordering (MED-5): the background driver and sync worker write through rt's open store
+	// on their own goroutines. rt.Close() must not race a mid-flight worker store write, so JOIN both
+	// goroutines (they exit promptly on ctx cancel) BEFORE closing the store. Defers run LIFO, so the
+	// later-registered wg.Wait() runs FIRST — after ServeRuntime returns (ctx cancelled), then the
+	// store closes on a quiesced runtime.
 	defer rt.Close()
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	if reproject := serveReproject(rt, loaded, opts.Hosts, opts.ProjectRoot, opts.MirrorMode); reproject != nil {
 		d := driver.New(rt, swallowReprojectErrors(reproject, os.Stderr), 0)
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			if err := d.Run(ctx); err != nil && ctx.Err() == nil {
 				fmt.Fprintf(os.Stderr, "mnemon-harness: background driver stopped: %v\n", err)
 			}
@@ -169,11 +179,15 @@ func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string,
 	// The sync worker runs on its OWN goroutine/cadence (never inside driver.Tick — a slow remote
 	// must not stall the governed loop; the client is timeout-bounded regardless, v1.1 #2/#10). It
 	// self-gates on remotes.json presence: no remote configured = zero sync activity (I13).
-	go RunSyncWorker(ctx, rt, SyncWorkerOptions{
-		ProjectRoot:         opts.ProjectRoot,
-		AllowInsecureRemote: opts.AllowInsecureRemote,
-		Interval:            opts.SyncInterval,
-	}, os.Stderr)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		RunSyncWorker(ctx, rt, SyncWorkerOptions{
+			ProjectRoot:         opts.ProjectRoot,
+			AllowInsecureRemote: opts.AllowInsecureRemote,
+			Interval:            opts.SyncInterval,
+		}, os.Stderr)
+	}()
 	return runtime.ServeRuntime(ctx, addr, rt, channel.NewBindingAuthenticator(loaded), out)
 }
 

@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,6 +22,26 @@ import (
 
 // ReplicaGrant aliases the contract type (the grant record is ABI surface, sync-abi-v1 §2).
 type ReplicaGrant = contract.ReplicaGrant
+
+// BadRequestError marks a request-VALIDATION failure (a malformed/missing field) as distinct from an
+// AUTHORIZATION failure (no grant / out-of-scope). The HTTP layer maps it to 400; everything else
+// from Push/Pull/Status (no replica grant, out-of-scope clamp) stays 403 (LOW-10). It is the wire
+// layer's only error-class signal — the per-commit accept/reject/conflict verdicts ride the 200 body.
+type BadRequestError struct{ err error }
+
+func (e *BadRequestError) Error() string { return e.err.Error() }
+func (e *BadRequestError) Unwrap() error { return e.err }
+
+// badRequestf builds a BadRequestError (validation class).
+func badRequestf(format string, a ...any) error {
+	return &BadRequestError{err: fmt.Errorf(format, a...)}
+}
+
+// IsBadRequest reports whether err is (or wraps) a request-validation failure.
+func IsBadRequest(err error) bool {
+	var bre *BadRequestError
+	return errors.As(err, &bre)
+}
 
 // Grants resolves an authenticated principal's replica grant for ONE sync verb (a contract.SyncVerb*
 // string). Implementations MUST be fail-closed: an unknown principal, a non-replica principal, or an
@@ -74,12 +95,12 @@ func (s *Server) Push(principal contract.ActorID, req contract.SyncPushRequest) 
 	}
 	replicaID := strings.TrimSpace(req.ReplicaID)
 	if replicaID == "" {
-		return contract.SyncPushResponse{}, fmt.Errorf("sync push requires replica_id")
+		return contract.SyncPushResponse{}, badRequestf("sync push requires replica_id")
 	}
 	var resp contract.SyncPushResponse
 	for _, commit := range req.Commits {
 		if commit.OriginReplicaID != replicaID {
-			return contract.SyncPushResponse{}, fmt.Errorf("sync push replica_id %q does not match commit origin %q", replicaID, commit.OriginReplicaID)
+			return contract.SyncPushResponse{}, badRequestf("sync push replica_id %q does not match commit origin %q", replicaID, commit.OriginReplicaID)
 		}
 		if diagnostic := validateSyncCommit(commit); diagnostic != "" {
 			resp.Rejected = append(resp.Rejected, syncResult(commit, "rejected", diagnostic))
@@ -118,14 +139,14 @@ func (s *Server) Pull(principal contract.ActorID, req contract.SyncPullRequest) 
 	}
 	replicaID := strings.TrimSpace(req.ReplicaID)
 	if replicaID == "" {
-		return contract.SyncPullResponse{}, fmt.Errorf("sync pull requires replica_id")
+		return contract.SyncPullResponse{}, badRequestf("sync pull requires replica_id")
 	}
 	cursor := int64(0)
 	if strings.TrimSpace(req.RemoteCursor) != "" {
 		var err error
 		cursor, err = strconv.ParseInt(req.RemoteCursor, 10, 64)
 		if err != nil {
-			return contract.SyncPullResponse{}, fmt.Errorf("parse remote_cursor: %w", err)
+			return contract.SyncPullResponse{}, badRequestf("parse remote_cursor: %v", err)
 		}
 	}
 	scopes, err := contract.ClampRefs(principal, grant.Scopes, req.Scopes)
@@ -191,6 +212,8 @@ func validateSyncCommit(commit contract.LocalCommit) string {
 		return "origin_replica_id is required"
 	case strings.TrimSpace(commit.LocalDecisionID) == "":
 		return "local_decision_id is required"
+	case strings.TrimSpace(string(commit.Actor)) == "":
+		return "actor is required"
 	case strings.TrimSpace(string(commit.ResourceRef.Kind)) == "" || strings.TrimSpace(string(commit.ResourceRef.ID)) == "":
 		return "resource_ref is required"
 	case !contract.SyncableResourceKinds[commit.ResourceRef.Kind]:

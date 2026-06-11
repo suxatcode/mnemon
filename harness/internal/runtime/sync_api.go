@@ -46,6 +46,15 @@ func (g bindingGrants) Grant(principal contract.ActorID, verb string) (contract.
 	if !ok || b.ActorKind != contract.KindReplicaAgent || !b.Allows(channel.Verb(verb)) {
 		return contract.ReplicaGrant{}, false
 	}
+	// Fail closed on an empty sync scope (parity with mnemond's replicas.json gate,
+	// replicas.go:80). An empty grant scope would otherwise reach RemoteSyncCommitsAfter, whose
+	// "no scope filter = serve all" SQL bypasses scope authorization — an empty-scope replica
+	// binding must grant NOTHING, never the whole hub log. ClampRefs already denies explicit refs
+	// under an empty scope; this closes the EMPTY-requested-defaults-to-empty-scope hole at the
+	// grant boundary before SQL.
+	if len(b.SubscriptionScope) == 0 {
+		return contract.ReplicaGrant{}, false
+	}
 	return contract.ReplicaGrant{Principal: principal, Scopes: b.SubscriptionScope}, true
 }
 

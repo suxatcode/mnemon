@@ -91,6 +91,14 @@ func loadReplicas(path string) (syncserver.GrantMap, map[string]contract.ActorID
 		if !filepath.IsAbs(tokPath) {
 			tokPath = filepath.Join(baseDir, tokPath)
 		}
+		// The credential file holds the ACTUAL bearer secret — guard it like replicas.json itself
+		// (which only NAMES these files). A world-readable token leaks the credential to any local
+		// user, so refuse it fail-closed (keep it 0600 in a 0700 dir).
+		if tokInfo, err := os.Stat(tokPath); err != nil {
+			return nil, nil, fmt.Errorf("replica[%d] (%s): stat credential_ref %s: %w", i, principal, e.CredentialRef, err)
+		} else if tokInfo.Mode().Perm()&0o004 != 0 {
+			return nil, nil, fmt.Errorf("credential file %s is world-readable; chmod 0600", tokPath)
+		}
 		tokRaw, err := os.ReadFile(tokPath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("replica[%d] (%s): read credential_ref %s: %w", i, principal, e.CredentialRef, err)

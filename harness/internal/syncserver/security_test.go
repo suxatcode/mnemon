@@ -128,6 +128,75 @@ func TestOutOfScopeCommitRejectedByClamp(t *testing.T) {
 	}
 }
 
+// LOW-10: the HTTP layer distinguishes a request-VALIDATION failure (400 / bad_request) from an
+// AUTHORIZATION failure (403 / denied). A missing replica_id and malformed JSON are 400; a no-grant
+// / out-of-scope refusal stays 403.
+func TestErrorMappingSeparatesValidationFromAuthorization(t *testing.T) {
+	srv, _, audit := newSecurityHub(t)
+
+	// authenticated but missing replica_id -> request validation -> 400 bad_request.
+	missing := postSync(t, srv.URL+"/sync/push", "tok-a", contract.SyncPushRequest{})
+	if missing.StatusCode != http.StatusBadRequest {
+		t.Fatalf("missing replica_id must be 400, got %d", missing.StatusCode)
+	}
+	if !strings.Contains(audit.String(), "principal=replica-a@team verb=sync.push result=bad_request") {
+		t.Fatalf("a validation failure must audit result=bad_request, got:\n%s", audit.String())
+	}
+
+	// malformed JSON body -> 400 bad_request (handled at decode).
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/sync/push", bytes.NewReader([]byte("{not json")))
+	req.Header.Set("Authorization", "Bearer tok-a")
+	badJSON, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer badJSON.Body.Close()
+	if badJSON.StatusCode != http.StatusBadRequest {
+		t.Fatalf("malformed JSON must be 400, got %d", badJSON.StatusCode)
+	}
+
+	// no-grant push (wrong verb) stays 403 denied (authorization, not validation).
+	mem := contract.ResourceRef{Kind: "memory", ID: "project"}
+	denied := postSync(t, srv.URL+"/sync/push", "tok-pull",
+		contract.SyncPushRequest{ReplicaID: "local-a", Commits: []contract.LocalCommit{testCommit("local-a", "d1", mem, map[string]any{"content": "x"})}})
+	if denied.StatusCode != http.StatusForbidden {
+		t.Fatalf("authorization refusal must stay 403, got %d", denied.StatusCode)
+	}
+}
+
+// LOW-12: the frozen verb→method mapping is enforced — push/pull reject non-POST with 405, status
+// accepts GET or POST, and a 405 carries an Allow header + a bad_request audit line.
+func TestMethodEnforcement(t *testing.T) {
+	srv, _, audit := newSecurityHub(t)
+
+	getReq := func(url string) *http.Response {
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req.Header.Set("Authorization", "Bearer tok-a")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		return resp
+	}
+
+	if r := getReq(srv.URL + "/sync/push"); r.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /sync/push must be 405, got %d", r.StatusCode)
+	} else if r.Header.Get("Allow") != http.MethodPost {
+		t.Fatalf("405 must carry Allow: POST, got %q", r.Header.Get("Allow"))
+	}
+	if r := getReq(srv.URL + "/sync/pull"); r.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /sync/pull must be 405, got %d", r.StatusCode)
+	}
+	// status accepts GET (and POST).
+	if r := getReq(srv.URL + "/sync/status"); r.StatusCode != http.StatusOK {
+		t.Fatalf("GET /sync/status must be allowed (200), got %d", r.StatusCode)
+	}
+	if !strings.Contains(audit.String(), "verb=sync.push result=bad_request") {
+		t.Fatalf("a 405 must leave a bad_request audit line, got:\n%s", audit.String())
+	}
+}
+
 func TestReplayedBatchIsIdempotentOverTheWire(t *testing.T) {
 	srv, _, _ := newSecurityHub(t)
 	mem := contract.ResourceRef{Kind: "memory", ID: "project"}
