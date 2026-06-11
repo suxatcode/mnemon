@@ -10,7 +10,7 @@ import (
 )
 
 // DrainOutbox is the driver's out-of-band claim of projection invalidations: an accepted apply
-// enqueues an invalidation, the driver claims + acks it (unconditional of the job lane), and a
+// enqueues an invalidation, the driver claims + acks it, and a
 // re-drain finds nothing.
 func TestDrainOutboxClaimsInvalidations(t *testing.T) {
 	rt, err := OpenRuntime(filepath.Join(t.TempDir(), "s.db"), RuntimeConfig{

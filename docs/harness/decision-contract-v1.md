@@ -1,5 +1,8 @@
 # Decision Contract v1 (frozen)
 
+> Revision v1.1 (2026-06-12): the job verdict is removed from the Shadow comparison set together
+> with the retired job lane (P1 clearcut; R1 versioned-revision channel).
+
 The semantics and ordering rules of the governed pipeline — the contract replay, the Shadow
 promotion gate, and every future evolution tool are held to. Joins wasm-abi-v0, capability-spec-v1
 and the Sync DTOs as a frozen face.
@@ -56,7 +59,7 @@ frozen qualifications:
 `Shadow(events, subs, live, candidate)` answers "would promoting this rule set change behavior?"
 by re-running BOTH rule sets over the OBSERVED events at dispatch-time state (proposals evolve the
 throwaway kernel; evaluations are read-only). The comparison covers verdict, proposal (type +
-payload), job, trusted origin actor, **Reasons**, and diagnostics — Reasons are not advisory: they
+payload), trusted origin actor, **Reasons**, and diagnostics — Reasons are not advisory: they
 land verbatim in durable *.diagnostic events, so a reword IS a behavior change (pinned by the
 gate test mutating one spec enum message). The report counts diffs; the operator gates promotion
 on Clean. Capability-spec-level evolution (capability-spec-v1.md) is exactly what this gate

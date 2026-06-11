@@ -1,5 +1,8 @@
 # WASM Rule ABI v0 (frozen on paper; NOT built)
 
+> Revision v0.1 (2026-06-12): the two job-lane verdict values are removed from the verdict enum
+> together with the retired job lane (P1 clearcut; R1 in-place revision).
+
 The Rule Host's second implementation seam. A future `wasmRule` is a pure adapter implementing the
 existing `rule.Rule` interface (`harness/internal/rule/rule.go`) — registered in the same select-only
 trusted registry as the native rules (one code-level map entry, by design: the seam is
@@ -17,7 +20,7 @@ input  (host -> guest, JSON):  RuleInput
 
 output (guest -> host, JSON):  contract.RuleDecision
   {
-    "verdict":  "allow" | "deny" | "warn" | "propose" | "enqueue_job" | "request_evidence",
+    "verdict":  "allow" | "deny" | "warn" | "propose",
     "reasons":  [string],
     "proposal": contract.ProposedEvent?  // {type, payload:{writes:[contract.ResourceWrite]}}
   }

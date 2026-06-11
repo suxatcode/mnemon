@@ -79,20 +79,18 @@ func NewRuleSet(rules ...Rule) RuleSet { return RuleSet{rules: rules} }
 // trusted bridge binding from its Actor()/Emits()).
 func (rs RuleSet) Rules() []Rule { return rs.rules }
 
-// verdictRank orders the reduction: deny beats everything; enqueue_job/request_evidence beat propose/warn/
-// allow; warn beats allow. The highest-ranked verdict among the handling rules wins.
+// verdictRank orders the reduction: deny beats everything; propose beats warn/allow; warn beats
+// allow. The highest-ranked verdict among the handling rules wins.
 var verdictRank = map[contract.RuleVerdict]int{
-	contract.VerdictAllow:           0,
-	contract.VerdictWarn:            1,
-	contract.VerdictPropose:         2,
-	contract.VerdictRequestEvidence: 3,
-	contract.VerdictEnqueueJob:      4,
-	contract.VerdictDeny:            5,
+	contract.VerdictAllow:   0,
+	contract.VerdictWarn:    1,
+	contract.VerdictPropose: 2,
+	contract.VerdictDeny:    3,
 }
 
 // Evaluate reduces every handling rule into one decision (deny-priority) plus diagnostics. An erroring rule
 // contributes ZERO intent and exactly one Diagnostic naming it (S7 / Invariant #13). Warn reasons attach to
-// the final decision; the first proposal/job for the winning verdict is carried.
+// the final decision; the first proposal for the winning verdict is carried.
 func (rs RuleSet) Evaluate(in RuleInput) (contract.RuleDecision, []contract.Diagnostic) {
 	out := contract.RuleDecision{Verdict: contract.VerdictAllow}
 	var diags []contract.Diagnostic
@@ -104,6 +102,13 @@ func (rs RuleSet) Evaluate(in RuleInput) (contract.RuleDecision, []contract.Diag
 		d, err := r.Evaluate(in)
 		if err != nil {
 			diags = append(diags, contract.Diagnostic{Stage: "rule", Reason: err.Error(), Ref: r.ID()})
+			continue
+		}
+		// S7 fail-closed: an UNKNOWN verdict (e.g. a stale rule still emitting a retired verdict string) must
+		// not be silently swallowed by its zero rank — it contributes ZERO intent and exactly one diagnostic
+		// naming the rule and the verdict, mirroring the erroring-rule treatment.
+		if _, known := verdictRank[d.Verdict]; !known {
+			diags = append(diags, contract.Diagnostic{Stage: "rule", Reason: fmt.Sprintf("rule %q returned unknown verdict %q", r.ID(), string(d.Verdict)), Ref: r.ID()})
 			continue
 		}
 		reasons = append(reasons, d.Reasons...)
@@ -125,10 +130,6 @@ func (rs RuleSet) Evaluate(in RuleInput) (contract.RuleDecision, []contract.Diag
 		if d.Verdict == contract.VerdictPropose && d.Proposal != nil && out.Proposal == nil {
 			out.Proposal = d.Proposal
 			out.ProposalActor = r.Actor() // TRUSTED origin: the server stamps the bridge identity from this
-		}
-		// carry the first Job for an enqueue_job/request_evidence verdict (both spawn a job-lane effect).
-		if d.Job != nil && out.Job == nil {
-			out.Job = d.Job
 		}
 	}
 	out.Reasons = reasons

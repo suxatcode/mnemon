@@ -303,8 +303,8 @@ func (t *Tx) EnqueueOutbox(row OutboxRow) error {
 // to owner for ttl, bumping attempts, and returns them. The single writer connection serializes claims, so
 // two workers never both win the same row (S4 delivery lease). Rows are read fully before the UPDATE so the
 // single connection is not held by an open cursor during the writes. If kinds is non-empty, ONLY rows of
-// those kinds are claimed — a delivery worker must lease only the rows it actually delivers (so the job lane
-// never grabs invalidation rows, and vice-versa); empty kinds claims every kind.
+// those kinds are claimed — a delivery worker must lease only the rows it actually delivers (one kind's
+// worker never grabs another kind's rows); empty kinds claims every kind.
 func (s *Store) ClaimOutbox(owner string, ttl time.Duration, kinds ...string) ([]OutboxRow, error) {
 	now := time.Now().Unix()
 	until := now + int64(ttl/time.Second)

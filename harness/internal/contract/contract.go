@@ -119,40 +119,28 @@ type ObservationEnvelope struct {
 }
 
 // ---- rule pre-gate (D4) ----
-// A rule is an ADMISSION CONTROLLER: it PROPOSES or ENQUEUES; it can NEVER write (S12). The kernel stays the
+// A rule is an ADMISSION CONTROLLER: it PROPOSES; it can NEVER write (S12). The kernel stays the
 // only writer. The rich semantics live in this server-side pre-gate, not in the minimal kernel.
 type RuleVerdict string
 
 const (
-	VerdictAllow           RuleVerdict = "allow"
-	VerdictDeny            RuleVerdict = "deny"
-	VerdictWarn            RuleVerdict = "warn"
-	VerdictRequestEvidence RuleVerdict = "request_evidence"
-	VerdictPropose         RuleVerdict = "propose"
-	VerdictEnqueueJob      RuleVerdict = "enqueue_job"
+	VerdictAllow   RuleVerdict = "allow"
+	VerdictDeny    RuleVerdict = "deny"
+	VerdictWarn    RuleVerdict = "warn"
+	VerdictPropose RuleVerdict = "propose"
 )
 
-// RuleDecision is a rule's output: a verdict plus (for propose) a Proposal or (for enqueue_job) a Job. It is
+// RuleDecision is a rule's output: a verdict plus (for propose) a Proposal. It is
 // return-only — a rule never holds a Store/Kernel, so it can describe an effect but never perform one (S12).
 type RuleDecision struct {
 	Verdict  RuleVerdict
 	Reasons  []string
 	Proposal *ProposedEvent
-	Job      *JobSpec
 	// ProposalActor is the TRUSTED origin actor of the carried Proposal — stamped by the RuleSet reducer from
 	// the producing rule's Actor(), never by a rule's own output (json:"-" so an untrusted wasm rule cannot
 	// forge it: the field is dropped on decode and re-set from the trusted Rule.Actor()). The server stamps the
 	// bridge write identity from this instead of guessing the producer by scanning Handles/Emits.
 	ProposalActor ActorID `json:"-"`
-}
-
-// JobSpec describes an effectful job for the at-least-once job lane. IdempotencyKey backs provider idempotency
-// (S4); EstCostUSD feeds the budget reserve (S6).
-type JobSpec struct {
-	Kind           string
-	IdempotencyKey string
-	EstCostUSD     float64
-	Args           map[string]any
 }
 
 // Diagnostic is the durable "why" of a reject/defer (S7: no silent drop). It is emitted as a "*.diagnostic"
@@ -226,8 +214,10 @@ var (
 // scope reference, a kind the schema guard does not know (else config could DEFINE a phantom kind that
 // the kernel silently accepts — an unknown kind has no required fields, so SchemaGuard.Validate passes).
 // Invariant: keys(kernel.DefaultSchemaGuard().Required) == KindCatalog (enforced by a kernel test).
-// lease/budget are first-class versioned resources (D3): their per-resource Version is the fence / CAS counter.
-// receipt is the durable record of an external effect (S4: the job lane writes a receipt resource via CAS).
+// lease/budget/receipt are GOVERNANCE resource kinds — first-class versioned resources (D3) whose
+// per-resource Version is the fence / CAS counter; receipt is the durable record of an external effect.
+// Their governed writes are kernel-produced control-plane state, kept registered for compatibility of
+// existing logs and external-package reservation checks.
 // coordination is the host-lifecycle teamwork-topology kind (P2.2 route 3/3): an approved
 // coordination op is recorded as a governed coordination resource so the mutation flows
 // through the kernel single-writer before the host emits its mirror topology events.

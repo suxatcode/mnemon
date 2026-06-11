@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/job"
 	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/rule"
 	"github.com/mnemon-dev/mnemon/harness/internal/store"
@@ -48,14 +47,6 @@ type RuntimeConfig struct {
 	// every principal must have a binding granting the verb / observed type / pull scope it uses. The
 	// zero (nil) leaves the API unbound — correct for a trusted in-process owner (embedded coreengine).
 	Bindings []channel.ChannelBinding
-
-	// Runner, when non-nil, enables the effectful job lane (S4/S5): jobs the rule pre-gate enqueues are
-	// run by Runner under leases owned by LaneOwner, fenced for LaneTTL seconds. A nil Runner leaves the
-	// lane OFF — a job verdict is inert. (The assembler sets Runner only when the rule set emits a job
-	// verdict; the P0 builtins never do, so it stays nil.)
-	Runner    job.Runner
-	LaneOwner contract.ActorID
-	LaneTTL   int64
 }
 
 func (cfg RuntimeConfig) withDefaults() RuntimeConfig {
@@ -100,9 +91,6 @@ func OpenRuntime(storePath string, cfg RuntimeConfig) (*Runtime, error) {
 	cfg = cfg.withDefaults()
 	k := kernel.NewKernel(store, kernel.DefaultSchemaGuard(), cfg.Authority)
 	cs := New(store, k, cfg.Rules, cfg.Subs, cfg.Modes, cfg.NewID, cfg.Now)
-	if cfg.Runner != nil { // gated lane: configured ONLY when a runner is supplied (a nil runner = no lane)
-		cs.WithLane(cfg.Runner, cfg.LaneOwner, func() int64 { return time.Now().Unix() }, cfg.LaneTTL)
-	}
 	rt := &Runtime{store: store, cs: cs, api: cs, storePath: storePath}
 	if len(cfg.Bindings) > 0 {
 		bindings, err := channel.NewBindingSet(cfg.Bindings...)
@@ -186,8 +174,8 @@ func (r *Runtime) Status(principal contract.ActorID) (contract.ChannelStatus, er
 }
 
 // DrainOutbox claims, acks, AND PRUNES the pending projection-invalidation outbox rows. It is the
-// driver's out-of-band duty, UNCONDITIONAL of the job lane (a second ClaimOutbox caller, kind
-// "invalidation", with an owner distinct from the lane). It returns the DEDUPED resource refs the
+// driver's out-of-band duty (a kind-scoped ClaimOutbox caller for the "invalidation" rows it
+// actually delivers). It returns the DEDUPED resource refs the
 // drained rows invalidated (the producer stamps d.NewVersions into every row's payload) so the
 // driver can refresh selectively, plus the drained row COUNT — re-projection triggers on the count,
 // never on the refs, so an undecodable payload loses selectivity but never the trigger. Acked rows

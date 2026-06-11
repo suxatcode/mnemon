@@ -15,9 +15,10 @@ func DefaultSchemaGuard() SchemaGuard {
 		"memory": {"content"},
 		"goal":   {"statement"},
 		"skill":  {"name"},
-		// lease/budget are versioned resources (D3); their required fields back the fenced claim (S5) and the
-		// atomic budget reserve (S6). receipt records an external effect (S4). Must stay in lockstep with
-		// contract.KindCatalog (kind_catalog_test).
+		// lease/budget/receipt are GOVERNANCE resource kinds (D3): versioned control-plane state whose
+		// required fields back fencing, budget accounting, and the durable record of an external effect.
+		// Kept registered for compatibility of existing logs and external-package reservation checks.
+		// Must stay in lockstep with contract.KindCatalog (kind_catalog_test).
 		"lease":   {"job_id", "owner", "fence_until"},
 		"budget":  {"limit_usd", "spent_usd"},
 		"receipt": {"job_id", "effect_id", "outcome"},

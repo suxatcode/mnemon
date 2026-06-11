@@ -116,26 +116,25 @@ func Shadow(events []contract.Event, subs map[contract.ActorID]contract.Subscrip
 }
 
 // canonicalRuleResult serializes the behaviorally-meaningful output of a rule evaluation — the decision
-// (verdict, proposal type+payload, job, trusted origin actor), the REASONS (the server writes these verbatim
+// (verdict, proposal type+payload, trusted origin actor), the REASONS (the server writes these verbatim
 // into durable deny/warn *.diagnostic events, so they are auditable state, not advisory), AND the durable
 // diagnostics — to a stable string for comparison. json.Marshal sorts map keys, so equal payloads compare equal.
 func canonicalRuleResult(d contract.RuleDecision, diags []contract.Diagnostic) string {
 	v := struct {
 		Verdict     contract.RuleVerdict
 		Proposal    *contract.ProposedEvent
-		Job         *contract.JobSpec
 		Actor       contract.ActorID
 		Reasons     []string
 		Diagnostics []contract.Diagnostic
-	}{d.Verdict, d.Proposal, d.Job, d.ProposalActor, d.Reasons, diags}
+	}{d.Verdict, d.Proposal, d.ProposalActor, d.Reasons, diags}
 	b, err := json.Marshal(v)
 	if err == nil {
 		return string(b)
 	}
-	// A non-finite float (NaN/Inf — legal in JobSpec.EstCostUSD or a Proposal payload, settable by a native
+	// A non-finite float (NaN/Inf — legal in a Proposal payload, settable by a native
 	// rule) makes json.Marshal fail. Do NOT collapse to "" (the zero value when the error is dropped): two
 	// DIVERGENT decisions would both render "" and compare equal, masking a reason/verdict change as Clean.
-	// Fall back to a Go-syntax rendering — but FLATTEN the Proposal/Job pointers to values first, because %#v
+	// Fall back to a Go-syntax rendering — but FLATTEN the Proposal pointer to a value first, because %#v
 	// prints a NESTED pointer field as a heap ADDRESS (non-deterministic) rather than its dereferenced value.
 	// On the flattened, pointer-free struct, fmt renders NaN/Inf as "NaN"/"+Inf" and sorts map keys, so the
 	// canonical form handles every float value AND distinguishes every field deterministically.
@@ -143,17 +142,12 @@ func canonicalRuleResult(d contract.RuleDecision, diags []contract.Diagnostic) s
 		Verdict     contract.RuleVerdict
 		Proposal    contract.ProposedEvent
 		HasProposal bool
-		Job         contract.JobSpec
-		HasJob      bool
 		Actor       contract.ActorID
 		Reasons     []string
 		Diagnostics []contract.Diagnostic
 	}{Verdict: d.Verdict, Actor: d.ProposalActor, Reasons: d.Reasons, Diagnostics: diags}
 	if d.Proposal != nil {
 		flat.Proposal, flat.HasProposal = *d.Proposal, true
-	}
-	if d.Job != nil {
-		flat.Job, flat.HasJob = *d.Job, true
 	}
 	return "nonjson:" + fmt.Sprintf("%#v", flat)
 }

@@ -52,18 +52,18 @@ func TestRuleSetDenyBeatsAll(t *testing.T) {
 	}
 }
 
-func TestRuleSetRequestEvidenceBeatsAllow(t *testing.T) {
+func TestRuleSetWarnBeatsAllow(t *testing.T) {
 	allow := NewNativeRule("a", "agent", "x.proposed", []string{"memory.observed"},
 		func(RuleInput) (contract.RuleDecision, error) {
 			return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
 		})
-	req := NewNativeRule("r", "agent", "x.proposed", []string{"memory.observed"},
+	warn := NewNativeRule("w", "agent", "x.proposed", []string{"memory.observed"},
 		func(RuleInput) (contract.RuleDecision, error) {
-			return contract.RuleDecision{Verdict: contract.VerdictRequestEvidence}, nil
+			return contract.RuleDecision{Verdict: contract.VerdictWarn, Reasons: []string{"heads up"}}, nil
 		})
-	d, _ := NewRuleSet(allow, req).Evaluate(RuleInput{Event: contract.Event{Type: "memory.observed"}})
-	if d.Verdict != contract.VerdictRequestEvidence {
-		t.Fatalf("request_evidence must beat allow; got %+v", d)
+	d, _ := NewRuleSet(allow, warn).Evaluate(RuleInput{Event: contract.Event{Type: "memory.observed"}})
+	if d.Verdict != contract.VerdictWarn {
+		t.Fatalf("warn must beat allow; got %+v", d)
 	}
 }
 
@@ -78,6 +78,22 @@ func TestRuleSetErroringRuleContributesDiagnosticNotIntent(t *testing.T) {
 	}
 	if len(diags) != 1 || diags[0].Ref != "boomer" {
 		t.Fatalf("erroring rule must contribute exactly one diagnostic naming it; got %+v", diags)
+	}
+}
+
+// S7 fail-closed: a rule returning an UNKNOWN verdict (e.g. the retired "enqueue_job") contributes
+// zero intent and exactly one diagnostic naming it — never a silent zero-rank swallow.
+func TestRuleSetUnknownVerdictContributesDiagnosticNotIntent(t *testing.T) {
+	stale := NewNativeRule("stale", "agent", "x.proposed", []string{"memory.observed"},
+		func(RuleInput) (contract.RuleDecision, error) {
+			return contract.RuleDecision{Verdict: contract.RuleVerdict("enqueue_job")}, nil
+		})
+	d, diags := NewRuleSet(stale).Evaluate(RuleInput{Event: contract.Event{Type: "memory.observed"}})
+	if d.Verdict != contract.VerdictAllow {
+		t.Fatalf("an unknown verdict must contribute nothing (verdict stays allow); got %+v", d)
+	}
+	if len(diags) != 1 || diags[0].Ref != "stale" || diags[0].Stage != "rule" {
+		t.Fatalf("an unknown verdict must contribute exactly one stage:rule diagnostic naming the rule; got %+v", diags)
 	}
 }
 

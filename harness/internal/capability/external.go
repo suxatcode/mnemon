@@ -26,7 +26,7 @@ const externalRootRel = ".mnemon/loops"
 // specNamePattern (one grammar across the boundary).
 var externalIdentifierPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 
-// externalReservedKinds are the kernel-internal control-plane lanes (job/coordination state) no
+// externalReservedKinds are the kernel-internal GOVERNANCE resource kinds (control-plane state) no
 // external package may claim (class ⑪): their governed writes are kernel-produced, so a
 // static-literal header would satisfy the class-⑦ lockstep trivially while meaning nothing —
 // and an external claim would route untrusted specs into the coordination loop itself.

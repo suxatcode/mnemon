@@ -162,26 +162,27 @@ func TestShadowComparesDenyReasons(t *testing.T) {
 	}
 }
 
-// S8 (marshal robustness): canonicalRuleResult must not collapse to "" on a non-marshalable value. A non-finite
-// Job cost (NaN/Inf, legal in JobSpec.EstCostUSD and settable by a native rule) makes json.Marshal fail; if the
+// S8 (marshal robustness): canonicalRuleResult must not collapse to "" on a non-marshalable value. A
+// non-finite float in a Proposal payload (NaN/Inf, settable by a native rule) makes json.Marshal fail; if the
 // error is swallowed, two DIVERGENT decisions both render "" and compare equal -> a false-clean that masks a
 // reason/verdict change. The comparison must still distinguish the other fields.
-func TestShadowComparesEvenWithNonFiniteJobCost(t *testing.T) {
+func TestShadowComparesEvenWithNonFinitePayload(t *testing.T) {
 	events, subs := observedLog()
-	enqueueWithReason := func(reason string, cost float64) rule.Rule {
+	proposeWithReason := func(reason string, cost float64) rule.Rule {
 		return rule.NewNativeRule("j", "agent", "memory.write.proposed", []string{"memory.observed"},
 			func(rule.RuleInput) (contract.RuleDecision, error) {
-				return contract.RuleDecision{Verdict: contract.VerdictEnqueueJob, Reasons: []string{reason},
-					Job: &contract.JobSpec{Kind: "gather", EstCostUSD: cost}}, nil
+				return contract.RuleDecision{Verdict: contract.VerdictPropose, Reasons: []string{reason},
+					Proposal: &contract.ProposedEvent{Type: "memory.write.proposed",
+						Payload: map[string]any{"est_cost_usd": cost}}}, nil
 			})
 	}
 	nan := math.NaN()
-	rep := Shadow(events, subs, rule.NewRuleSet(enqueueWithReason("SECURITY: exfil blocked", nan)), rule.NewRuleSet(enqueueWithReason("routine", nan)))
+	rep := Shadow(events, subs, rule.NewRuleSet(proposeWithReason("SECURITY: exfil blocked", nan)), rule.NewRuleSet(proposeWithReason("routine", nan)))
 	if rep.Clean {
-		t.Fatalf("a NaN Job cost must not collapse divergent reasons to clean; got %+v", rep)
+		t.Fatalf("a NaN payload value must not collapse divergent reasons to clean; got %+v", rep)
 	}
-	// identical policies (even with a NaN cost) stay clean (no false positive).
-	if c := Shadow(events, subs, rule.NewRuleSet(enqueueWithReason("same", nan)), rule.NewRuleSet(enqueueWithReason("same", nan))); !c.Clean {
-		t.Fatalf("identical policies must stay clean even with a NaN cost; got %+v", c)
+	// identical policies (even with a NaN payload) stay clean (no false positive).
+	if c := Shadow(events, subs, rule.NewRuleSet(proposeWithReason("same", nan)), rule.NewRuleSet(proposeWithReason("same", nan))); !c.Clean {
+		t.Fatalf("identical policies must stay clean even with a NaN payload; got %+v", c)
 	}
 }

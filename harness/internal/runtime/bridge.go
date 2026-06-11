@@ -9,7 +9,7 @@ import (
 )
 
 // ResolvedBinding carries the trusted write identity (Actor) and authorized emit type for a
-// proposal: the server builds it at dispatch time from the rule (Actor()/Emits()) or the job lane,
+// proposal: the server builds it at dispatch time from the rule (Actor()/Emits()),
 // and Bridge.Stamp reads only these two fields. It is runtime's own stamping DTO — trusted write
 // identity at stamp time has nothing to do with file config (where it lived before the assembler
 // cutover).
