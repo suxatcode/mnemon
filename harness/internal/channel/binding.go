@@ -18,15 +18,13 @@ const (
 
 // Verb is a channel operation. The Agent Integration channel exposes observe (Ingest) + pull
 // (PullProjection) + status. Replica sync gets separate verbs so a sync credential does not inherit
-// Agent Integration access. Evolution proposal submission is explicit and does not imply direct write
-// or promotion authority.
+// Agent Integration access.
 type Verb string
 
 const (
-	VerbObserve          Verb = "observe"
-	VerbPull             Verb = "pull"
-	VerbStatus           Verb = "status"
-	VerbEvolutionPropose Verb = "evolution-propose"
+	VerbObserve Verb = "observe"
+	VerbPull    Verb = "pull"
+	VerbStatus  Verb = "status"
 	// The sync verb STRINGS are ABI surface owned by contract (sync-abi-v1 §1); these aliases keep
 	// the channel's Verb space complete without channel becoming the wire-name authority.
 	VerbSyncPush   Verb = contract.SyncVerbPush
@@ -100,7 +98,7 @@ func HostAgentBinding(principal contract.ActorID, endpoint string, scope []contr
 func ControlAgentBinding(principal contract.ActorID, endpoint string, scope []contract.ResourceRef) ChannelBinding {
 	return ChannelBinding{
 		Principal: principal, ActorKind: contract.KindControlAgent, Transport: TransportHTTP, Endpoint: endpoint,
-		AllowedVerbs: []Verb{VerbObserve, VerbPull, VerbStatus, VerbEvolutionPropose}, SubscriptionScope: scope,
+		AllowedVerbs: []Verb{VerbObserve, VerbPull, VerbStatus}, SubscriptionScope: scope,
 		IdempotencyNamespace: "control:" + string(principal),
 	}
 }
