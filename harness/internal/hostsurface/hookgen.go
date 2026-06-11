@@ -1,6 +1,7 @@
 package hostsurface
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -561,4 +562,31 @@ func (r *hookRender) includeBlock(fragment string) (string, error) {
 		return "", fmt.Errorf("%s/%s/%s: fragment %s is empty", r.host, r.loop, r.timing, fragment)
 	}
 	return content, nil
+}
+
+// DeclaredHookTimings returns the lifecycle timings the loop's intents declare, in canonical
+// order. A loop without an intents file is a hook-less loop (nil, nil) — legitimate, not an
+// error; a present-but-invalid intents file fails closed.
+func DeclaredHookTimings(loop string) ([]string, error) {
+	if !markerNamePattern.MatchString(loop) {
+		return nil, fmt.Errorf("invalid loop name %q", loop)
+	}
+	raw, err := fs.ReadFile(assets.FS, "loops/"+loop+"/hooks/intents.json")
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	intents, err := decodeHookIntents(raw)
+	if err != nil {
+		return nil, fmt.Errorf("decode hook intents for loop %s: %w", loop, err)
+	}
+	var out []string
+	for _, t := range hookTimings {
+		if _, ok := intents.Hooks[t]; ok {
+			out = append(out, t)
+		}
+	}
+	return out, nil
 }

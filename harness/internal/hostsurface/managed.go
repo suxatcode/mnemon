@@ -261,6 +261,9 @@ func classifyManaged(dst string, desired []byte, prior string) managedClass {
 	if prior != "" && currentHash == prior {
 		return classWrite
 	}
+	if prior == "" && knownLegacyManagedHashes[currentHash] {
+		return classWrite // pre-ownership workspace holding our own legacy bytes: adopt and upgrade
+	}
 	return classConflict
 }
 

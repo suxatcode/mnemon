@@ -1,12 +1,9 @@
 package hostsurface
 
 import (
-	"io/fs"
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 )
 
 // bareMnemonCLI matches an invocation of the legacy `mnemon` binary (a space-delimited command), but
@@ -17,18 +14,16 @@ var bareMnemonCLI = regexp.MustCompile(`\bmnemon `)
 // CLI, and a `mnemon-harness control` (observe/pull/status) routing — never a direct read of the
 // governed store. (Catting the derived MEMORY.md mirror is intended and not checked here.)
 func TestHostPrimesRouteThroughChannel(t *testing.T) {
-	primes := []string{
-		"hosts/codex/memory/hooks/prime.sh",
-		"hosts/codex/skill/hooks/prime.sh",
-		"hosts/claude-code/memory/hooks/prime.sh",
-		"hosts/claude-code/skill/hooks/prime.sh",
+	primes := []struct{ host, loop string }{
+		{"codex", "memory"}, {"codex", "skill"},
+		{"claude-code", "memory"}, {"claude-code", "skill"},
 	}
-	for _, p := range primes {
-		data, err := fs.ReadFile(assets.FS, p)
+	for _, pr := range primes {
+		p := pr.host + "/" + pr.loop + "/prime"
+		content, err := RenderHook(pr.loop, pr.host, "prime")
 		if err != nil {
-			t.Fatalf("read %s: %v", p, err)
+			t.Fatalf("render %s: %v", p, err)
 		}
-		content := string(data)
 		if bareMnemonCLI.MatchString(content) {
 			t.Errorf("%s calls the bare `mnemon` CLI; route through mnemon-harness control instead", p)
 		}

@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
 )
 
 func writeMemoryFixture(t *testing.T, root string) {
@@ -264,14 +266,34 @@ func TestSetupRejectsUnsupportedProductLoop(t *testing.T) {
 func TestAgentIntegrationAssetsDoNotReferenceRemoteWorkspace(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
-		"harness/internal/assets/hosts/codex/memory/hooks",
-		"harness/internal/assets/hosts/codex/skill/hooks",
-		"harness/internal/assets/hosts/claude-code/memory/hooks",
-		"harness/internal/assets/hosts/claude-code/skill/hooks",
 		"harness/internal/assets/loops/memory/skills",
 		"harness/internal/assets/loops/skill/skills",
+		"harness/internal/assets/loops/skill/hooks/fragments",
 	} {
 		assertProjectedAssetsHaveNoRemoteWorkspace(t, filepath.Join(root, rel))
+	}
+	// Hooks are GENERATED now (stage 3); the content policy applies to the generator output.
+	for _, host := range []string{"codex", "claude-code"} {
+		for _, loop := range []string{"memory", "skill"} {
+			for _, timing := range []string{"prime", "remind", "nudge", "compact"} {
+				content, err := hostsurface.RenderHook(loop, host, timing)
+				if err != nil {
+					t.Fatalf("render %s/%s/%s: %v", host, loop, timing, err)
+				}
+				assertContentHasNoRemoteWorkspace(t, host+"/"+loop+"/"+timing, content)
+			}
+		}
+	}
+}
+
+func assertContentHasNoRemoteWorkspace(t *testing.T, label, content string) {
+	t.Helper()
+	blocked := []string{"remote workspace", "remote token", "remote credential", "mnemon_remote", "remote_workspace", "https://"}
+	lower := strings.ToLower(content)
+	for _, term := range blocked {
+		if strings.Contains(lower, term) {
+			t.Fatalf("generated hook %s leaked %q", label, term)
+		}
 	}
 }
 

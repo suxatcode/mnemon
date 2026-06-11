@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -180,9 +179,16 @@ func (c projectorCore) removeHostManifestLoop(loopName string) error {
 }
 
 func (c projectorCore) hostHookExists(loopName, phase string) bool {
-	source := path.Join("hosts", c.host, loopName, "hooks", phase+".sh")
-	_, err := fs.Stat(assets.FS, source)
-	return err == nil
+	timings, err := DeclaredHookTimings(loopName)
+	if err != nil {
+		return false
+	}
+	for _, t := range timings {
+		if t == phase {
+			return true
+		}
+	}
+	return false
 }
 
 func skillID(skillPath string) string {
@@ -295,16 +301,21 @@ func (p projectorCore) ensureStore(ctx context.Context, storeName string) error 
 	return nil
 }
 
+// projectHooks installs the GENERATED hook shells for every timing the loop's intents declare.
+// Render errors fail the install closed — a half-migrated loop must never silently install with
+// zero hooks (the legacy code skipped absent asset files, which would have masked exactly that).
 func (p projectorCore) projectHooks(loop manifest.LoopManifest, binding manifest.BindingManifest) error {
-	for phase := range loop.Assets.HookPrompts {
-		source := path.Join("hosts", p.host, loop.Name, "hooks", phase+".sh")
-		if _, err := fs.Stat(assets.FS, source); errors.Is(err, fs.ErrNotExist) {
-			continue
-		} else if err != nil {
-			return fmt.Errorf("stat hook %s: %w", phase, err)
+	timings, err := DeclaredHookTimings(loop.Name)
+	if err != nil {
+		return fmt.Errorf("hook intents for %s: %w", loop.Name, err)
+	}
+	for _, phase := range timings {
+		content, err := RenderHook(loop.Name, p.host, phase)
+		if err != nil {
+			return fmt.Errorf("render hook %s/%s for %s: %w", loop.Name, phase, p.host, err)
 		}
 		target := pathJoin(binding.ProjectionPath, "hooks", "mnemon-"+loop.Name, phase+".sh")
-		if err := p.projectManaged(source, target, 0o755); err != nil {
+		if err := p.projectManagedBytes([]byte(content), target, 0o755); err != nil {
 			return err
 		}
 	}
