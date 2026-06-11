@@ -93,7 +93,7 @@ func TestDriverTickDrainsReprojectsAndPrunes(t *testing.T) {
 		t.Fatal(err)
 	}
 	storePath := filepath.Join(root, ".mnemon", "harness", "local", "governed.db")
-	rt, err := OpenLocalRuntime(storePath, loaded, []string{"memory"})
+	rt, err := OpenLocalRuntime(storePath, loaded, []string{"memory"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestDriverTickRegeneratesMemoryMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt, err := OpenLocalRuntime(filepath.Join(root, ".mnemon", "harness", "local", "governed.db"), loaded, []string{"memory"})
+	rt, err := OpenLocalRuntime(filepath.Join(root, ".mnemon", "harness", "local", "governed.db"), loaded, []string{"memory"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestDriverManualModeSkipsMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt, err := OpenLocalRuntime(filepath.Join(root, ".mnemon", "harness", "local", "governed.db"), loaded, []string{"memory"})
+	rt, err := OpenLocalRuntime(filepath.Join(root, ".mnemon", "harness", "local", "governed.db"), loaded, []string{"memory"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

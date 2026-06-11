@@ -85,7 +85,7 @@ func TestControlPullJSONIncludesScopedContent(t *testing.T) {
 	ref := contract.ResourceRef{Kind: "memory", ID: "project"}
 	binding := channel.HostAgentBinding("codex@project", "http://x", []contract.ResourceRef{ref})
 	binding.AllowedObservedTypes = []string{capability.MemoryWriteCandidateObserved}
-	rt, err := app.OpenLocalRuntime(filepath.Join(t.TempDir(), "governed.db"), channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}}, nil)
+	rt, err := app.OpenLocalRuntime(filepath.Join(t.TempDir(), "governed.db"), channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestControlPullMirrorWritesNonAuthoritativeMemoryFile(t *testing.T) {
 	ref := contract.ResourceRef{Kind: "memory", ID: "project"}
 	binding := channel.HostAgentBinding("codex@project", "http://x", []contract.ResourceRef{ref})
 	binding.AllowedObservedTypes = []string{capability.MemoryWriteCandidateObserved}
-	rt, err := app.OpenLocalRuntime(filepath.Join(t.TempDir(), "governed.db"), channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}}, nil)
+	rt, err := app.OpenLocalRuntime(filepath.Join(t.TempDir(), "governed.db"), channel.LoadedBindings{Bindings: []channel.ChannelBinding{binding}}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

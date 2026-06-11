@@ -220,6 +220,112 @@ run_note() {
 	echo "    note via config alone OK"
 }
 
+# run_external_goal proves stage 5 on the product path: a capability NEVER embedded (goal) stands
+# up from a pure external package directory (.mnemon/loops/goal/capability.json) + the SAME
+# config.loops/binding edit note/decision use — admission-equal rights. Includes the governed pull
+# CONTENT leg (the goal text arrives via the pull verb, not only a digest delta) and the negative
+# path: a malformed second package REFUSES `local run` boot, naming its path on stderr.
+run_external_goal() {
+	local principal="codex@project" addr="http://127.0.0.1:8787"
+	CUR_HOST="external-goal"
+	local proj="$WORK/proj-external-goal"
+	mkdir -p "$proj"
+	echo "=== E2E external goal capability package ==="
+	(
+		cd "$proj"
+		local tok=".mnemon/harness/channel/credentials/codex-project.token"
+		"$MH" setup --host codex --memory --principal "$principal" --control-url "$addr" >/dev/null
+
+		# The external package: directory presence = capability declaration (loop-package-v1,
+		# "External capability packages").
+		mkdir -p .mnemon/loops/goal
+		cat >.mnemon/loops/goal/capability.json <<-'JSONEOF'
+		{
+		  "schema_version": 1,
+		  "name": "goal",
+		  "observed_type": "goal.write_candidate.observed",
+		  "proposed_type": "goal.write.proposed",
+		  "resource_kind": "goal",
+		  "items_field": "items",
+		  "fields": [
+		    {
+		      "name": "statement",
+		      "validators": [
+		        {"id": "required", "params": {"missing_style": "empty"}},
+		        {"id": "safety:unsafe"}
+		      ]
+		    }
+		  ],
+		  "render": {
+		    "content": {"member": "bullet-list", "params": {"title": "# Goals", "field": "statement"}},
+		    "static": {"statement": "project"}
+		  }
+		}
+		JSONEOF
+
+		# The enablement edit — EXACTLY isomorphic to note/decision: config.loops + binding
+		# scope/types (config.loops stays the product-path authority).
+		python3 - <<-'PYEOF'
+		import json
+		cfg = json.load(open(".mnemon/harness/local/config.json"))
+		cfg["loops"].append("goal")
+		json.dump(cfg, open(".mnemon/harness/local/config.json", "w"), indent=2)
+		doc = json.load(open(".mnemon/harness/channel/bindings.json"))
+		b = doc["bindings"][0]
+		b["allowed_observed_types"].append("goal.write_candidate.observed")
+		b["subscription_scope"].append({"kind": "goal", "id": "project"})
+		json.dump(doc, open(".mnemon/harness/channel/bindings.json", "w"), indent=2)
+		PYEOF
+
+		"$MH" local run >"$WORK/run-external-goal.log" 2>&1 &
+		local runpid=$!
+		echo "$runpid" >"$PIDFILE"
+		local up=0 i
+		for i in $(seq 1 60); do
+			if "$MH" control status --addr "$addr" --principal "$principal" --token-file "$tok" >/dev/null 2>&1; then
+				up=1
+				break
+			fi
+			sleep 0.1
+		done
+		[ "$up" = 1 ] || { cat "$WORK/run-external-goal.log"; exit 1; }
+
+		# observe -> synchronous tick admits through the EXTERNAL rule (goal is not embedded, so
+		# there is no builtin fallback that could fake this) -> scoped digest delta.
+		local out pre post
+		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
+		pre="${out##*digest=}"; pre="${pre%% *}"
+		out="$("$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
+			--type goal.write_candidate.observed --external-id g1 \
+			--payload '{"statement":"ship stage five"}')"
+		case "$out" in *ticked=true*) ;; *) echo "goal observe: $out"; exit 1 ;; esac
+		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
+		post="${out##*digest=}"; post="${post%% *}"
+		[ -n "$pre" ] && [ -n "$post" ] && [ "$pre" != "$post" ] || { echo "goal write did not change the scoped digest (pre=$pre post=$post)"; exit 1; }
+
+		# Governed pull CONTENT leg: the goal statement itself arrives via the pull verb
+		# (control pull --json emits the scoped projection's resources + fields).
+		"$MH" control pull --json --addr "$addr" --principal "$principal" --token-file "$tok" \
+			| grep -q "ship stage five" || { echo "goal content did not arrive via the governed pull verb"; exit 1; }
+
+		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
+		rm -f "$PIDFILE"
+		sleep 0.3
+
+		# NEGATIVE: a malformed second package must REFUSE boot (directory presence is contract;
+		# split streams — the "ready" banner goes to stdout, the refusal names the path on stderr).
+		mkdir -p .mnemon/loops/bad
+		printf '{nope' >.mnemon/loops/bad/capability.json
+		if "$MH" local run >"$WORK/external-bad.out.log" 2>"$WORK/external-bad.err.log"; then
+			echo "local run must refuse to start with a malformed external package"; exit 1
+		fi
+		grep -q ".mnemon/loops/bad" "$WORK/external-bad.err.log" || { echo "boot refusal must name the bad package path on stderr"; cat "$WORK/external-bad.err.log"; exit 1; }
+		rm -rf .mnemon/loops/bad
+	) || fail "external goal flow failed (see $WORK/run-external-goal.log)"
+	sleep 0.3
+	echo "    external goal package OK"
+}
+
 # Both hosts run sequentially (the server is stopped between them). codex stays on the default
 # port (covering the bare default path); claude-code deliberately runs on a NON-default port to
 # pin the stage-0 promise that a bare `local run` listens where setup's --control-url pointed.
@@ -228,5 +334,6 @@ run_host claude-code claude@project 8899 .claude
 run_skill codex codex@project
 run_skill claude-code claude@project
 run_note
+run_external_goal
 
-echo "E2E PASS (codex + claude-code; memory + skill + note-via-config)"
+echo "E2E PASS (codex + claude-code; memory + skill + note-via-config + external-goal)"

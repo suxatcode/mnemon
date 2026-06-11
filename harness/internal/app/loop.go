@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/assets"
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
+	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
 	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
 )
 
@@ -33,11 +36,31 @@ func (h *Harness) LoopValidate() ([]string, error) {
 	}
 	lines = append(lines, hookLines...)
 	if h.root != "" {
+		// Manifest-TREE validation (a loops/hosts/bindings tree at the root) — distinct from the
+		// .mnemon/loops external CAPABILITY packages validated below.
 		external, err := manifest.ValidateFS(os.DirFS(h.root))
 		if err != nil {
 			return nil, err
 		}
 		lines = append(lines, external.Lines...)
+	}
+	// External capability packages: run the SAME fail-closed resolution boot uses (symlink screen
+	// + LoadExternal + four-axis shadowing merge), so a package that would refuse `local run`
+	// fails validate too. One OK line per package — the v1 source label (status integration is
+	// explicitly deferred).
+	merged, err := capability.ResolveCatalog(h.root, kernel.DefaultSchemaGuard().Required)
+	if err != nil {
+		return nil, err
+	}
+	var externalNames []string
+	for name := range merged {
+		if _, embedded := capability.Builtins[name]; !embedded {
+			externalNames = append(externalNames, name)
+		}
+	}
+	sort.Strings(externalNames)
+	for _, name := range externalNames {
+		lines = append(lines, fmt.Sprintf("external capability %s: OK", name))
 	}
 	return lines, nil
 }

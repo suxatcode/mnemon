@@ -22,6 +22,7 @@ var (
 	localStorePath        string
 	localBindingsPath     string
 	localAllowNonLoopback bool
+	localIgnoreExternal   bool
 )
 
 var localCmd = &cobra.Command{
@@ -47,10 +48,11 @@ var localRunCmd = &cobra.Command{
 		fmt.Fprintln(cmd.OutOrStdout(), "Local Mnemon: ready")
 		fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: disconnected")
 		return app.RunLocalHTTPServerWithBindings(cmd.Context(), addr, boot.StorePath, boot.Loaded, app.ServeOptions{
-			Loops:       boot.Config.Loops,
-			Hosts:       boot.Config.Hosts,
-			ProjectRoot: projectRoot(),
-			MirrorMode:  boot.Config.MirrorMode,
+			Loops:          boot.Config.Loops,
+			Hosts:          boot.Config.Hosts,
+			ProjectRoot:    projectRoot(),
+			MirrorMode:     boot.Config.MirrorMode,
+			IgnoreExternal: localIgnoreExternal,
 		}, io.Discard)
 	},
 }
@@ -76,6 +78,7 @@ func init() {
 	localRunCmd.Flags().StringVar(&localAddr, "addr", "127.0.0.1:8787", "listen address")
 	localRunCmd.Flags().StringVar(&localBindingsPath, "bindings", "", "Agent Integration binding file")
 	localRunCmd.Flags().BoolVar(&localAllowNonLoopback, "allow-nonloopback", false, "explicitly allow listening on a non-loopback address (T1: loopback-only by default)")
+	localRunCmd.Flags().BoolVar(&localIgnoreExternal, "ignore-external", false, "boot the embedded-only capability catalog, ignoring external packages under .mnemon/loops (each ignored package is named on stderr)")
 	_ = localRunCmd.Flags().MarkHidden("bindings")
 	localCmd.AddCommand(localRunCmd, localStatusCmd, localStopCmd)
 	localCmd.GroupID = groupSpine

@@ -12,8 +12,8 @@ import (
 // Builtins is the trusted registry, built by compiling the EMBEDDED capability specs
 // (assets/capabilities/*.json) against the closed catalogs. Embedded specs are compile-time
 // artifacts: a corrupt one is a build defect, caught by TestBuiltinsLoadFromEmbeddedSpecs and the
-// gates before merge — hence the panic at package init, not an error path. (External spec
-// directories are stage 5 and will take loadBuiltins' error path, never the panic.)
+// gates before merge — hence the panic at package init, not an error path. (External capability
+// packages — LoadExternal/ResolveCatalog — take the error path, never the panic.)
 var Builtins = mustLoadBuiltins()
 
 func mustLoadBuiltins() map[string]Capability {
@@ -40,7 +40,7 @@ func loadBuiltins(fsys fs.FS) (map[string]Capability, error) {
 	}
 	sort.Strings(names)
 	out := map[string]Capability{}
-	seenObserved, seenProposed := map[string]string{}, map[string]string{}
+	reg := newSpecRegistry()
 	for _, name := range names {
 		raw, err := fs.ReadFile(fsys, path.Join("capabilities", name))
 		if err != nil {
@@ -54,17 +54,39 @@ func loadBuiltins(fsys fs.FS) (map[string]Capability, error) {
 		if err != nil {
 			return nil, fmt.Errorf("compile capability spec %s: %w", name, err)
 		}
-		if _, dup := out[cap.Name]; dup {
-			return nil, fmt.Errorf("capability spec %s: duplicate capability name %q", name, cap.Name)
+		if err := reg.claim("capability spec "+name, cap); err != nil {
+			return nil, err
 		}
-		if prev, dup := seenObserved[cap.ObservedType]; dup {
-			return nil, fmt.Errorf("capability spec %s: observed type %q already claimed by %q", name, cap.ObservedType, prev)
-		}
-		if prev, dup := seenProposed[cap.ProposedType]; dup {
-			return nil, fmt.Errorf("capability spec %s: proposed type %q already claimed by %q", name, cap.ProposedType, prev)
-		}
-		seenObserved[cap.ObservedType], seenProposed[cap.ProposedType] = cap.Name, cap.Name
 		out[cap.Name] = cap
 	}
 	return out, nil
+}
+
+// specRegistry enforces cross-spec uniqueness on the three event-family axes EVERY loader must
+// hold — no two capabilities may claim the same name, observed type, or proposed type. Shared by
+// the embedded loader, the external loader, and the catalog merge (which adds the fourth,
+// resource-kind axis on top).
+type specRegistry struct {
+	names    map[string]bool
+	observed map[string]string
+	proposed map[string]string
+}
+
+func newSpecRegistry() *specRegistry {
+	return &specRegistry{names: map[string]bool{}, observed: map[string]string{}, proposed: map[string]string{}}
+}
+
+func (r *specRegistry) claim(source string, c Capability) error {
+	if r.names[c.Name] {
+		return fmt.Errorf("%s: duplicate capability name %q", source, c.Name)
+	}
+	if prev, dup := r.observed[c.ObservedType]; dup {
+		return fmt.Errorf("%s: observed type %q already claimed by %q", source, c.ObservedType, prev)
+	}
+	if prev, dup := r.proposed[c.ProposedType]; dup {
+		return fmt.Errorf("%s: proposed type %q already claimed by %q", source, c.ProposedType, prev)
+	}
+	r.names[c.Name] = true
+	r.observed[c.ObservedType], r.proposed[c.ProposedType] = c.Name, c.Name
+	return nil
 }

@@ -69,7 +69,7 @@ func TestProductStatusUsesReachableLocalMnemon(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve local boot: %v", err)
 	}
-	rt, err := app.OpenLocalRuntime(boot.StorePath, boot.Loaded, boot.Config.Loops)
+	rt, err := app.OpenLocalRuntime(boot.StorePath, boot.Loaded, boot.Config.Loops, nil)
 	if err != nil {
 		t.Fatalf("open local runtime: %v", err)
 	}

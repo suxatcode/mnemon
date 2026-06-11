@@ -70,10 +70,16 @@ duplicate capability names / observed types / proposed types rejected.
 ## Loading
 
 Embedded specs are compile-time artifacts: corruption panics at init (a build defect, gated by
-`TestBuiltinsLoadFromEmbeddedSpecs` + CI before merge). The injectable `loadBuiltins(fsys)` keeps
-every error path tested and is the stage-5 external-directory seam — external specs take the
-error path, never the panic, and their `title`/`static` strings must be re-reviewed as untrusted
-input at that stage.
+`TestBuiltinsLoadFromEmbeddedSpecs` + CI before merge). External capability packages
+(`.mnemon/loops/<name>/capability.json`; loop-package-v1 "External capability packages") load
+through `capability.ResolveCatalog`: the SAME strict decode + FromSpec compile takes the ERROR
+path, never the panic — any failure (ten fail-closed fault classes, every message naming the
+package path) refuses Local Mnemon boot. Two deliberate differences from embedded loading:
+(a) external spec TEXT — name, enum deny messages, render `static` values, the bullet-list
+`title` — is scanned by the secret/prompt-injection scanners at load time, because embedded spec
+text is reviewed code pinned by golden parity (TestSpecGoldens) while external spec text is
+untrusted input; (b) the merge rejects shadowing on FOUR axes (name, observed type, proposed
+type, resource kind) — an external spec can never displace or impersonate an embedded one.
 
 ## Stability promise
 

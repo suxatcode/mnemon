@@ -24,7 +24,7 @@ func TestAssembleAdmitsConfiguredNoteCapabilityEndToEnd(t *testing.T) {
 	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
 		"note": {Enabled: true, ResourceRef: "note/project", RuleRef: "native:note"},
 	}}
-	rc, err := Assemble(cfg, []channel.ChannelBinding{binding})
+	rc, err := Assemble(cfg, []channel.ChannelBinding{binding}, nil)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}
@@ -56,11 +56,74 @@ func TestAssembleAdmitsConfiguredNoteCapabilityEndToEnd(t *testing.T) {
 	}
 }
 
+// Stage-5: Assemble selects from the PROVIDED catalog — a capability that exists only in an
+// external package (goal) resolves when the resolved catalog is passed, and fails closed when the
+// caller passes nil (nil = capability.Builtins, the backward-compatible seam).
+func TestAssembleResolvesFromProvidedCatalog(t *testing.T) {
+	goalSpec := capability.CapabilitySpec{
+		SchemaVersion: 1, Name: "goal",
+		ObservedType: "goal.write_candidate.observed", ProposedType: "goal.write.proposed",
+		ResourceKind: "goal", ItemsField: "items",
+		Fields: []capability.FieldSpec{{Name: "statement", Validators: []capability.ValidatorRef{
+			{ID: "required", Params: map[string]string{"missing_style": "empty"}},
+		}}},
+		Render: capability.RenderSpec{
+			Content: &capability.ContentRender{Member: "bullet-list", Params: map[string]string{"title": "# Goals", "field": "statement"}},
+			Static:  map[string]string{"statement": "project"},
+		},
+	}
+	goalCap, err := capability.FromSpec(goalSpec)
+	if err != nil {
+		t.Fatalf("compile goal spec: %v", err)
+	}
+	catalog := map[string]capability.Capability{"goal": goalCap}
+	for id, c := range capability.Builtins {
+		catalog[id] = c
+	}
+
+	ref := contract.ResourceRef{Kind: "goal", ID: "project"}
+	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
+	binding.AllowedObservedTypes = []string{"goal.write_candidate.observed"}
+	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
+		"goal": {Enabled: true, ResourceRef: "goal/project", RuleRef: "native:goal"},
+	}}
+
+	if _, err := Assemble(cfg, []channel.ChannelBinding{binding}, nil); err == nil {
+		t.Fatal("native:goal must fail closed against the nil (Builtins) catalog")
+	}
+	rc, err := Assemble(cfg, []channel.ChannelBinding{binding}, catalog)
+	if err != nil {
+		t.Fatalf("assemble with external-merged catalog: %v", err)
+	}
+
+	rt, err := runtime.OpenRuntime(filepath.Join(t.TempDir(), "g.db"), rc)
+	if err != nil {
+		t.Fatalf("open runtime: %v", err)
+	}
+	defer rt.Close()
+	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
+		ExternalID: "g1",
+		Event:      contract.Event{Type: "goal.write_candidate.observed", Payload: map[string]any{"statement": "ship stage five"}},
+	}); err != nil {
+		t.Fatalf("ingest goal: %v", err)
+	}
+	if _, err := rt.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	v, fields, err := rt.Resource(ref)
+	if err != nil || v == 0 {
+		t.Fatalf("the catalog-selected goal capability must admit (v=%d err=%v)", v, err)
+	}
+	if content, _ := fields["content"].(string); !strings.Contains(content, "ship stage five") {
+		t.Fatalf("goal content missing the candidate: %q", content)
+	}
+}
+
 func TestAssembleFailsClosedOnUnknownCapability(t *testing.T) {
 	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
 		"bogus": {Enabled: true, ResourceRef: "bogus/project", RuleRef: "native:bogus"},
 	}}
-	if _, err := Assemble(cfg, nil); err == nil {
+	if _, err := Assemble(cfg, nil, nil); err == nil {
 		t.Fatal("an unknown capability rule_ref must fail closed")
 	}
 }
@@ -75,7 +138,7 @@ func TestAssembleDerivesRefFromBindingScope(t *testing.T) {
 	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
 		"memory": {Enabled: true, ResourceRef: "memory/project", RuleRef: "native:memory"},
 	}}
-	rc, err := Assemble(cfg, []channel.ChannelBinding{binding})
+	rc, err := Assemble(cfg, []channel.ChannelBinding{binding}, nil)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}
@@ -113,7 +176,7 @@ func TestAssembleSkipsUnscopedBinding(t *testing.T) {
 	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
 		"memory": {Enabled: true, ResourceRef: "memory/project", RuleRef: "native:memory"},
 	}}
-	rc, err := Assemble(cfg, []channel.ChannelBinding{binding})
+	rc, err := Assemble(cfg, []channel.ChannelBinding{binding}, nil)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}
@@ -146,7 +209,7 @@ func TestAssembleRejectsBareRuleRef(t *testing.T) {
 	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
 		"memory": {Enabled: true, ResourceRef: "memory/project", RuleRef: "memory"}, // 缺 native: 前缀
 	}}
-	if _, err := Assemble(cfg, nil); err == nil {
+	if _, err := Assemble(cfg, nil, nil); err == nil {
 		t.Fatal("a bare rule_ref without the native: namespace prefix must fail closed")
 	}
 }
@@ -161,7 +224,7 @@ func TestAssembleAdmitsDecisionCapabilityEndToEnd(t *testing.T) {
 	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
 		"decision": {Enabled: true, ResourceRef: "decision/project", RuleRef: "native:decision"},
 	}}
-	rc, err := Assemble(cfg, []channel.ChannelBinding{binding})
+	rc, err := Assemble(cfg, []channel.ChannelBinding{binding}, nil)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}

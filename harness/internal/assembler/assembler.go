@@ -1,8 +1,8 @@
 // Package assembler is the select-only Loop/Capability Assembler: it compiles a config.File (which
-// built-in capabilities are enabled + how they are bound/limited) plus the channel bindings into a
-// runtime.RuntimeConfig. It only SELECTS already-compiled built-in capabilities from
-// capability.Builtins (resolved via the native:<id> rule_ref); an unknown capability id fails closed.
-// Config can never define new behavior — the canonical state still flows observed -> rule -> kernel.
+// capabilities are enabled + how they are bound/limited) plus the channel bindings into a
+// runtime.RuntimeConfig. It only SELECTS already-compiled capabilities from the provided catalog
+// (resolved via the native:<id> rule_ref); an unknown capability id fails closed. Config can never
+// define new behavior — the canonical state still flows observed -> rule -> kernel.
 package assembler
 
 import (
@@ -19,15 +19,23 @@ import (
 )
 
 // Assemble derives the Local Mnemon runtime config from the enabled capabilities in cfg and the
-// installed channel bindings. For each enabled capability it resolves the built-in descriptor by
-// rule_ref (fail-closed on an unknown id), then builds one actor-bound rule per binding that may
+// installed channel bindings. For each enabled capability it resolves the descriptor by rule_ref
+// from catalog (fail-closed on an unknown id), then builds one actor-bound rule per binding that may
 // observe the capability's type, granting that principal kernel write authority for the resource kind.
+//
+// catalog selects the capability universe; nil means capability.Builtins. That nil default is the
+// backward-compatible seam: every pre-stage-5 caller (and the test/sync surfaces with no project
+// root to resolve external packages from) keeps embedded-only behavior unchanged, while the boot
+// path passes the merged capability.ResolveCatalog result.
 //
 // Divergence from the locked Assemble(cfg, loops) signature (code wins): the runtime config needs the
 // channel bindings (principals/scope), which the loop manifests do not carry; bindings are the second
 // argument. This is the production boot path: app.OpenLocalRuntime derives the config.File from the
 // setup-written loops list and assembles here.
-func Assemble(cfg config.File, bindings []channel.ChannelBinding) (runtime.RuntimeConfig, error) {
+func Assemble(cfg config.File, bindings []channel.ChannelBinding, catalog map[string]capability.Capability) (runtime.RuntimeConfig, error) {
+	if catalog == nil {
+		catalog = capability.Builtins
+	}
 	var rules []rule.Rule
 	allow := map[contract.ActorID][]contract.ResourceKind{}
 	for name, cc := range cfg.Capabilities {
@@ -39,7 +47,7 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding) (runtime.Runti
 			return runtime.RuntimeConfig{}, fmt.Errorf("capability %q: rule_ref %q must be %q-prefixed (fail-closed)", name, cc.RuleRef, nativePrefix)
 		}
 		id := strings.TrimPrefix(cc.RuleRef, nativePrefix)
-		cap, ok := capability.Builtins[id]
+		cap, ok := catalog[id]
 		if !ok {
 			return runtime.RuntimeConfig{}, fmt.Errorf("capability %q: unknown rule_ref %q (fail-closed)", name, cc.RuleRef)
 		}

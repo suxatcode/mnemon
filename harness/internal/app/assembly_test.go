@@ -16,7 +16,7 @@ func TestBootConfigAdmitsLegacyObservedTypeAlias(t *testing.T) {
 	b := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
 	b.AllowedObservedTypes = []string{"memory.write_candidate_observed"} // legacy underscore only
 
-	rc, err := LocalRuntimeConfigFromBindings([]channel.ChannelBinding{b})
+	rc, err := LocalRuntimeConfigFromBindings([]channel.ChannelBinding{b}, nil)
 	if err != nil {
 		t.Fatalf("boot config: %v", err)
 	}

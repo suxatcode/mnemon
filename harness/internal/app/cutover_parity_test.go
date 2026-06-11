@@ -56,7 +56,7 @@ func TestAssembledBootMatchesBindingDerivedBoot(t *testing.T) {
 		}
 	}
 
-	bootRC, err := LocalRuntimeConfigFromBindings([]channel.ChannelBinding{mkBinding()})
+	bootRC, err := LocalRuntimeConfigFromBindings([]channel.ChannelBinding{mkBinding()}, nil)
 	if err != nil {
 		t.Fatalf("boot config: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestAssembledBootMatchesBindingDerivedBoot(t *testing.T) {
 	}
 	defer bootRT.Close()
 
-	asmRC, err := assembler.Assemble(capabilityFileFromLoops([]string{"memory", "skill"}), []channel.ChannelBinding{mkBinding()})
+	asmRC, err := assembler.Assemble(capabilityFileFromLoops([]string{"memory", "skill"}), []channel.ChannelBinding{mkBinding()}, nil)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestLoopsFromBindingsDerivesEnablement(t *testing.T) {
 	b := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{
 		{Kind: "memory", ID: "project"}, {Kind: "skill", ID: "project"},
 	})
-	got := loopsFromBindings([]channel.ChannelBinding{b})
+	got := loopsFromBindings([]channel.ChannelBinding{b}, nil)
 	want := []string{"memory", "skill"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("loopsFromBindings = %v, want %v", got, want)

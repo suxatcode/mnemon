@@ -61,7 +61,9 @@ func sanitizePrincipal(p string) string {
 // (capability.Builtins) AND carry projectable assets for the host (manifest.LoopsForHost over the
 // embedded FS) — derived, not hardcoded, so a future loop whose assets land is admitted without
 // editing a literal. Today the intersection is exactly {memory, skill} (note has no host assets).
-func validateProductLoops(host string, loops []string) error {
+// A requested loop that is instead an EXTERNAL capability package under projectRoot gets the
+// pinned admission-vs-projection diagnosis: external packages carry no host assets in v1.
+func validateProductLoops(host string, loops []string, projectRoot string) error {
 	hostLoops, err := manifest.LoopsForHost(assets.FS, host)
 	if err != nil {
 		return fmt.Errorf("setup: discover %s loops: %w", host, err)
@@ -81,10 +83,21 @@ func validateProductLoops(host string, loops []string) error {
 			return fmt.Errorf("setup loop id cannot be empty")
 		}
 		if !available[loop] {
+			if isExternalPackage(projectRoot, loop) {
+				return fmt.Errorf("loop %q: external packages carry no host assets; enable via config.loops + binding", loop)
+			}
 			return fmt.Errorf("unsupported product loop %q for host %s; available: %s", loop, host, strings.Join(names, ", "))
 		}
 	}
 	return nil
+}
+
+// isExternalPackage reports whether loop names an external capability package under the project
+// root. Presence check only: setup never LOADS external packages — they carry no host assets, so
+// there is nothing for setup to project.
+func isExternalPackage(projectRoot, loop string) bool {
+	fi, err := os.Stat(filepath.Join(projectRoot, ".mnemon", "loops", loop, "capability.json"))
+	return err == nil && fi.Mode().IsRegular()
 }
 
 // Setup projects the selected loops into the host and writes the Local Mnemon
@@ -98,7 +111,7 @@ func (h *Harness) Setup(ctx context.Context, out, errw io.Writer, opts SetupOpti
 	if len(opts.Loops) == 0 {
 		return SetupResult{}, fmt.Errorf("setup requires --memory, --skills, or at least one --loop")
 	}
-	if err := validateProductLoops(opts.Host, opts.Loops); err != nil {
+	if err := validateProductLoops(opts.Host, opts.Loops, opts.ProjectRoot); err != nil {
 		return SetupResult{}, err
 	}
 	projectRoot := opts.ProjectRoot

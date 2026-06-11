@@ -26,12 +26,13 @@ import (
 // OpenLocalRuntime boots Local Mnemon over the select-only assembler: loops (from the setup-written
 // localConfig) enable capabilities; bindings stay the source of truth for observe/pull/status scope.
 // An empty loops list (the hidden `local run --bindings` path, which has no localConfig) derives
-// enablement from the binding scope kinds ∩ capability.Builtins.
-func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings, loops []string) (*runtime.Runtime, error) {
+// enablement from the binding scope kinds ∩ catalog. catalog selects the capability universe
+// (nil = capability.Builtins); the serve path passes the boot-resolved external-merged catalog.
+func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings, loops []string, catalog map[string]capability.Capability) (*runtime.Runtime, error) {
 	if len(loops) == 0 {
-		loops = loopsFromBindings(loaded.Bindings)
+		loops = loopsFromBindings(loaded.Bindings, catalog)
 	}
-	rc, err := assembler.Assemble(capabilityFileFromLoops(loops), loaded.Bindings)
+	rc, err := assembler.Assemble(capabilityFileFromLoops(loops), loaded.Bindings, catalog)
 	if err != nil {
 		return nil, err
 	}
@@ -39,10 +40,10 @@ func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings, loops []s
 }
 
 // LocalRuntimeConfigFromBindings derives Local Mnemon's policy from the installed Agent Integration
-// bindings alone (enablement = binding scope kinds ∩ Builtins). It is the bindings-only convenience
-// over the same select-only assembly OpenLocalRuntime uses.
-func LocalRuntimeConfigFromBindings(bindings []channel.ChannelBinding) (runtime.RuntimeConfig, error) {
-	return assembler.Assemble(capabilityFileFromLoops(loopsFromBindings(bindings)), bindings)
+// bindings alone (enablement = binding scope kinds ∩ catalog; nil = Builtins). It is the
+// bindings-only convenience over the same select-only assembly OpenLocalRuntime uses.
+func LocalRuntimeConfigFromBindings(bindings []channel.ChannelBinding, catalog map[string]capability.Capability) (runtime.RuntimeConfig, error) {
+	return assembler.Assemble(capabilityFileFromLoops(loopsFromBindings(bindings, catalog)), bindings, catalog)
 }
 
 // capabilityFileFromLoops constructs the in-memory config.File for the enabled loops. The on-disk
@@ -57,14 +58,19 @@ func capabilityFileFromLoops(loops []string) config.File {
 	return config.File{Capabilities: caps}
 }
 
-// loopsFromBindings derives capability enablement from binding scope kinds ∩ Builtins.
-func loopsFromBindings(bindings []channel.ChannelBinding) []string {
+// loopsFromBindings derives capability enablement from binding scope kinds ∩ catalog (nil =
+// Builtins). config.loops stays the product-path authority — this derivation only runs when the
+// loops list is empty (the hidden bindings-only path).
+func loopsFromBindings(bindings []channel.ChannelBinding, catalog map[string]capability.Capability) []string {
+	if catalog == nil {
+		catalog = capability.Builtins
+	}
 	seen := map[string]bool{}
 	var loops []string
 	for _, b := range bindings {
 		for _, ref := range b.SubscriptionScope {
 			id := string(ref.Kind)
-			if _, ok := capability.Builtins[id]; ok && !seen[id] {
+			if _, ok := catalog[id]; ok && !seen[id] {
 				seen[id] = true
 				loops = append(loops, id)
 			}
@@ -78,10 +84,11 @@ func loopsFromBindings(bindings []channel.ChannelBinding) []string {
 // enablement (Loops), the per-host projected loops (Hosts — the background driver's re-projection
 // authority), and the project root the host surfaces live under.
 type ServeOptions struct {
-	Loops       []string
-	Hosts       map[string][]string
-	ProjectRoot string
-	MirrorMode  string // "manual" | "prime-refresh" (driver-side mirror regeneration gate)
+	Loops          []string
+	Hosts          map[string][]string
+	ProjectRoot    string
+	MirrorMode     string // "manual" | "prime-refresh" (driver-side mirror regeneration gate)
+	IgnoreExternal bool   // boot the embedded-only catalog, naming each ignored external package on stderr
 }
 
 // RunLocalHTTPServerWithBindings serves Local Mnemon from a binding manifest. It is the product boot
@@ -90,7 +97,11 @@ type ServeOptions struct {
 // Tick + DrainOutbox and re-projecting each recorded host's managed definition files when an
 // invalidation drained. A driver error stops the driver (logged to stderr); the hot path serves on.
 func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string, loaded channel.LoadedBindings, opts ServeOptions, out io.Writer) error {
-	rt, err := OpenLocalRuntime(storePath, loaded, opts.Loops)
+	catalog, err := resolveBootCatalog(opts.ProjectRoot, opts.IgnoreExternal, os.Stderr)
+	if err != nil {
+		return err
+	}
+	rt, err := OpenLocalRuntime(storePath, loaded, opts.Loops, catalog)
 	if err != nil {
 		return err
 	}
@@ -104,6 +115,29 @@ func RunLocalHTTPServerWithBindings(ctx context.Context, addr, storePath string,
 		}()
 	}
 	return runtime.ServeRuntime(ctx, addr, rt, channel.NewBindingAuthenticator(loaded), out)
+}
+
+// resolveBootCatalog resolves the capability catalog ONCE at boot. Default: embedded Builtins +
+// every external package under <projectRoot>/.mnemon/loops via capability.ResolveCatalog
+// (requiredFields = kernel.DefaultSchemaGuard().Required — app owns the kernel import; capability
+// stays a contract-level leaf), fail-closed: a bad external package REFUSES to start Local Mnemon
+// — the directory's presence is a contract, not a hint. ignoreExternal is the operator escape
+// hatch (`local run --ignore-external`): boot the embedded-only catalog and name each ignored
+// package on errw, one line per package, so what is offline is visible, never silent.
+func resolveBootCatalog(projectRoot string, ignoreExternal bool, errw io.Writer) (map[string]capability.Capability, error) {
+	if !ignoreExternal {
+		return capability.ResolveCatalog(projectRoot, kernel.DefaultSchemaGuard().Required)
+	}
+	entries, err := os.ReadDir(filepath.Join(projectRoot, ".mnemon", "loops"))
+	if err != nil {
+		return capability.Builtins, nil // absent (or unreadable) external root: nothing to ignore
+	}
+	for _, e := range entries {
+		if e.IsDir() || e.Type()&os.ModeSymlink != 0 {
+			fmt.Fprintf(errw, "mnemon-harness: --ignore-external: ignoring external package .mnemon/loops/%s\n", e.Name())
+		}
+	}
+	return capability.Builtins, nil
 }
 
 // serveReproject builds the driver's reproject callback: (a) re-project every recorded host's
