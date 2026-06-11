@@ -123,20 +123,21 @@ func TestDecodeHostMechanicsFailClosed(t *testing.T) {
 	wrap := func(mechanics string) []byte {
 		return []byte(`{"schema_version":2,"name":"x","mechanics":` + mechanics + `}`)
 	}
-	valid := `{"stdin_read":{"default":"tolerant"},"dialect":{"default":"plain"},"json_escape":false}`
+	valid := `{"stdin_read":{"default":"tolerant"},"dialect":{"default":"plain"},"json_escape":true}`
 	cases := map[string][]byte{
 		"missing mechanics":   []byte(`{"schema_version":2,"name":"x"}`),
-		"unknown stdin idiom": wrap(`{"stdin_read":{"default":"buffered"},"dialect":{"default":"plain"},"json_escape":false}`),
-		"unknown dialect":     wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"yaml"},"json_escape":false}`),
-		"unknown json field":  wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"plain"},"json_escape":false,"shell":"zsh"}`),
+		"unknown stdin idiom": wrap(`{"stdin_read":{"default":"buffered"},"dialect":{"default":"plain"},"json_escape":true}`),
+		"json_escape false":   wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"plain"},"json_escape":false}`),
+		"unknown dialect":     wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"yaml"},"json_escape":true}`),
+		"unknown json field":  wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"plain"},"json_escape":true,"shell":"zsh"}`),
 		"trailing json":       wrap(valid + `{}`),
 		"unknown override timing": wrap(`{"stdin_read":{"default":"strict","overrides":{"memory":{"boot":"tolerant"}}},
-			"dialect":{"default":"plain"},"json_escape":false}`),
+			"dialect":{"default":"plain"},"json_escape":true}`),
 		"unknown override value": wrap(`{"stdin_read":{"default":"strict","overrides":{"memory":{"nudge":"buffered"}}},
-			"dialect":{"default":"plain"},"json_escape":false}`),
-		"unknown wording slot": wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"plain"},"json_escape":false,
+			"dialect":{"default":"plain"},"json_escape":true}`),
+		"unknown wording slot": wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"plain"},"json_escape":true,
 			"wording_overrides":{"memory":{"remind":{"texxt":"hi"}}}}`),
-		"unknown marker timing": wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"plain"},"json_escape":false,
+		"unknown marker timing": wrap(`{"stdin_read":{"default":"strict"},"dialect":{"default":"plain"},"json_escape":true,
 			"marker_overrides":{"memory":{"boot":false}}}`),
 	}
 	for name, raw := range cases {

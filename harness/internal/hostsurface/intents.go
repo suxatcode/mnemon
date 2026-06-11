@@ -3,6 +3,7 @@ package hostsurface
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -617,6 +618,13 @@ func validateResponse(timing string, response HookResponse, hasThreshold bool) e
 }
 
 func validateHostMechanics(mech HostMechanics) error {
+	// json_escape=false was the bare-interpolation migration record; no false-using host
+	// remains in the tree and the frozen face (host-mechanics-v1) declares the injection face
+	// closed PERMANENTLY — so false is now rejected outright (the frozen sentence's enforcement
+	// site).
+	if !mech.JSONEscape {
+		return errors.New("host mechanics: json_escape must be true (bare JSON interpolation is a closed injection face)")
+	}
 	stdinIdioms := map[string]bool{stdinTolerant: true, stdinStrict: true, stdinGrepDirect: true}
 	dialects := map[string]bool{dialectCodexContinue: true, dialectClaudeDecision: true, dialectSystemMessageOnly: true, dialectPlain: true}
 	if err := validateMechanicSelection("mechanics.stdin_read", mech.StdinRead, stdinIdioms); err != nil {

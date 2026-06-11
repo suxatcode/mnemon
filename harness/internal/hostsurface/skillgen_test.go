@@ -79,19 +79,26 @@ func TestPayloadContractTokenCoverage(t *testing.T) {
 				if !strings.Contains(rendered, `"`+f.Name+`":`) {
 					t.Errorf("payload skeleton must carry field %q", f.Name)
 				}
+				required := false
 				for _, v := range f.Validators {
 					switch v.ID {
 					case "required":
+						required = true
 						if !strings.Contains(row, "required") {
 							t.Errorf("field %q is required by the spec but its row says: %s", f.Name, row)
 						}
 					case "enum":
 						for _, value := range strings.Split(v.Params["values"], "|") {
-							if !strings.Contains(rendered, "`"+value+"`") {
+							// row-scoped: the value must be documented in THIS field's row,
+							// not merely appear anywhere in the document.
+							if !strings.Contains(row, "`"+value+"`") {
 								t.Errorf("enum value %q of field %q missing from the contract", value, f.Name)
 							}
 						}
 					}
+				}
+				if !required && !strings.HasPrefix(strings.TrimSpace(strings.SplitN(strings.TrimPrefix(row, "| `"+f.Name+"` |"), "|", 2)[0]), "optional") {
+					t.Errorf("field %q is optional by the spec but its requirement cell says: %s", f.Name, row)
 				}
 			}
 			if !strings.Contains(rendered, tmpl.ExternalIDRecipe) {

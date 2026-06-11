@@ -12,6 +12,7 @@ loop packages need zero changes.
   "stdin_read":  { "default": "strict|tolerant|grep-direct", "overrides": {"<loop>": {"<timing>": "..."}} },
   "dialect":     { "default": "plain|system-message-only|codex-continue|claude-decision", "overrides": { ... } },
   "json_escape": true,
+  "marker_overrides": { "<loop>": { "<timing>": false } },
   "wording_overrides": { "<loop>": { "<timing>": { "<slot>": "host wording" } } }
 }
 ```
@@ -24,8 +25,12 @@ loop packages need zero changes.
   `claude-decision` (`{"decision","reason"}`). Field-name sets and escaping are COMPILED members;
   the JSON shape is not authorable.
 - **json_escape**: JSON dialects route interpolation through the compiled `json_escape` shell
-  function. `false` exists only as a migration record; new hosts must use `true` (the bare-
-  interpolation injection face is closed and stays closed).
+  function. `false` is REJECTED at validation (the bare-interpolation injection face is closed
+  and stays closed; the historical record lives in git, not in the schema).
+- **marker_overrides**: a host may drop a marker gate an intent declares (per loop/timing).
+  Validated strictly and currently unused — the last consumer was claude skill/prime, removed by
+  the recorded dedup-marker unification; kept in v1 because marker applicability is genuinely
+  host mechanics.
 - **wording_overrides**: the ONLY free text a host owns. Overrides that nothing consumes are
   render errors (misconfiguration is loud); slots reject shell-active characters.
 

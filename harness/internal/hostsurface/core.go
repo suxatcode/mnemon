@@ -178,6 +178,10 @@ func (c projectorCore) removeHostManifestLoop(loopName string) error {
 	return c.writeJSON(c.hostManifestPath(), manifest, 0o644)
 }
 
+// hostHookExists answers from the loop's declared intents. The error path collapses to false by
+// signature; that only affects uninstall bookkeeping (Ownership.Files) — an invalid intents file
+// cannot reach an installed workspace, because loop validate and projectHooks both fail closed on
+// it first.
 func (c projectorCore) hostHookExists(loopName, phase string) bool {
 	timings, err := DeclaredHookTimings(loopName)
 	if err != nil {
@@ -308,6 +312,9 @@ func (p projectorCore) projectHooks(loop manifest.LoopManifest, binding manifest
 	timings, err := DeclaredHookTimings(loop.Name)
 	if err != nil {
 		return fmt.Errorf("hook intents for %s: %w", loop.Name, err)
+	}
+	if len(timings) == 0 && len(loop.Assets.HookPrompts) > 0 {
+		return fmt.Errorf("loop %s declares hook_prompts but no hook intents: refusing to install zero hooks", loop.Name)
 	}
 	for _, phase := range timings {
 		content, err := RenderHook(loop.Name, p.host, phase)

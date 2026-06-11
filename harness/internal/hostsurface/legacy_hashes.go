@@ -6,6 +6,11 @@ package hostsurface
 // that predates ownership recording holds these exact bytes with no recorded prior;
 // classifyManaged adopts a match as ours so the generated replacement (incl. the claude compact
 // escape fix) reaches old workspaces — a REAL user edit never matches and is preserved as before.
+//
+// Scope notes (deliberate): adoption is CONTENT-keyed, not path-keyed — matching content is by
+// definition bytes we shipped, so adopting it at any managed path is safe. The table pins only
+// the LAST handwritten generation of each surface; earlier generations (and the codex projected
+// SKILL.md variants, which append a binding-derived runtime note) upgrade via uninstall+reinstall.
 var knownLegacyManagedHashes = map[string]bool{
 	"0281afc8283922df9ee4b7a1fabf9910776079c66b107f3d2d8179337ce3eec1": true, // hosts/claude-code/memory/hooks/compact.sh
 	"870336ca55cc85bb891f3abdfe6477bc851d4b7215476ffb4d70427c6be15c59": true, // hosts/claude-code/memory/hooks/nudge.sh
@@ -21,4 +26,6 @@ var knownLegacyManagedHashes = map[string]bool{
 	"466b4ccdfef70ec931db795d7885b8da98adc1ab10b63c6a6f44ebfe80fe470f": true, // hosts/codex/skill/hooks/compact.sh
 	"ad914b0849a1dc2a69c5580f9434b78e7bff15167bc74bf393cacfdd12169844": true, // hosts/codex/skill/hooks/nudge.sh
 	"93621a58110dcd1ee6ff97745dcac64e04436a7cb7a32f38c4d7b4df49270d64": true, // hosts/codex/skill/hooks/prime.sh
+	"0a2abd4211b03d9f8e327927b230ffe0bae10ba9f8574f9c8d53d26c553057fb": true, // legacy handwritten memory-set/SKILL.md (claude projection = canonical bytes)
+	"4f75d45525fa39f804e5d87e2b3038cc6afb77fc01cd18d8f69017648871d663": true, // legacy handwritten skill-manage/SKILL.md (claude projection = canonical bytes)
 }

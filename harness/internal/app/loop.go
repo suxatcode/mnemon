@@ -23,8 +23,11 @@ func (h *Harness) LoopValidate() ([]string, error) {
 	lines := result.Lines
 	// Stage-3: hooks are generated; validate renders for every embedded (host, loop) pair so a
 	// broken intents/mechanics/fragment combination fails HERE, not at install time.
-	hookLines, err := hostsurface.ValidateGeneratedHooks(
-		[]string{"codex", "claude-code"}, []string{"memory", "skill"})
+	hookHosts, hookLoops, err := hostsurface.EmbeddedHookUniverse()
+	if err != nil {
+		return nil, err
+	}
+	hookLines, err := hostsurface.ValidateGeneratedHooks(hookHosts, hookLoops)
 	if err != nil {
 		return nil, err
 	}

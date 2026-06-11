@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path"
+	"sort"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/assets"
@@ -108,9 +110,6 @@ func renderHook(loop, host, timing string, intent TimingIntent, mech HostMechani
 	}
 	if markerGate != nil && r.stdin == stdinGrepDirect {
 		return "", fmt.Errorf("%s/%s/%s: marker gates need a captured INPUT; stdin_read grep-direct is invalid here", host, loop, timing)
-	}
-	if inputGate != nil && markerGate != nil && r.stdin == stdinGrepDirect {
-		return "", fmt.Errorf("%s/%s/%s: grep-direct cannot combine with a marker gate", host, loop, timing)
 	}
 
 	var blocks []string
@@ -589,6 +588,29 @@ func DeclaredHookTimings(loop string) ([]string, error) {
 		}
 	}
 	return out, nil
+}
+
+// EmbeddedHookUniverse discovers the (hosts, loops-with-intents) coverage universe from the
+// embedded assets — derived, not hardcoded, so a future loop or host that ships hook data is
+// admitted to every gate (loop validate, golden pins) without editing a literal.
+func EmbeddedHookUniverse() (hosts, loops []string, err error) {
+	hostDirs, err := fs.Glob(assets.FS, "hosts/*/host.json")
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, h := range hostDirs {
+		hosts = append(hosts, path.Base(path.Dir(h)))
+	}
+	intentFiles, err := fs.Glob(assets.FS, "loops/*/hooks/intents.json")
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, f := range intentFiles {
+		loops = append(loops, path.Base(path.Dir(path.Dir(f))))
+	}
+	sort.Strings(hosts)
+	sort.Strings(loops)
+	return hosts, loops, nil
 }
 
 // ValidateGeneratedHooks is the loop-validate-time gate for the generated hook surface: every

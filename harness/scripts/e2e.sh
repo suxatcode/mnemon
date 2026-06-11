@@ -56,7 +56,7 @@ run_host() {
 		# observe a valid candidate -> synchronous tick admits -> kernel applies
 		local out
 		out="$("$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
-			--type memory.write_candidate_observed --external-id m1 \
+			--type memory.write_candidate.observed --external-id m1 \
 			--payload '{"content":"E2E memory works for '"$host"'","source":"user","confidence":"high"}')"
 		case "$out" in *ticked=true*) ;; *) echo "observe: $out"; exit 1 ;; esac
 
@@ -70,12 +70,13 @@ run_host() {
 
 		# negative: a secret-like candidate is denied; pull still shows exactly one resource
 		"$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
-			--type memory.write_candidate_observed --external-id bad1 \
+			--type memory.write_candidate.observed --external-id bad1 \
 			--payload '{"content":"api_key=sk-abcdefABCDEF123456","source":"user","confidence":"high"}' >/dev/null
 		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"
 		case "$out" in *resources=1*) ;; *) echo "negative pull leaked: $out"; exit 1 ;; esac
 
 		# 阶段一:写入即见 —— 不跑任何 prime,driver 在 invalidation 后自动再生镜像。
+		# (m2 deliberately keeps the legacy underscore type: the standing ALIAS PIN.)
 		"$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
 			--type memory.write_candidate_observed --external-id m2 \
 			--payload '{"content":"E2E driver mirror '"$host"'","source":"user","confidence":"high"}' >/dev/null
@@ -131,7 +132,7 @@ run_skill() {
 
 		local out
 		out="$("$MH" control observe --addr "$addr" --principal "$principal" --token-file "$tok" \
-			--type skill.write_candidate_observed --external-id s1 \
+			--type skill.write_candidate.observed --external-id s1 \
 			--payload '{"skill_id":"e2e-skill","name":"E2E Skill","status":"active","source":"user","confidence":"high"}')"
 		case "$out" in *ticked=true*) ;; *) echo "skill observe: $out"; exit 1 ;; esac
 		out="$("$MH" control pull --addr "$addr" --principal "$principal" --token-file "$tok")"

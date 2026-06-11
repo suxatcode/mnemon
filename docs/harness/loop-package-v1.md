@@ -32,8 +32,10 @@ data, wrong schema_version all fail closed):
 - **Response** (per timing): `role: one-liner | message | block` with `text` or threshold-selected
   `over`/`under` slots.
 - **Wording convention**: intents carry the canonical default text for every slot; hosts override
-  via host.json `wording_overrides` (host-mechanics-v1). Slots are PROSE ONLY — shell-active
-  characters are rejected at decode time.
+  via host.json `wording_overrides` (host-mechanics-v1). Slots are PROSE ONLY — the decoder rejects
+  `"`, `` ` ``, `\`, newlines and `$(`; everything else is inert because every slot
+  interpolation site in the compiled templates is double-quoted (that quoting context is part of
+  the frozen template contract).
 
 The vocabulary is CLOSED: a member not listed here does not exist; adding one is a versioned
 change to this document plus the compiled catalog.
@@ -42,10 +44,14 @@ change to this document plus the compiled catalog.
 
 Fragments are loop-side shell bodies referenced by `include{fragment}`. They are concatenated
 into the generated hook at GENERATION time and never evaluated by the generator or the runtime.
-**v1: fragments are valid only in EMBEDDED loop packages. An external package (stage 5) that
-contains `hooks/fragments/` or an `include` intent fails validation closed.** Relaxing this
-requires a new version of this document — external packages otherwise gain arbitrary shell
-execution on the host the moment they gain "same rights" loading.
+**v1: fragments are valid only in EMBEDDED loop packages.** Today this is enforced structurally —
+the renderer reads fragments exclusively from the embedded asset FS; no external loader exists.
+**Binding stage-5 obligation: any external-package loader MUST reject a package containing
+`hooks/fragments/`, an `include` intent, or a `skills/*/template.json` whose recipe/notes were not
+shipped embedded — fail closed, with a regression test, before external packages gain "same
+rights" loading.** (template.json recipe/notes are LLM-facing and recipe is shell-by-design; they
+carry the same trust requirement as fragments.) Relaxing any of this requires a new version of
+this document.
 
 ## SKILL generation rule
 
