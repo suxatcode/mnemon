@@ -41,6 +41,7 @@ func TestSyncTickAfterIngest(t *testing.T) {
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"agent": {"memory"}}},
 		Subs:      map[contract.ActorID]contract.Subscription{"agent": {Actor: "agent", Refs: []contract.ResourceRef{ref}}},
 		NewID:     seqGen(), Now: fixedNow(),
+		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}),
 	})
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)

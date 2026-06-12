@@ -24,7 +24,7 @@ func liveDecisions(t *testing.T, events []contract.Event) (*store.Store, []contr
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { s.Close() })
-	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), permissiveAuthority(events))
+	k := kernel.NewKernel(s, kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), permissiveAuthority(events))
 	r := reconcile.NewReconciler(s, k)
 	for _, ev := range events {
 		if _, err := s.AppendEvent(ev); err != nil {

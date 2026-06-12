@@ -231,7 +231,7 @@ func DefaultModes() Modes {
 	return Modes{Conflict: ConflictReject, Isolation: IsolationProjectionReadSet, Authz: AuthzStrict}
 }
 
-var KindCatalog = map[ResourceKind]bool{"memory": true, "goal": true, "skill": true, "lease": true, "budget": true, "receipt": true, "coordination": true, "note": true, "decision": true}
+var KindCatalog = map[ResourceKind]bool{"lease": true, "budget": true, "receipt": true, "coordination": true}
 
 // GovernanceKinds are the kernel-internal control-plane kinds (D3): their writes are kernel-produced,
 // never proposed by a capability. They are the compiled core a capability spec may NEVER declare

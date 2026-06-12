@@ -51,7 +51,7 @@ func TestIngestRejectsCrossPrincipalForgedProposed(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	rules := kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"alice": {"memory"}, "bob": {"memory"}}}
-	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), rules)
+	k := kernel.NewKernel(s, kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), rules)
 	subs := map[contract.ActorID]contract.Subscription{
 		"alice": {Actor: "alice", Refs: []contract.ResourceRef{{Kind: "memory", ID: "mem_a"}}},
 		"bob":   {Actor: "bob", Refs: []contract.ResourceRef{{Kind: "memory", ID: "mem_b"}}},

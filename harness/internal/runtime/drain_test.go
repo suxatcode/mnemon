@@ -17,6 +17,7 @@ func TestDrainOutboxClaimsInvalidations(t *testing.T) {
 		Rules:     rule.NewRuleSet(createOnObserve()),
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"agent": {"memory"}}},
 		Subs:      map[contract.ActorID]contract.Subscription{"agent": {Actor: "agent", Refs: []contract.ResourceRef{{Kind: "memory", ID: "m1"}}}},
+		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}}),
 	})
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
@@ -54,6 +55,7 @@ func TestDrainOutboxPrunesAckedRows(t *testing.T) {
 		Rules:     rule.NewRuleSet(createOnObserve()),
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"agent": {"memory"}}},
 		Subs:      map[contract.ActorID]contract.Subscription{"agent": {Actor: "agent", Refs: []contract.ResourceRef{{Kind: "memory", ID: "m1"}}}},
+		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}}),
 	})
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)

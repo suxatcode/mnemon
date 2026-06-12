@@ -29,7 +29,7 @@ func newStoreKernel(t *testing.T) (*store.Store, *kernel.Kernel) {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { s.Close() })
-	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), p1Rules())
+	k := kernel.NewKernel(s, kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), p1Rules())
 	return s, k
 }
 func createP(t *testing.T, k *kernel.Kernel, ref contract.ResourceRef, fields map[string]any) {
@@ -64,7 +64,7 @@ func newStoreWith(t *testing.T) *store.Store {
 // accept applies one accepted update against an existing store.
 func accept(t *testing.T, s *store.Store, ref contract.ResourceRef, basedOn contract.Version, fields map[string]any) {
 	t.Helper()
-	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), p1Rules())
+	k := kernel.NewKernel(s, kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), p1Rules())
 	updateP(t, k, ref, basedOn, fields)
 }
 

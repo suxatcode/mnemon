@@ -35,7 +35,7 @@ func mustCreate(t *testing.T, k *Kernel, kind contract.ResourceKind, id contract
 	}
 }
 func newKernel(t *testing.T) *Kernel {
-	return NewKernel(newTestStore(t), DefaultSchemaGuard(), permissiveRules())
+	return NewKernel(newTestStore(t), SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), permissiveRules())
 }
 
 func TestApplyMultiResourceAllOrNothing(t *testing.T) {
@@ -55,7 +55,7 @@ func TestApplyMultiResourceAllOrNothing(t *testing.T) {
 	}
 }
 func TestAuthzFailureIsRejectedNotDeferred(t *testing.T) {
-	k := NewKernel(newTestStore(t), DefaultSchemaGuard(), AuthorityRules{}) // nobody allowed
+	k := NewKernel(newTestStore(t), SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), AuthorityRules{}) // nobody allowed
 	d := k.Apply(contract.KernelOp{OpID: "op2", Actor: "codex@x", Writes: []contract.ResourceWrite{
 		{Ref: contract.ResourceRef{Kind: "memory", ID: "m1"}, Kind: contract.OpCreate, Fields: map[string]any{"content": "a"}}}}, p0Modes())
 	if d.Status != contract.Rejected || d.NextAction != "" {

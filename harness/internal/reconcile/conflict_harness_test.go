@@ -25,7 +25,7 @@ func newRecon(t *testing.T) (*store.Store, *kernel.Kernel) {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { s.Close() })
-	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), rules())
+	k := kernel.NewKernel(s, kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), rules())
 	return s, k
 }
 func casModes() contract.Modes {

@@ -51,7 +51,7 @@ func newServerWith(t *testing.T, rs rule.RuleSet) (*store.Store, *kernel.Kernel,
 	}
 	t.Cleanup(func() { s.Close() })
 	rules := kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"agent": {"memory"}}}
-	k := kernel.NewKernel(s, kernel.DefaultSchemaGuard(), rules)
+	k := kernel.NewKernel(s, kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}), rules)
 	cs := New(s, k, rs, agentSubs(), p0Modes(), seqGen(), fixedNow())
 	if d := k.Apply(contract.KernelOp{OpID: "seed", Actor: "agent", Writes: []contract.ResourceWrite{
 		{Ref: contract.ResourceRef{Kind: "memory", ID: "m1"}, Kind: contract.OpCreate, Fields: map[string]any{"content": "v0"}}}}, p0Modes()); d.Status != contract.Accepted {

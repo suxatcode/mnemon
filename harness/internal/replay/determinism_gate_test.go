@@ -22,6 +22,7 @@ func gateRuntime(t *testing.T) *runtime.Runtime {
 		Rules:     rule.NewRuleSet(capability.EmbeddedCatalog()["memory"].Rule(gateActor, ref, capability.Limits{})),
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{gateActor: {"memory"}}},
 		Subs:      map[contract.ActorID]contract.Subscription{gateActor: {Actor: gateActor, Refs: []contract.ResourceRef{ref}}},
+		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}),
 	})
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)

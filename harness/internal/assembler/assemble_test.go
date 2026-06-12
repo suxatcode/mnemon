@@ -352,7 +352,14 @@ func TestAssembleAdmitsDecisionCapabilityEndToEnd(t *testing.T) {
 // Header⊇SchemaGuard 锁步:每个内置能力的渲染产物必须覆盖其 kind 的全部必填字段——
 // 否则 spec 文件能声明一个 kernel 永远拒绝的能力(装配期可发现的缺陷不留到运行期)。
 func TestBuiltinHeadersSatisfySchemaGuard(t *testing.T) {
-	guard := kernel.DefaultSchemaGuard()
+	// Post-graduation, a kind's required header IS the capability's RequiredHeader (the assembler
+	// registers it). Build the guard from the caps and assert each cap's rendered fields satisfy its
+	// own kind's required — the render⊇required lockstep, now derived from the spec.
+	extra := map[contract.ResourceKind][]string{}
+	for _, cap := range capability.EmbeddedCatalog() {
+		extra[cap.ResourceKind] = cap.RequiredHeader
+	}
+	guard := kernel.SchemaGuardWith(extra)
 	for id, cap := range capability.EmbeddedCatalog() {
 		item, err := cap.Decode(minimalAcceptPayload(id))
 		if err != nil {

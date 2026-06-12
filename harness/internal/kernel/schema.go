@@ -11,28 +11,36 @@ type SchemaGuard struct {
 }
 
 func DefaultSchemaGuard() SchemaGuard {
+	// DefaultSchemaGuard carries ONLY the GOVERNANCE kinds — kernel-internal control-plane state whose
+	// writes the kernel produces (D3). User kinds (memory/skill and any declared/external kind) are
+	// NOT compiled here: the assembler registers each enabled capability's kind + required header onto
+	// this base (PD2), so the live guard is governance ∪ enabled caps. memory/skill are ordinary
+	// first-party packages (PD5 graduation), registered exactly like an external kind.
 	return SchemaGuard{Required: map[contract.ResourceKind][]string{
-		"memory": {"content"},
-		"goal":   {"statement"},
-		"skill":  {"name"},
-		// lease/budget/receipt are GOVERNANCE resource kinds (D3): versioned control-plane state whose
-		// required fields back fencing, budget accounting, and the durable record of an external effect.
-		// Kept registered for compatibility of existing logs and external-package reservation checks.
-		// Must stay in lockstep with contract.KindCatalog (kind_catalog_test).
+		// lease/budget/receipt are versioned control-plane state whose required fields back fencing,
+		// budget accounting, and the durable record of an external effect. Lockstep with
+		// contract.KindCatalog == GovernanceKinds (kind_catalog_test).
 		"lease":   {"job_id", "owner", "fence_until"},
 		"budget":  {"limit_usd", "spent_usd"},
 		"receipt": {"job_id", "effect_id", "outcome"},
 		// coordination records a governed teamwork-topology op (P2.2 route 3/3); operation is the
-		// minimal required field. Must stay in lockstep with contract.KindCatalog (kind_catalog_test).
+		// minimal required field. Lockstep with contract.KindCatalog (kind_catalog_test).
 		"coordination": {"operation"},
-		// note is the Phase-2 3rd capability proving config-only assembly; the generic kind renders
-		// items into content. Must stay in lockstep with contract.KindCatalog (kind_catalog_test).
-		"note": {"content"},
-		// decision is the stage-2 4th capability: a spec file + this line is its ENTIRE Go footprint
-		// (the L2 one-line registration the platform promises). Lockstep with contract.KindCatalog.
-		"decision": {"content"},
 	}}
 }
+// SchemaGuardWith returns the governance DefaultSchemaGuard extended with the given user-kind
+// required fields. The live runtime gets these from the assembler (each enabled capability's
+// declared required header); SchemaGuardWith is for callers that build a kernel WITHOUT assembling a
+// catalog (tests using a canonical user kind, and any hand-built config) — they name the kinds they
+// need rather than relying on a privileged default.
+func SchemaGuardWith(extra map[contract.ResourceKind][]string) SchemaGuard {
+	g := DefaultSchemaGuard()
+	for k, v := range extra {
+		g.Required[k] = v
+	}
+	return g
+}
+
 func (g SchemaGuard) Validate(kind contract.ResourceKind, fields map[string]any) error {
 	required, known := g.Required[kind]
 	if !known {

@@ -34,6 +34,7 @@ func bootRuntime(t *testing.T) *runtime.Runtime {
 		Rules:     rule.NewRuleSet(createRule()),
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{"agent": {"memory"}}},
 		Subs:      map[contract.ActorID]contract.Subscription{"agent": {Actor: "agent", Refs: []contract.ResourceRef{{Kind: "memory", ID: "m1"}}}},
+		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}, "goal": {"statement"}}),
 	})
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)

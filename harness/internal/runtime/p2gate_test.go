@@ -41,6 +41,7 @@ func TestP2ChannelEndToEnd(t *testing.T) {
 		Subs:      map[contract.ActorID]contract.Subscription{"codex": {Actor: "codex", Refs: []contract.ResourceRef{ref}}},
 		Bindings:  []channel.ChannelBinding{binding},
 		NewID:     seqGen(), Now: fixedNow(),
+		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}}),
 	})
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
@@ -82,6 +83,7 @@ func TestP2ChannelNegatives(t *testing.T) {
 			AllowedVerbs: []channel.Verb{channel.VerbObserve, channel.VerbPull, channel.VerbStatus}, AllowedObservedTypes: []string{"session.observed"},
 			SubscriptionScope: []contract.ResourceRef{ref}, IdempotencyNamespace: "host:codex",
 		}},
+		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}}),
 	})
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)

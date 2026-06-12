@@ -373,6 +373,13 @@ func OpenSyncImportRuntime(storePath string, refs []contract.ResourceRef) (*runt
 // the same three-rule set withSyncImport merges into the serving runtime, so the offline and
 // in-process import paths share one policy.
 func SyncImportRuntimeConfig(refs []contract.ResourceRef) runtime.RuntimeConfig {
+	// The sync-import kernel guard registers the importable kinds on top of the governance base
+	// (memory/skill are no longer compiled into DefaultSchemaGuard; PD5/PD6). TRANSITIONAL: the kinds
+	// are still named here because the import rules are hand-written; PD6 descriptor-derived import
+	// replaces this with a catalog-derived guard.
+	guard := kernel.DefaultSchemaGuard()
+	guard.Required["memory"] = []string{"content"}
+	guard.Required["skill"] = []string{"name"}
 	return runtime.RuntimeConfig{
 		Subs: map[contract.ActorID]contract.Subscription{
 			contract.SyncImportActor: {Actor: contract.SyncImportActor, Refs: refs},
@@ -384,5 +391,6 @@ func SyncImportRuntimeConfig(refs []contract.ResourceRef) runtime.RuntimeConfig 
 		Authority: kernel.AuthorityRules{Allow: map[contract.ActorID][]contract.ResourceKind{
 			contract.SyncImportActor: {"memory", "skill"},
 		}},
+		SchemaGuard: guard,
 	}
 }

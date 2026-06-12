@@ -7,7 +7,7 @@ import (
 )
 
 func TestSchemaGuardRejectsMissingField(t *testing.T) {
-	g := DefaultSchemaGuard()
+	g := SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}})
 	if g.Validate("memory", map[string]any{}) == nil {
 		t.Fatal("expected missing-content rejection")
 	}
