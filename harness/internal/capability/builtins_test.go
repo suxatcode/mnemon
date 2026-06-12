@@ -8,8 +8,8 @@ import (
 
 func TestBuiltinsLoadFromEmbeddedSpecs(t *testing.T) {
 	// memory/skill are the optional first-party packages; project_intent/assignment/progress_digest
-	// are the AgentTeam "coordination" first-party kinds (P3a, declarative path).
-	for _, id := range []string{"memory", "skill", "project_intent", "assignment", "progress_digest"} {
+	// are the AgentTeam "coordination" first-party kinds (P3a); loopdef is the D-loop kind (P3e).
+	for _, id := range []string{"memory", "skill", "project_intent", "assignment", "progress_digest", "loopdef"} {
 		cap, ok := EmbeddedCatalog()[id]
 		if !ok {
 			t.Fatalf("builtin %q must load from assets/capabilities", id)
@@ -25,9 +25,9 @@ func TestBuiltinsLoadFromEmbeddedSpecs(t *testing.T) {
 			t.Fatalf("%q must NOT be embedded (demoted to a test/external-package fixture)", id)
 		}
 	}
-	// Exactly the two optional packages + the three coordination kinds.
-	if len(EmbeddedCatalog()) != 5 {
-		t.Fatalf("EmbeddedCatalog() must be {memory, skill, project_intent, assignment, progress_digest}, got %d entries", len(EmbeddedCatalog()))
+	// Two optional packages + three coordination kinds + loopdef.
+	if len(EmbeddedCatalog()) != 6 {
+		t.Fatalf("EmbeddedCatalog() must be {memory, skill, project_intent, assignment, progress_digest, loopdef}, got %d entries", len(EmbeddedCatalog()))
 	}
 }
 

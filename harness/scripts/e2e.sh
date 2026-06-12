@@ -782,7 +782,7 @@ run_coordination() {
 		# the status FIELD section (P3d, tower seed) reports the coordination entry counts: each kind
 		# has one admitted entry (the evidence-less assignment was denied, so assignment=1 not 2).
 		out="$("$MH" control status --addr "http://$addr" --principal codex@project --token-file "$tok")"
-		case "$out" in *"Field: assignment=1, progress digest=1, project intent=1"*) ;; *) echo "status FIELD wrong: $out"; exit 1 ;; esac
+		case "$out" in *"Field: assignment=1, loopdef=0, progress digest=1, project intent=1"*) ;; *) echo "status FIELD wrong: $out"; exit 1 ;; esac
 		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
 		rm -f "$PIDFILE"
 	) || fail "coordination flow failed (see $WORK/run-coord.log)"
