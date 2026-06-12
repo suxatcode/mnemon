@@ -38,6 +38,11 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding, catalog map[st
 	}
 	var rules []rule.Rule
 	allow := map[contract.ActorID][]contract.ResourceKind{}
+	// The live kernel's schema guard is the governance core (kernel.DefaultSchemaGuard) PLUS each
+	// enabled capability's declared required header — so a declared user kind has ONE source, its
+	// capability spec (PD2). DefaultSchemaGuard returns a fresh map per call; add-only registration
+	// keeps a compiled kind's hand-written required while the transitional default still carries it.
+	guard := kernel.DefaultSchemaGuard()
 	for name, cc := range cfg.Capabilities {
 		if !cc.Enabled {
 			continue
@@ -50,6 +55,9 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding, catalog map[st
 		cap, ok := catalog[id]
 		if !ok {
 			return runtime.RuntimeConfig{}, fmt.Errorf("capability %q: unknown rule_ref %q (fail-closed)", name, cc.RuleRef)
+		}
+		if _, known := guard.Required[cap.ResourceKind]; !known {
+			guard.Required[cap.ResourceKind] = cap.RequiredHeader
 		}
 		defRef, err := parseRef(cc.ResourceRef)
 		if err != nil {
@@ -71,10 +79,11 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding, catalog map[st
 		}
 	}
 	return runtime.RuntimeConfig{
-		Bindings:  bindings,
-		Subs:      channel.SubsFromBindings(bindings),
-		Rules:     rule.NewRuleSet(rules...),
-		Authority: kernel.AuthorityRules{Allow: allow},
+		Bindings:    bindings,
+		Subs:        channel.SubsFromBindings(bindings),
+		Rules:       rule.NewRuleSet(rules...),
+		Authority:   kernel.AuthorityRules{Allow: allow},
+		SchemaGuard: guard,
 	}, nil
 }
 

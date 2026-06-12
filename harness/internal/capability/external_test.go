@@ -58,9 +58,9 @@ func TestLoadExternalFailClosedClasses(t *testing.T) {
 		{"class2 unknown render member",
 			map[string]string{"goal/capability.json": strings.Replace(goalSpecJSON, `"member":"bullet-list"`, `"member":"bogus-render"`, 1)},
 			[]string{".mnemon/loops/goal", "unknown render"}},
-		{"class3 kind outside KindCatalog",
-			map[string]string{"widget/capability.json": extSpec("widget", "widget", "widget")},
-			[]string{".mnemon/loops/widget", "not in KindCatalog"}},
+		{"class11 reserved first-party event family",
+			map[string]string{"sync/capability.json": extSpec("sync", "sync", "sync")},
+			[]string{".mnemon/loops/sync", "reserved first-party event family"}},
 		{"class6 hooks entry present",
 			map[string]string{"goal/capability.json": goalSpecJSON, "goal/hooks/prime.sh": "echo hi"},
 			[]string{".mnemon/loops/goal", "hooks/"}},
@@ -388,14 +388,17 @@ func TestResolveCatalogRejectsSymlinkedExternalRoot(t *testing.T) {
 	}
 }
 
-// 边界两侧一个文法:下划线名通过目录文法(失败点是 KindCatalog 成员资格——目录之门已让行),
-// dash 名在目录文法即拒(不会穿门后死在 FromSpec)。
+// 边界两侧一个文法:下划线名通过目录文法并作为声明式 kind 成功加载(capability-spec v2:
+// kind 不再需预注册于 KindCatalog);dash 名在目录文法即拒(不会穿门后死在 FromSpec)。
 func TestExternalDirectoryGrammarMatchesSpecNameGrammar(t *testing.T) {
 	root := t.TempDir()
 	writeExternalPackage(t, root, "my_loop", extSpec("my_loop", "my_loop", "my_loop"))
-	_, err := ResolveCatalog(root, testRequiredFields())
-	if err == nil || !strings.Contains(err.Error(), "not in KindCatalog") {
-		t.Fatalf("underscore name must pass the directory door and fail on kind membership, got %v", err)
+	catalog, err := ResolveCatalog(root, testRequiredFields())
+	if err != nil {
+		t.Fatalf("underscore name passes the directory door and loads as a declared kind, got %v", err)
+	}
+	if _, ok := catalog["my_loop"]; !ok {
+		t.Fatalf("declared kind my_loop must be in the resolved catalog: %v", catalog)
 	}
 
 	root2 := t.TempDir()

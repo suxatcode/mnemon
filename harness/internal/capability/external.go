@@ -26,12 +26,6 @@ const externalRootRel = ".mnemon/loops"
 // specNamePattern (one grammar across the boundary).
 var externalIdentifierPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 
-// externalReservedKinds are the kernel-internal GOVERNANCE resource kinds (control-plane state) no
-// external package may claim (class ⑪): their governed writes are kernel-produced, so a
-// static-literal header would satisfy the class-⑦ lockstep trivially while meaning nothing —
-// and an external claim would route untrusted specs into the coordination loop itself.
-var externalReservedKinds = map[string]bool{"lease": true, "budget": true, "receipt": true, "coordination": true}
-
 func externalPkgPath(name string) string { return externalRootRel + "/" + name }
 
 // LoadExternal compiles every external capability package under fsys. Each TOP-LEVEL directory is
@@ -117,13 +111,12 @@ func loadExternalPackage(fsys fs.FS, name string, requiredFields map[contract.Re
 	if spec.Name != name {
 		return Capability{}, fmt.Errorf("external package %s: directory name %q must equal spec name %q (directory-as-declaration)", pkg, name, spec.Name)
 	}
-	cap, err := FromSpec(spec) // classes ②③ + every FromSpec fail-closed check
+	// classes ②③ + every FromSpec fail-closed check, INCLUDING the G8 kind reservation (class ⑪):
+	// FromSpec rejects a governance/mnemon/reserved-family kind for first-party and external specs
+	// alike, so the external loader no longer needs its own deny-list.
+	cap, err := FromSpec(spec)
 	if err != nil {
 		return Capability{}, fmt.Errorf("external package %s: %w", pkg, err)
-	}
-	// Class ⑪: the kernel-internal job/coordination lanes are deny-listed for external claim.
-	if externalReservedKinds[spec.ResourceKind] {
-		return Capability{}, fmt.Errorf("external package %s: resource_kind %q is kernel-internal (control-plane job/coordination lane) and may not be claimed by an external package (fail-closed)", pkg, spec.ResourceKind)
 	}
 	// Class ⑨ (kind third): directory == name == kind in v1. Enablement derives the catalog entry
 	// from the binding scope KIND — a name/kind divergence would make the package unreachable (or

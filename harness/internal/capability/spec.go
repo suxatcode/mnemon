@@ -111,8 +111,14 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 	if want := spec.Name + eventTypeProposedSuffix; spec.ProposedType != want {
 		return Capability{}, fmt.Errorf("capability spec %q: proposed_type %q must be %q (frozen type grammar; the reconciler consumes only *.proposed)", spec.Name, spec.ProposedType, want)
 	}
-	if !contract.KindCatalog[contract.ResourceKind(spec.ResourceKind)] {
-		return Capability{}, fmt.Errorf("capability spec %q: resource_kind %q not in KindCatalog (fail-closed; register it in contract.KindCatalog + kernel.DefaultSchemaGuard first)", spec.Name, spec.ResourceKind)
+	// G8 reservation (capability-spec v2): a spec DECLARES its own resource kind — it needs no
+	// pre-registration in a compiled catalog (the assembly-time SchemaGuard learns the kind from
+	// this spec's required header). But it may NOT claim a kernel-internal governance kind (whose
+	// writes are kernel-produced), the reserved `mnemon` namespace, or a first-party event family
+	// whose diagnostics share a domain (sync/session/remote) — else an untrusted package could mint
+	// events that confound the control-plane or import-diagnostic families.
+	if err := reserveKind(spec.Name, spec.ResourceKind); err != nil {
+		return Capability{}, err
 	}
 	declared := map[string]bool{}
 	for _, f := range spec.Fields {
@@ -258,6 +264,26 @@ func decodeSpec(raw []byte) (CapabilitySpec, error) {
 // specNamePattern pins capability names to the intake event-type segment charset (server-side
 // validateObservedType allows [a-z0-9._]) — a name is the event-family segment by frozen grammar.
 var specNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// reservedKindFamilies are first-party event families whose `<family>.diagnostic` / `<family>.*`
+// events the platform mints (sync-import skip, host session, remote commit). A declared kind here
+// would let an untrusted package emit events the runtime routes by first-segment domain (G8).
+var reservedKindFamilies = map[string]bool{"sync": true, "session": true, "remote": true}
+
+// reserveKind is the G8 namespace gate for a declared resource kind (capability-spec v2): reject a
+// governance kind, the `mnemon` namespace, or a reserved first-party event family.
+func reserveKind(name, kind string) error {
+	if contract.GovernanceKinds[contract.ResourceKind(kind)] {
+		return fmt.Errorf("capability spec %q: resource_kind %q is a reserved kernel-internal governance kind (fail-closed)", name, kind)
+	}
+	if kind == "mnemon" || strings.HasPrefix(kind, "mnemon_") {
+		return fmt.Errorf("capability spec %q: resource_kind %q uses the reserved mnemon namespace (fail-closed)", name, kind)
+	}
+	if reservedKindFamilies[kind] {
+		return fmt.Errorf("capability spec %q: resource_kind %q is a reserved first-party event family (fail-closed)", name, kind)
+	}
+	return nil
+}
 
 // eventTypeGrammar is the CLOSED table of event-type forms the platform recognises, each a suffix
 // over a capability's family segment (= its kind). `declarable` forms are what a capability author

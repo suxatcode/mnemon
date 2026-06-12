@@ -64,7 +64,12 @@ func TestFromSpecFailsClosed(t *testing.T) {
 	mutate("unknown validator", func(s *CapabilitySpec) { s.Fields[0].Validators[0].ID = "regex" }, "unknown validator")
 	mutate("unknown render", func(s *CapabilitySpec) { s.Render.Content.Member = "html" }, "unknown render")
 	mutate("missing resource kind", func(s *CapabilitySpec) { s.ResourceKind = "" }, "missing resource_kind")
-	mutate("kind not in catalog", func(s *CapabilitySpec) { s.ResourceKind = "phantom" }, "not in KindCatalog")
+	// G8 reservation (capability-spec v2): a spec declares its OWN kind (a non-reserved kind like
+	// "phantom" now compiles — that is the declarative-kind feature), but may not claim a governance
+	// kind, the mnemon namespace, or a reserved first-party event family.
+	mutate("governance kind reserved", func(s *CapabilitySpec) { s.ResourceKind = "lease" }, "kernel-internal governance kind")
+	mutate("mnemon namespace reserved", func(s *CapabilitySpec) { s.ResourceKind = "mnemon" }, "reserved mnemon namespace")
+	mutate("reserved first-party family", func(s *CapabilitySpec) { s.ResourceKind = "sync" }, "reserved first-party event family")
 	mutate("dashed name", func(s *CapabilitySpec) { s.Name = "my-loop" }, "event-family segment")
 	mutate("foreign observed family", func(s *CapabilitySpec) {
 		s.ObservedType = "other.write_candidate.observed"

@@ -83,6 +83,60 @@ func TestAssembleAdmitsConfiguredNoteCapabilityEndToEnd(t *testing.T) {
 	}
 }
 
+// PD2 declared kinds: a capability whose resource kind is NOT in the compiled
+// kernel.DefaultSchemaGuard (a genuinely declared user kind) boots end-to-end — Assemble registers
+// its required header in the RuntimeConfig.SchemaGuard, and the live kernel admits its candidate.
+// This is the assembly-time declared kind set: the live known-kind set is governance ∪ enabled caps.
+func TestAssembleRegistersDeclaredKindNotInDefaultGuard(t *testing.T) {
+	if _, compiled := kernel.DefaultSchemaGuard().Required["widget"]; compiled {
+		t.Fatal("precondition: widget must NOT be a compiled kind for this test to prove declared-kind registration")
+	}
+	widgetSpec := capability.CapabilitySpec{
+		SchemaVersion: 1, Name: "widget",
+		ObservedType: "widget.write_candidate.observed", ProposedType: "widget.write.proposed",
+		ResourceKind: "widget", ItemsField: "items",
+		Fields: []capability.FieldSpec{{Name: "text", Validators: []capability.ValidatorRef{
+			{ID: "required", Params: map[string]string{"missing_style": "empty"}},
+		}}},
+		Render: capability.RenderSpec{Content: &capability.ContentRender{
+			Member: "bullet-list", Params: map[string]string{"title": "# Widgets", "field": "text"}}},
+	}
+	widgetCap, err := capability.FromSpec(widgetSpec)
+	if err != nil {
+		t.Fatalf("a declared (non-reserved) kind must compile: %v", err)
+	}
+	ref := contract.ResourceRef{Kind: "widget", ID: "project"}
+	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
+	binding.AllowedObservedTypes = []string{"widget.write_candidate.observed"}
+	cfg := config.File{Capabilities: map[string]config.CapabilityConfig{
+		"widget": {Enabled: true, ResourceRef: "widget/project", RuleRef: "native:widget"},
+	}}
+	rc, err := Assemble(cfg, []channel.ChannelBinding{binding}, map[string]capability.Capability{"widget": widgetCap})
+	if err != nil {
+		t.Fatalf("assemble: %v", err)
+	}
+	if _, known := rc.SchemaGuard.Required["widget"]; !known {
+		t.Fatal("Assemble must register the declared kind's schema guard entry from the capability")
+	}
+	rt, err := runtime.OpenRuntime(filepath.Join(t.TempDir(), "g.db"), rc)
+	if err != nil {
+		t.Fatalf("open runtime: %v", err)
+	}
+	defer rt.Close()
+	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
+		ExternalID: "w1",
+		Event:      contract.Event{Type: "widget.write_candidate.observed", Payload: map[string]any{"text": "a declared kind"}},
+	}); err != nil {
+		t.Fatalf("ingest widget: %v", err)
+	}
+	if _, err := rt.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	if v, _, err := rt.Resource(ref); err != nil || v == 0 {
+		t.Fatalf("the live kernel must admit the declared kind (v=%d err=%v)", v, err)
+	}
+}
+
 // Stage-5: Assemble selects from the PROVIDED catalog — a capability that exists only in an
 // external package (goal) resolves when the resolved catalog is passed, and fails closed when the
 // caller passes nil (nil = capability.Builtins, the backward-compatible seam).

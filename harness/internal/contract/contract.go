@@ -209,10 +209,12 @@ var (
 	AuthzCatalog     = map[string]bool{AuthzStrict: true} // only strict is implemented; the rest are reserved (see consts above)
 )
 
-// KindCatalog — the third define≠select guard (alongside the mode catalogs). The resolver checks
-// actor permissions and projection scopes against this; an actor may NOT be authorized to write, nor a
-// scope reference, a kind the schema guard does not know (else config could DEFINE a phantom kind that
-// the kernel silently accepts — an unknown kind has no required fields, so SchemaGuard.Validate passes).
+// KindCatalog documents the platform's compiled kinds and pins the kernel-test lockstep against
+// kernel.DefaultSchemaGuard. The define≠select guard at RUNTIME is the kernel SchemaGuard itself
+// (an unknown kind has no required fields, so SchemaGuard.Validate fails closed on it); since PD2
+// the live guard is the assembly-time set — GovernanceKinds ∪ the enabled capabilities' declared
+// kinds — so a USER kind need not appear here to be admitted (a declared external kind registers at
+// assembly). This map stays the compiled-default reference until memory/skill graduate (PD5).
 // Invariant: keys(kernel.DefaultSchemaGuard().Required) == KindCatalog (enforced by a kernel test).
 // lease/budget/receipt are GOVERNANCE resource kinds — first-class versioned resources (D3) whose
 // per-resource Version is the fence / CAS counter; receipt is the durable record of an external effect.
@@ -230,3 +232,11 @@ func DefaultModes() Modes {
 }
 
 var KindCatalog = map[ResourceKind]bool{"memory": true, "goal": true, "skill": true, "lease": true, "budget": true, "receipt": true, "coordination": true, "note": true, "decision": true}
+
+// GovernanceKinds are the kernel-internal control-plane kinds (D3): their writes are kernel-produced,
+// never proposed by a capability. They are the compiled core a capability spec may NEVER declare
+// (capability.FromSpec G8 reservation) and that the assembly-time SchemaGuard always carries. User
+// kinds, by contrast, are declared by capability specs and registered at assembly time — so the live
+// kernel's known-kind set is GovernanceKinds ∪ the enabled capabilities' kinds, not this compiled
+// KindCatalog (which now only pins the kernel-test lockstep and documents the platform kinds).
+var GovernanceKinds = map[ResourceKind]bool{"lease": true, "budget": true, "receipt": true, "coordination": true}
