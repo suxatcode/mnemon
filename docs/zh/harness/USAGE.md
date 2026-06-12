@@ -12,13 +12,13 @@ go build -o mnemon-harness ./harness/cmd/mnemon-harness
 把 memory 和 skill integration 安装到当前项目：
 
 ```sh
-./mnemon-harness setup --host codex --memory --skills --project-root .
+./mnemon-harness setup --host codex --loop memory --loop skill --project-root .
 ```
 
 使用 `--dry-run` 预览文件变化：
 
 ```sh
-./mnemon-harness setup --host codex --memory --skills --project-root . --dry-run
+./mnemon-harness setup --host codex --loop memory --loop skill --project-root . --dry-run
 ```
 
 ## 2. 运行 Local Mnemon

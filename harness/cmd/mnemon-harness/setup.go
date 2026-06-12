@@ -12,8 +12,6 @@ var (
 	setupProjectRoot string
 	setupHost        string
 	setupLoops       []string
-	setupMemory      bool
-	setupSkills      bool
 	setupPrincipal   string
 	setupControlURL  string
 	setupActorKind   string
@@ -21,11 +19,13 @@ var (
 	setupDryRun      bool
 )
 
-// setup is the everyday install front door: it projects memory/skill assets and
-// wires the Local Mnemon channel artifacts a projected host agent uses.
+// setup is the everyday install front door: it projects a loop's assets and wires
+// the Local Mnemon channel artifacts a projected host agent uses. Every integration
+// is a loop — memory and skill are ordinary first-party loops, enabled with
+// `--loop memory` / `--loop skill` like any other (PD7: no privileged flags).
 var setupCmd = &cobra.Command{
-	Use:   "setup --host HOST (--memory | --skills | --loop LOOP)",
-	Short: "Install Agent Integration for memory and skill",
+	Use:   "setup --host HOST --loop LOOP [--loop LOOP ...]",
+	Short: "Install Agent Integration for one or more loops",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_, err := app.New(setupRoot).Setup(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), app.SetupOptions{
 			Host:          setupHost,
@@ -58,7 +58,7 @@ var setupStatusCmd = &cobra.Command{
 }
 
 var setupUninstallCmd = &cobra.Command{
-	Use:   "uninstall --host HOST (--memory | --skills | --loop LOOP) --principal PRINCIPAL",
+	Use:   "uninstall --host HOST --loop LOOP [--loop LOOP ...] --principal PRINCIPAL",
 	Short: "Uninstall Agent Integration assets for a principal",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return app.New(setupRoot).SetupUninstall(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), app.SetupOptions{
@@ -74,9 +74,7 @@ func init() {
 	setupCmd.PersistentFlags().StringVar(&setupRoot, "root", ".", "repository root containing harness declarations")
 	setupCmd.PersistentFlags().StringVar(&setupProjectRoot, "project-root", "", "project root for Agent Integration artifacts (defaults to root)")
 	setupCmd.PersistentFlags().StringVar(&setupHost, "host", "", "Agent Integration host id")
-	setupCmd.PersistentFlags().StringArrayVar(&setupLoops, "loop", nil, "integration id; may be repeated")
-	setupCmd.PersistentFlags().BoolVar(&setupMemory, "memory", false, "install memory Agent Integration")
-	setupCmd.PersistentFlags().BoolVar(&setupSkills, "skills", false, "install skill Agent Integration")
+	setupCmd.PersistentFlags().StringArrayVar(&setupLoops, "loop", nil, "loop id to install (e.g. memory, skill, or an external package); may be repeated")
 	setupCmd.PersistentFlags().StringVar(&setupPrincipal, "principal", "", "Agent Integration principal")
 
 	setupCmd.Flags().StringVar(&setupControlURL, "control-url", "", "Local Mnemon endpoint URL")
@@ -90,24 +88,17 @@ func init() {
 	rootCmd.AddCommand(setupCmd)
 }
 
+// selectedSetupLoops dedupes the repeated --loop flag (every integration is a loop; PD7 removed the
+// privileged --memory/--skills shortcuts — memory and skill are now `--loop memory` / `--loop skill`).
 func selectedSetupLoops() []string {
 	seen := map[string]bool{}
 	var loops []string
-	add := func(loop string) {
+	for _, loop := range setupLoops {
 		if loop == "" || seen[loop] {
-			return
+			continue
 		}
 		seen[loop] = true
 		loops = append(loops, loop)
-	}
-	for _, loop := range setupLoops {
-		add(loop)
-	}
-	if setupMemory {
-		add("memory")
-	}
-	if setupSkills {
-		add("skill")
 	}
 	return loops
 }

@@ -124,7 +124,7 @@ func (h *Harness) Setup(ctx context.Context, out, errw io.Writer, opts SetupOpti
 		return SetupResult{}, fmt.Errorf("setup requires --host")
 	}
 	if len(opts.Loops) == 0 {
-		return SetupResult{}, fmt.Errorf("setup requires --memory, --skills, or at least one --loop")
+		return SetupResult{}, fmt.Errorf("setup requires at least one --loop (e.g. --loop memory --loop skill)")
 	}
 	if err := validateProductLoops(opts.Host, opts.Loops, opts.ProjectRoot); err != nil {
 		return SetupResult{}, err

@@ -41,7 +41,7 @@ run_host() {
 		local addr="http://127.0.0.1:$port"
 		local tok=".mnemon/harness/channel/credentials/$(printf '%s' "$principal" | tr '@' '-').token"
 
-		"$MH" setup --host "$host" --memory --principal "$principal" --control-url "$addr" >/dev/null
+		"$MH" setup --host "$host" --loop memory --principal "$principal" --control-url "$addr" >/dev/null
 
 		# start Local Mnemon (creates governed.db on first serve)
 		"$MH" local run >"$WORK/run-$host.log" 2>&1 &
@@ -98,7 +98,7 @@ run_host() {
 		# refresh no-clobber: hand-edit a projected GUIDE, refresh, assert the edit is preserved + reported
 		local guide="$configdir/mnemon-memory/GUIDE.md"
 		printf '# E2E USER EDIT\n\n%s' "$(cat "$guide")" >"$guide.tmp" && mv "$guide.tmp" "$guide"
-		out="$("$MH" refresh --host "$host" --memory)"
+		out="$("$MH" refresh --host "$host" --loop memory)"
 		case "$out" in *GUIDE.md*) ;; *) echo "refresh did not report GUIDE: $out"; exit 1 ;; esac
 		grep -q "E2E USER EDIT" "$guide" || { echo "refresh clobbered GUIDE"; exit 1; }
 
@@ -111,7 +111,7 @@ run_host() {
 }
 
 # run_skill exercises the SKILL loop end-to-end (the memory arm above covers the memory loop): setup
-# --skills, observe a skill candidate, tick, pull.
+# --loop skill, observe a skill candidate, tick, pull.
 run_skill() {
 	local host="$1" principal="$2" addr="http://127.0.0.1:8787"
 	CUR_HOST="$host-skill"
@@ -121,7 +121,7 @@ run_skill() {
 	(
 		cd "$proj"
 		local tok=".mnemon/harness/channel/credentials/$(printf '%s' "$principal" | tr '@' '-').token"
-		"$MH" setup --host "$host" --skills --principal "$principal" --control-url "$addr" >/dev/null
+		"$MH" setup --host "$host" --loop skill --principal "$principal" --control-url "$addr" >/dev/null
 		"$MH" local run >"$WORK/run-skill.log" 2>&1 &
 		local runpid=$!
 		echo "$runpid" >"$PIDFILE"
@@ -167,7 +167,7 @@ run_note() {
 	(
 		cd "$proj"
 		local tok=".mnemon/harness/channel/credentials/codex-project.token"
-		"$MH" setup --host codex --memory --principal "$principal" --control-url "$addr" >/dev/null
+		"$MH" setup --host codex --loop memory --principal "$principal" --control-url "$addr" >/dev/null
 
 		# The external packages: directory presence = capability declaration (loop-package-v1).
 		# capability.json carries the spec formerly embedded as assets/capabilities/note.json /
@@ -294,7 +294,7 @@ run_external_goal() {
 	(
 		cd "$proj"
 		local tok=".mnemon/harness/channel/credentials/codex-project.token"
-		"$MH" setup --host codex --memory --principal "$principal" --control-url "$addr" >/dev/null
+		"$MH" setup --host codex --loop memory --principal "$principal" --control-url "$addr" >/dev/null
 
 		# The external package: directory presence = capability declaration (loop-package-v1,
 		# "External capability packages").
@@ -434,8 +434,8 @@ run_foo_external() {
 	echo "=== E2E external loop-package projection (foo) ==="
 	(
 		cd "$proj"
-		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
-		"$MH" setup --host claude-code --memory --principal claude@project --control-url http://127.0.0.1:8899 >/dev/null
+		"$MH" setup --host codex --loop memory --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
+		"$MH" setup --host claude-code --loop memory --principal claude@project --control-url http://127.0.0.1:8899 >/dev/null
 
 		# Author writes a package DIRECTORY, then registers it via the product front door
 		# (`loop add`) — the minimal-onboarding path (P2): copy under the canonical name + validate
@@ -578,7 +578,7 @@ run_sync_pair() {
 	(
 		cd "$proja"
 		local tok=".mnemon/harness/channel/credentials/codex-project.token"
-		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
+		"$MH" setup --host codex --loop memory --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
 		"$MH" setup --host codex --loop journal --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
 		"$MH" sync connect hub --remote-url https://127.0.0.1:9787 \
 			--token-file "$hubdir/replica-a.token" --ca-file "$tlsdir/cert.pem" >/dev/null
@@ -604,7 +604,7 @@ run_sync_pair() {
 	(
 		cd "$projb"
 		local tok=".mnemon/harness/channel/credentials/codex-project.token"
-		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8899 >/dev/null
+		"$MH" setup --host codex --loop memory --principal codex@project --control-url http://127.0.0.1:8899 >/dev/null
 		"$MH" setup --host codex --loop journal --principal codex@project --control-url http://127.0.0.1:8899 >/dev/null
 		"$MH" sync connect hub --remote-url https://127.0.0.1:9787 \
 			--token-file "$hubdir/replica-b.token" --ca-file "$tlsdir/cert.pem" >/dev/null

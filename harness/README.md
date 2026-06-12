@@ -36,7 +36,7 @@ make harness-validate
 Install memory and skill integration for a host:
 
 ```sh
-./mnemon-harness setup --host codex --memory --skills --project-root .
+./mnemon-harness setup --host codex --loop memory --loop skill --project-root .
 ./mnemon-harness local run
 ./mnemon-harness status
 ```
@@ -44,7 +44,7 @@ Install memory and skill integration for a host:
 Remove projected assets for a principal:
 
 ```sh
-./mnemon-harness setup uninstall --host codex --memory --skills --principal codex@project --project-root .
+./mnemon-harness setup uninstall --host codex --loop memory --loop skill --principal codex@project --project-root .
 ```
 
 More command examples are in `docs/harness/USAGE.md`.

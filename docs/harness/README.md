@@ -48,7 +48,7 @@ go build -o mnemon-harness ./harness/cmd/mnemon-harness
 Install memory and skill integration for a project:
 
 ```sh
-./mnemon-harness setup --host codex --memory --skills --project-root .
+./mnemon-harness setup --host codex --loop memory --loop skill --project-root .
 ./mnemon-harness local run
 ./mnemon-harness status
 ```

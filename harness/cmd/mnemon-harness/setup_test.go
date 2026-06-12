@@ -15,17 +15,13 @@ import (
 
 func TestSetupProductFlagsSelectLoops(t *testing.T) {
 	oldLoops := setupLoops
-	oldMemory := setupMemory
-	oldSkills := setupSkills
 	t.Cleanup(func() {
 		setupLoops = oldLoops
-		setupMemory = oldMemory
-		setupSkills = oldSkills
 	})
 
-	setupLoops = []string{"memory"}
-	setupMemory = true
-	setupSkills = true
+	// Every integration is a loop now (PD7: no --memory/--skills); selectedSetupLoops only dedupes
+	// the repeated --loop flag, preserving first-seen order.
+	setupLoops = []string{"memory", "skill", "memory"}
 
 	got := selectedSetupLoops()
 	want := []string{"memory", "skill"}
@@ -40,8 +36,7 @@ func TestSetupCommandUsesProductDefaults(t *testing.T) {
 	setupRoot = cmdRepoRoot(t)
 	setupProjectRoot = projectRoot
 	setupHost = "codex"
-	setupMemory = true
-	setupSkills = true
+	setupLoops = []string{"memory", "skill"}
 	setupPrincipal = ""
 	setupControlURL = ""
 	setupUseToken = false
@@ -96,8 +91,6 @@ func restoreSetupFlags(t *testing.T) {
 	oldProjectRoot := setupProjectRoot
 	oldHost := setupHost
 	oldLoops := setupLoops
-	oldMemory := setupMemory
-	oldSkills := setupSkills
 	oldPrincipal := setupPrincipal
 	oldControlURL := setupControlURL
 	oldActorKind := setupActorKind
@@ -108,8 +101,6 @@ func restoreSetupFlags(t *testing.T) {
 		setupProjectRoot = oldProjectRoot
 		setupHost = oldHost
 		setupLoops = oldLoops
-		setupMemory = oldMemory
-		setupSkills = oldSkills
 		setupPrincipal = oldPrincipal
 		setupControlURL = oldControlURL
 		setupActorKind = oldActorKind
@@ -120,8 +111,6 @@ func restoreSetupFlags(t *testing.T) {
 	setupProjectRoot = ""
 	setupHost = ""
 	setupLoops = nil
-	setupMemory = false
-	setupSkills = false
 	setupPrincipal = ""
 	setupControlURL = ""
 	setupActorKind = "host-agent"
@@ -144,8 +133,7 @@ func setupProductIntegration(t *testing.T, projectRoot string) {
 	setupRoot = cmdRepoRoot(t)
 	setupProjectRoot = projectRoot
 	setupHost = "codex"
-	setupMemory = true
-	setupSkills = true
+	setupLoops = []string{"memory", "skill"}
 	setupPrincipal = ""
 	setupControlURL = ""
 	setupUseToken = false
