@@ -233,22 +233,21 @@ func (p projectorCore) copyCommonCanonicalAssets(loop manifest.LoopManifest) err
 	return nil
 }
 
+// prepareLoopState seeds the loop's state dir from its DECLARATIONS (PD4 — no loop-name switch):
+// each declared runtime_file is copied in if missing (the mirror seed), and each declared state_dir
+// is created. memory declares MEMORY.md; skill declares its skills/proposals/reports dirs.
 func (p projectorCore) prepareLoopState(loop manifest.LoopManifest) error {
-	switch loop.Name {
-	case "memory":
-		for _, runtimeFile := range loop.Assets.RuntimeFiles {
-			if err := p.copyFileIfMissing(p.loopAsset(loop, runtimeFile), pathJoin(p.stateDir(loop.Name), runtimeFile), 0o644); err != nil {
-				return err
-			}
+	for _, runtimeFile := range loop.Assets.RuntimeFiles {
+		if err := p.copyFileIfMissing(p.loopAsset(loop, runtimeFile), pathJoin(p.stateDir(loop.Name), runtimeFile), 0o644); err != nil {
+			return err
 		}
-	case "skill":
-		for _, dir := range []string{"skills/active", "skills/stale", "skills/archived", "proposals", "reports"} {
-			if p.dryRun {
-				continue
-			}
-			if err := os.MkdirAll(p.resolve(pathJoin(p.stateDir(loop.Name), dir)), 0o755); err != nil {
-				return fmt.Errorf("mkdir %s: %w", dir, err)
-			}
+	}
+	for _, dir := range loop.StateDirs {
+		if p.dryRun {
+			continue
+		}
+		if err := os.MkdirAll(p.resolve(pathJoin(p.stateDir(loop.Name), dir)), 0o755); err != nil {
+			return fmt.Errorf("mkdir %s: %w", dir, err)
 		}
 	}
 	return nil

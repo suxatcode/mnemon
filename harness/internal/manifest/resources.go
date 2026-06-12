@@ -18,6 +18,10 @@ type LoopManifest struct {
 	// (the projector ensures it via the mnemon CLI when --store is set). Declarative replacement for
 	// the hardcoded loop.Name == "memory" gate (PD4); absent = not store-backed.
 	Store *LoopStore `json:"store,omitempty"`
+	// StateDirs are loop state directories the projector creates under the loop's state dir at
+	// install (declarative replacement for the hardcoded skill-loop scaffolding; PD4). Each is a
+	// safe relative path (no absolute, no "..").
+	StateDirs []string `json:"state_dirs,omitempty"`
 }
 
 type LoopStore struct {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"strings"
 )
 
 type ValidationResult struct {
@@ -132,6 +133,18 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 		}
 		if err := rejectUnknownKeys(store, allowedLoopStoreKeys, manifest); err != nil {
 			return fmt.Errorf("loop store %w", err)
+		}
+	}
+
+	if hasField(data, "state_dirs") {
+		dirs, err := stringSlice(data["state_dirs"])
+		if err != nil {
+			return fmt.Errorf("loop manifest invalid state_dirs: %s: %w", manifest, err)
+		}
+		for _, s := range dirs {
+			if s == "" || strings.HasPrefix(s, "/") || strings.Contains(s, "..") {
+				return fmt.Errorf("loop manifest unsafe state_dir %q (must be a non-empty relative path, no \"..\"): %s", s, manifest)
+			}
 		}
 	}
 
@@ -332,7 +345,7 @@ func readManifest(fsys fs.FS, name string, target any) error {
 var (
 	allowedLoopKeys = map[string]bool{
 		"schema_version": true, "name": true, "version": true, "description": true,
-		"surfaces": true, "assets": true, "store": true,
+		"surfaces": true, "assets": true, "store": true, "state_dirs": true,
 	}
 	allowedLoopStoreKeys = map[string]bool{"native": true}
 	allowedLoopAssetKeys = map[string]bool{

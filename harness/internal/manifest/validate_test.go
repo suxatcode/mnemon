@@ -111,6 +111,37 @@ func TestLoopStoreDeclaration(t *testing.T) {
 	}
 }
 
+// PD4 state_dirs sink: the declaration loads, and a path-traversal entry fails closed on both paths.
+func TestLoopStateDirsDeclaration(t *testing.T) {
+	root := t.TempDir()
+	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
+	good := `{
+  "schema_version": 2, "name": "memory",
+  "surfaces": { "projection": [], "observation": [] },
+  "assets": { "guide": "GUIDE.md", "env": "env.sh", "runtime_files": ["MEMORY.md"], "skills": ["skills/memory-get/SKILL.md"], "subagents": [] },
+  "state_dirs": ["skills/active", "proposals"]
+}`
+	writeFile(t, filepath.Join(root, "loops", "memory", "loop.json"), good)
+	loop, err := LoadLoop(os.DirFS(root), "memory")
+	if err != nil {
+		t.Fatalf("a loop declaring state_dirs must load: %v", err)
+	}
+	if len(loop.StateDirs) != 2 || loop.StateDirs[0] != "skills/active" {
+		t.Fatalf("state_dirs must decode, got %v", loop.StateDirs)
+	}
+
+	bad := `{
+  "schema_version": 2, "name": "memory",
+  "surfaces": { "projection": [], "observation": [] },
+  "assets": { "guide": "GUIDE.md", "env": "env.sh", "runtime_files": ["MEMORY.md"], "skills": ["skills/memory-get/SKILL.md"], "subagents": [] },
+  "state_dirs": ["../../etc"]
+}`
+	writeFile(t, filepath.Join(root, "loops", "memory", "loop.json"), bad)
+	if _, err := ValidateFS(os.DirFS(root)); err == nil || !strings.Contains(err.Error(), "unsafe state_dir") {
+		t.Fatalf("ValidateFS must reject a path-traversal state_dir; got %v", err)
+	}
+}
+
 func TestValidateHarnessRejectsUnknownLoopKey(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
