@@ -928,6 +928,50 @@ run_subscription() {
 	echo "    subscription budget OK"
 }
 
+# run_tower proves the Agent Control Tower (P6): after the daemon admits a project_intent (GOAL) and
+# an assignment (FIELD), `tower --dump` renders the four read-only pages (GOAL/FIELD/INBOX/LEDGER) with
+# the governed data. The Tower opens the store directly (cross-actor reads the per-actor channel can't
+# serve), so the daemon is stopped first (single-writer, S11). READ-ONLY: --dump never writes or Ticks.
+run_tower() {
+	CUR_HOST="tower"
+	local proj="$WORK/proj-tower" addr="127.0.0.1:8792"
+	mkdir -p "$proj"
+	echo "=== E2E Control Tower (tower --dump) ==="
+	(
+		cd "$proj"
+		local tok=".mnemon/harness/channel/credentials/codex-project.token"
+		"$MH" setup --host codex --principal codex@project --control-url "http://$addr" >/dev/null
+		"$MH" local run >"$WORK/run-tower.log" 2>&1 &
+		local runpid=$!
+		echo "$runpid" >"$PIDFILE"
+		local up=0 i out
+		for i in $(seq 1 60); do
+			"$MH" control status --addr "http://$addr" --principal codex@project --token-file "$tok" >/dev/null 2>&1 && { up=1; break; }
+			sleep 0.1
+		done
+		[ "$up" = 1 ] || { cat "$WORK/run-tower.log"; exit 1; }
+		# seed GOAL (project_intent, mid-risk -> needs evidence) + FIELD (assignment with lease TTL)
+		"$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
+			--type project_intent.write_candidate.observed --external-id ti1 --payload '{"statement":"ship the AgentTeam beta","evidence":"roadmap"}' >/dev/null
+		"$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
+			--type assignment.write_candidate.observed --external-id ta1 --payload '{"scope":"fix projection","ttl":"2h","assignee":"codex@impl","evidence":"ticket"}' >/dev/null
+		# stop the daemon so the Tower can open the store (single-writer, S11)
+		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
+		rm -f "$PIDFILE"
+		# the Tower renders the four pages with the governed data
+		out="$("$MH" tower --dump 2>&1)"
+		local title
+		for title in "# GOAL" "# FIELD" "# INBOX" "# LEDGER"; do
+			case "$out" in *"$title"*) ;; *) echo "tower missing page $title:"; echo "$out"; exit 1 ;; esac
+		done
+		case "$out" in *"ship the AgentTeam beta"*) ;; *) echo "tower GOAL missing the project intent:"; echo "$out"; exit 1 ;; esac
+		case "$out" in *"fix projection"*) ;; *) echo "tower FIELD missing the assignment:"; echo "$out"; exit 1 ;; esac
+		case "$out" in *"codex@project"*) ;; *) echo "tower FIELD missing the agent:"; echo "$out"; exit 1 ;; esac
+	) || fail "tower flow failed (see $WORK/run-tower.log)"
+	sleep 0.3
+	echo "    Control Tower OK"
+}
+
 run_host codex codex@project 8787 .codex
 run_host claude-code claude@project 8899 .claude
 run_skill codex codex@project
@@ -940,5 +984,6 @@ run_daemon
 run_coordination
 run_dloop
 run_subscription
+run_tower
 
-echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair[memory+journal+assignment] + daemon + coordination + dloop + subscription)"
+echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair[memory+journal+assignment] + daemon + coordination + dloop + subscription + tower)"
