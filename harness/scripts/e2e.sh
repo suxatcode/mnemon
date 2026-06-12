@@ -869,6 +869,65 @@ run_dloop() {
 	echo "    D-loop governed event-model evolution OK"
 }
 
+# run_subscription proves the P4 context-budget acceptance ("packet 大小受预算约束"): a host endpoint
+# DECLARES budget=digest-only in its binding; after several memory writes its DERIVED MIRROR
+# (MEMORY.md) carries only the most-recent entry — the older entries are dropped by the LOCAL budget
+# transform (never a hub-side reduction). The authoritative pull still reports the resource present:
+# budget bounds PRESENTATION, not AUTHORITY (A4). The closed-set guard lives at the binding boundary.
+run_subscription() {
+	CUR_HOST="subscription"
+	local proj="$WORK/proj-sub" addr="127.0.0.1:8791"
+	mkdir -p "$proj"
+	echo "=== E2E subscription budget (digest-only context packet) ==="
+	(
+		cd "$proj"
+		local tok=".mnemon/harness/channel/credentials/codex-project.token"
+		"$MH" setup --host codex --loop memory --principal codex@project --control-url "http://$addr" >/dev/null
+		# the endpoint declares its context-budget tier: digest-only (latest entry only)
+		python3 - <<-'PYEOF'
+		import json
+		p = ".mnemon/harness/channel/bindings.json"
+		doc = json.load(open(p))
+		doc["bindings"][0]["budget"] = "digest-only"
+		json.dump(doc, open(p, "w"), indent=2)
+		PYEOF
+		"$MH" local run >"$WORK/run-sub.log" 2>&1 &
+		local runpid=$!
+		echo "$runpid" >"$PIDFILE"
+		local up=0 i out
+		for i in $(seq 1 60); do
+			"$MH" control status --addr "http://$addr" --principal codex@project --token-file "$tok" >/dev/null 2>&1 && { up=1; break; }
+			sleep 0.1
+		done
+		[ "$up" = 1 ] || { cat "$WORK/run-sub.log"; exit 1; }
+		# three distinct memory writes -> three admitted entries (full authority)
+		local n
+		for n in 1 2 3; do
+			out="$("$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
+				--type memory.write_candidate.observed --external-id "sub$n" \
+				--payload '{"content":"budget entry '"$n"'","source":"user","confidence":"high"}')"
+			case "$out" in *ticked=true*) ;; *) echo "sub observe $n: $out"; exit 1 ;; esac
+		done
+		# the DERIVED MIRROR is budgeted to digest-only: the newest entry present, older ones dropped.
+		local mirror=".codex/mnemon-memory/MEMORY.md" seen=0
+		for i in $(seq 1 100); do
+			if grep -q "budget entry 3" "$mirror" 2>/dev/null && ! grep -q "budget entry 1" "$mirror" 2>/dev/null; then
+				seen=1; break
+			fi
+			sleep 0.1
+		done
+		[ "$seen" = 1 ] || { echo "digest-only mirror did not shrink to the newest entry:"; cat "$mirror" 2>/dev/null; exit 1; }
+		# AUTHORITY preserved (A4): the un-budgeted pull still reports the memory resource present —
+		# budget shrank the mirror, never what was admitted/stored.
+		out="$("$MH" control pull --addr "http://$addr" --principal codex@project --token-file "$tok")"
+		case "$out" in *resources=1*) ;; *) echo "authority pull (want resources=1): $out"; exit 1 ;; esac
+		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
+		rm -f "$PIDFILE"
+	) || fail "subscription flow failed (see $WORK/run-sub.log)"
+	sleep 0.3
+	echo "    subscription budget OK"
+}
+
 run_host codex codex@project 8787 .codex
 run_host claude-code claude@project 8899 .claude
 run_skill codex codex@project
@@ -880,5 +939,6 @@ run_sync_pair
 run_daemon
 run_coordination
 run_dloop
+run_subscription
 
-echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair[memory+journal+assignment] + daemon + coordination + dloop)"
+echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair[memory+journal+assignment] + daemon + coordination + dloop + subscription)"
