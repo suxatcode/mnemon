@@ -424,6 +424,51 @@ run_external_goal() {
 	echo "    external goal package OK"
 }
 
+# run_foo_external proves loop-package-v2 (PD4): an EXTERNAL package that ships host assets
+# (loop.json + GUIDE + a skill) projects to BOTH hosts through the same machinery as a builtin —
+# no embedded loop, no embedded binding (the binding is derived host-side).
+run_foo_external() {
+	CUR_HOST="foo-external"
+	local proj="$WORK/proj-foo"
+	mkdir -p "$proj"
+	echo "=== E2E external loop-package projection (foo) ==="
+	(
+		cd "$proj"
+		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
+		"$MH" setup --host claude-code --memory --principal claude@project --control-url http://127.0.0.1:8899 >/dev/null
+
+		mkdir -p .mnemon/loops/foo/skills/foo-set
+		cat >.mnemon/loops/foo/capability.json <<-'JSONEOF'
+		{"schema_version":1,"name":"foo","observed_type":"foo.write_candidate.observed",
+		"proposed_type":"foo.write.proposed","resource_kind":"foo","items_field":"items",
+		"fields":[{"name":"text","validators":[{"id":"required","params":{"missing_style":"empty"}}]}],
+		"render":{"content":{"member":"bullet-list","params":{"title":"# Foo","field":"text"}}}}
+		JSONEOF
+		cat >.mnemon/loops/foo/loop.json <<-'JSONEOF'
+		{"schema_version":2,"name":"foo",
+		"surfaces":{"projection":[],"observation":[]},
+		"assets":{"guide":"GUIDE.md","env":"env.sh","skills":["skills/foo-set/SKILL.md"],"subagents":[]}}
+		JSONEOF
+		printf '# Foo\n\nA declarative external loop package.\n' >.mnemon/loops/foo/GUIDE.md
+		printf '#!/usr/bin/env bash\n' >.mnemon/loops/foo/env.sh
+		printf 'Use this to record a foo. Reject vague entries.\n' >.mnemon/loops/foo/skills/foo-set/SKILL.md
+
+		# Project foo to BOTH hosts.
+		"$MH" setup --host codex --loop foo --principal codex@project --control-url http://127.0.0.1:8787 >"$WORK/foo-codex.log" 2>&1 \
+			|| { echo "setup --loop foo (codex) failed"; cat "$WORK/foo-codex.log"; exit 1; }
+		"$MH" setup --host claude-code --loop foo --principal claude@project --control-url http://127.0.0.1:8899 >"$WORK/foo-claude.log" 2>&1 \
+			|| { echo "setup --loop foo (claude) failed"; cat "$WORK/foo-claude.log"; exit 1; }
+
+		[ -f .codex/mnemon-foo/GUIDE.md ] || { echo "foo GUIDE not projected to codex runtime surface"; exit 1; }
+		[ -f .codex/skills/foo-set/SKILL.md ] || { echo "foo skill not projected to codex"; exit 1; }
+		[ -f .claude/mnemon-foo/GUIDE.md ] || { echo "foo GUIDE not projected to claude runtime surface"; exit 1; }
+		[ -f .claude/skills/foo-set/SKILL.md ] || { echo "foo skill not projected to claude"; exit 1; }
+		grep -q "declarative external loop package" .codex/mnemon-foo/GUIDE.md || { echo "foo GUIDE content wrong"; exit 1; }
+	) || fail "foo external projection failed"
+	sleep 0.3
+	echo "    external loop-package projection (foo) OK"
+}
+
 # Both hosts run sequentially (the server is stopped between them). codex stays on the default
 # port (covering the bare default path); claude-code deliberately runs on a NON-default port to
 # pin the stage-0 promise that a bare `local run` listens where setup's --control-url pointed.
@@ -581,6 +626,7 @@ run_skill codex codex@project
 run_skill claude-code claude@project
 run_note
 run_external_goal
+run_foo_external
 run_sync_pair
 
-echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + sync-pair)"
+echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair)"

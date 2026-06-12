@@ -101,11 +101,7 @@ func RunClaudeProjector(ctx context.Context, action string, opts ClaudeOptions) 
 		return err
 	}
 	for _, loopName := range loops {
-		loop, err := manifest.LoadLoop(assets.FS, loopName)
-		if err != nil {
-			return err
-		}
-		binding, err := manifest.LoadBinding(assets.FS, "claude-code", loopName)
+		loop, binding, err := resolveLoopAndBinding("claude-code", loopName, projector.projectRoot, projector.paths.configDir)
 		if err != nil {
 			return err
 		}
@@ -131,11 +127,7 @@ func RunClaudeProjectorReport(ctx context.Context, opts ClaudeOptions) (Report, 
 		return Report{}, err
 	}
 	for _, loopName := range loops {
-		loop, err := manifest.LoadLoop(assets.FS, loopName)
-		if err != nil {
-			return Report{}, err
-		}
-		binding, err := manifest.LoadBinding(assets.FS, "claude-code", loopName)
+		loop, binding, err := resolveLoopAndBinding("claude-code", loopName, projector.projectRoot, projector.paths.configDir)
 		if err != nil {
 			return Report{}, err
 		}
@@ -217,11 +209,6 @@ func claudeProjectorPaths(opts claudeHostOptions) corePaths {
 }
 
 func (p claudeProjector) installLoop(ctx context.Context, loop manifest.LoopManifest, binding manifest.BindingManifest) error {
-	switch loop.Name {
-	case "memory", "skill":
-	default:
-		return fmt.Errorf("unsupported loop for Claude Code: %s", loop.Name)
-	}
 	p.beginManaged(loop.Name)
 	if err := p.copyCommonCanonicalAssets(loop); err != nil {
 		return err

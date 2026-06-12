@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -80,6 +81,58 @@ func (c projectorCore) assets() fs.FS {
 		return c.assetFS
 	}
 	return assets.FS
+}
+
+// resolveLoopAndBinding loads a loop's manifest (embedded or external, via the overlay) and its
+// projection binding: a first-party loop ships an embedded binding; an EXTERNAL package ships none,
+// so the binding is derived host-side (PD4). The asset-carrying external package thus projects with
+// the same machinery as a builtin.
+func resolveLoopAndBinding(host, loopName, projectRoot, configDir string) (manifest.LoopManifest, manifest.BindingManifest, error) {
+	loop, err := manifest.LoadLoop(newLoopAssetOverlay(projectRoot), loopName)
+	if err != nil {
+		return manifest.LoopManifest{}, manifest.BindingManifest{}, err
+	}
+	binding, err := manifest.LoadBinding(assets.FS, host, loopName)
+	if errors.Is(err, fs.ErrNotExist) {
+		binding, err = deriveBinding(host, loopName, configDir)
+	}
+	if err != nil {
+		return manifest.LoopManifest{}, manifest.BindingManifest{}, err
+	}
+	return loop, binding, nil
+}
+
+// deriveBinding builds a host-side projection binding for an external loop package (which ships no
+// binding): projection path = host config dir, runtime surface = <config>/mnemon-<loop>, lifecycle
+// mapping copied from the host's host.json (the four hook timings), reconcile empty (manifest
+// metadata only). Host mechanics come from the embedded host.json — never the external package.
+func deriveBinding(host, loopName, configDir string) (manifest.BindingManifest, error) {
+	raw, err := fs.ReadFile(assets.FS, "hosts/"+host+"/host.json")
+	if err != nil {
+		return manifest.BindingManifest{}, fmt.Errorf("derive binding: read host %s mechanics: %w", host, err)
+	}
+	var hostDoc struct {
+		LifecycleMapping map[string]string `json:"lifecycle_mapping"`
+	}
+	if err := json.Unmarshal(raw, &hostDoc); err != nil {
+		return manifest.BindingManifest{}, fmt.Errorf("derive binding: parse host %s: %w", host, err)
+	}
+	lifecycle := map[string]string{}
+	for _, timing := range hookTimings {
+		if ev, ok := hostDoc.LifecycleMapping[timing]; ok {
+			lifecycle[timing] = ev
+		}
+	}
+	return manifest.BindingManifest{
+		SchemaVersion:    1,
+		Name:             host + "." + loopName,
+		Host:             host,
+		Loop:             loopName,
+		ProjectionPath:   configDir,
+		RuntimeSurface:   pathJoin(configDir, "mnemon-"+loopName),
+		LifecycleMapping: lifecycle,
+		Reconcile:        []string{},
+	}, nil
 }
 
 // pathJoin is the package's display-path primitive: forward-slash joins for the host

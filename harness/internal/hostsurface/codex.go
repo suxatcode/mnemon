@@ -82,11 +82,7 @@ func RunCodexProjector(ctx context.Context, action string, opts CodexOptions) er
 		return err
 	}
 	for _, loopName := range loops {
-		loop, err := manifest.LoadLoop(assets.FS, loopName)
-		if err != nil {
-			return err
-		}
-		binding, err := manifest.LoadBinding(assets.FS, "codex", loopName)
+		loop, binding, err := resolveLoopAndBinding("codex", loopName, projector.projectRoot, projector.paths.configDir)
 		if err != nil {
 			return err
 		}
@@ -115,11 +111,7 @@ func RunCodexProjectorReport(ctx context.Context, opts CodexOptions) (Report, er
 		return Report{}, err
 	}
 	for _, loopName := range loops {
-		loop, err := manifest.LoadLoop(assets.FS, loopName)
-		if err != nil {
-			return Report{}, err
-		}
-		binding, err := manifest.LoadBinding(assets.FS, "codex", loopName)
+		loop, binding, err := resolveLoopAndBinding("codex", loopName, projector.projectRoot, projector.paths.configDir)
 		if err != nil {
 			return Report{}, err
 		}
@@ -237,9 +229,6 @@ func codexProjectorPaths(opts codexHostOptions) corePaths {
 }
 
 func (p codexProjector) installLoop(ctx context.Context, loop manifest.LoopManifest, binding manifest.BindingManifest) error {
-	if loop.Name != "memory" && loop.Name != "skill" {
-		return fmt.Errorf("unsupported loop for Codex: %s", loop.Name)
-	}
 	p.beginManaged(loop.Name)
 	if err := p.copyCommonCanonicalAssets(loop); err != nil {
 		return err

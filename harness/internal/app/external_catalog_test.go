@@ -218,8 +218,8 @@ func TestSetupRejectsExternalLoopWithPinnedMessage(t *testing.T) {
 	_, err := New(root).Setup(context.Background(), &out, &errw, SetupOptions{
 		Host: "codex", Loops: []string{"goal"}, Principal: "codex@project", ProjectRoot: root,
 	})
-	if err == nil || !strings.Contains(err.Error(), "external packages carry no host assets; enable via config.loops + binding") {
-		t.Fatalf("setup --loop goal must fail with the pinned external-package message, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "external package declares no host assets (no loop.json)") {
+		t.Fatalf("setup --loop goal (capability-only, no loop.json) must fail with the no-host-assets message, got %v", err)
 	}
 
 	// A loop that is neither embedded nor an external package keeps the original diagnosis.

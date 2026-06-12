@@ -85,7 +85,13 @@ func validateProductLoops(host string, loops []string, projectRoot string) error
 		}
 		if !available[loop] {
 			if isExternalPackage(projectRoot, loop) {
-				return fmt.Errorf("loop %q: external packages carry no host assets; enable via config.loops + binding", loop)
+				// loop-package-v2 (PD4): an external package that ships a loop.json declares host
+				// assets and projects through the same machinery as a builtin; one carrying only a
+				// capability.json (admission-equal, no host assets) is still refused.
+				if hasExternalLoopManifest(projectRoot, loop) {
+					continue
+				}
+				return fmt.Errorf("loop %q: external package declares no host assets (no loop.json); enable via config.loops + binding", loop)
 			}
 			return fmt.Errorf("unsupported product loop %q for host %s; available: %s", loop, host, strings.Join(names, ", "))
 		}
@@ -98,6 +104,14 @@ func validateProductLoops(host string, loops []string, projectRoot string) error
 // there is nothing for setup to project.
 func isExternalPackage(projectRoot, loop string) bool {
 	fi, err := os.Stat(filepath.Join(projectRoot, ".mnemon", "loops", loop, "capability.json"))
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// hasExternalLoopManifest reports whether an external package ships a loop.json — the signal that it
+// carries host projection assets (loop-package-v2). Presence check only; the projector validates the
+// manifest at load.
+func hasExternalLoopManifest(projectRoot, loop string) bool {
+	fi, err := os.Stat(filepath.Join(projectRoot, ".mnemon", "loops", loop, "loop.json"))
 	return err == nil && fi.Mode().IsRegular()
 }
 
