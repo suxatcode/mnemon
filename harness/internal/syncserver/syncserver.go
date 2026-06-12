@@ -83,11 +83,12 @@ func New(st *store.Store, grants Grants, now func() string) *Server {
 	return &Server{store: st, grants: grants, now: now}
 }
 
-// Push adjudicates one batch per commit (sync-abi-v1 §4): accepted (appended, first sight of the
-// idempotency key), rejected (validation or scope-clamp failure, with diagnostic), or conflict
-// (idempotency-key reuse with DIFFERENT content only). Replaying an identical batch repeats the
-// accepted results and appends nothing. The request replica_id must match every commit's origin —
-// a mismatch rejects the whole request before any adjudication.
+// Push adjudicates one batch per commit (sync-abi-v2 §4): accepted (appended, first sight of the
+// idempotency key), rejected (structural-validation or scope-clamp failure, with diagnostic), or
+// conflict (idempotency-key reuse with DIFFERENT content only). The accept surface is the grant
+// scope — the ref-level clamp is the sole kind/ref gate (no global syncable-kind set; v2). Replaying
+// an identical batch repeats the accepted results and appends nothing. The request replica_id must
+// match every commit's origin — a mismatch rejects the whole request before any adjudication.
 func (s *Server) Push(principal contract.ActorID, req contract.SyncPushRequest) (contract.SyncPushResponse, error) {
 	grant, ok := s.grants.Grant(principal, contract.SyncVerbPush)
 	if !ok {

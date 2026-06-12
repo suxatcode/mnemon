@@ -1,5 +1,13 @@
 # Sync ABI v1 (v1, FROZEN)
 
+> Superseded by `sync-abi-v2.md` (P2 / PD6, 2026-06-12). v2 makes the syncable-kind set
+> descriptor-derived: the hub's accept surface is the replica grant scope (not the deleted
+> `contract.SyncableResourceKinds`), the produce surface is the catalog's importable kinds, and the
+> sync-import observation renames `remote.<kind>.commit_observed` → `<kind>.remote_commit.observed`.
+> This document remains the v1 record for the UNCHANGED contract (wire verbs §1, grants §2, DTOs §3,
+> no-remote-reducer deviation §5, attribution map §7, T2 boundary §8, store ownership §9); the live
+> accept/produce/import surfaces follow v2 §4 and §6.
+>
 > Frozen 2026-06-12: the dual-replica e2e (run_sync_pair — push/pull roundtrip over TLS
 > with attribution, offline I13, authn baseline) passed; per the stage-6 precondition the ABI
 > freezes at stage close against TWO consumers (runtime co-hosted hub + mnemon-hub), not one.
