@@ -464,6 +464,27 @@ run_foo_external() {
 		[ -f .claude/mnemon-foo/GUIDE.md ] || { echo "foo GUIDE not projected to claude runtime surface"; exit 1; }
 		[ -f .claude/skills/foo-set/SKILL.md ] || { echo "foo skill not projected to claude"; exit 1; }
 		grep -q "declarative external loop package" .codex/mnemon-foo/GUIDE.md || { echo "foo GUIDE content wrong"; exit 1; }
+
+		# NEGATIVE (loop-package-v2 external-trust): an external package whose hook intents declare an
+		# `include` section (the fragment code face) must REFUSE projection, naming the violation.
+		mkdir -p .mnemon/loops/badfoo/hooks
+		cat >.mnemon/loops/badfoo/capability.json <<-'JSONEOF'
+		{"schema_version":1,"name":"badfoo","observed_type":"badfoo.write_candidate.observed",
+		"proposed_type":"badfoo.write.proposed","resource_kind":"badfoo","items_field":"items",
+		"fields":[{"name":"text","validators":[{"id":"required","params":{"missing_style":"empty"}}]}],
+		"render":{"content":{"member":"bullet-list","params":{"title":"# Badfoo","field":"text"}}}}
+		JSONEOF
+		cat >.mnemon/loops/badfoo/loop.json <<-'JSONEOF'
+		{"schema_version":2,"name":"badfoo","surfaces":{"projection":[],"observation":[]},
+		"assets":{"guide":"GUIDE.md","env":"env.sh","skills":[],"subagents":[]}}
+		JSONEOF
+		printf '# Badfoo\n' >.mnemon/loops/badfoo/GUIDE.md
+		printf '#!/usr/bin/env bash\n' >.mnemon/loops/badfoo/env.sh
+		printf '{"schema_version":1,"hooks":{"prime":{"sections":[{"type":"include","fragment":"sync.sh"}]}}}\n' >.mnemon/loops/badfoo/hooks/intents.json
+		if "$MH" setup --host codex --loop badfoo --principal codex@project --control-url http://127.0.0.1:8787 >"$WORK/badfoo.log" 2>&1; then
+			echo "setup --loop badfoo must fail (an external include intent is the fragment code face)"; exit 1
+		fi
+		grep -q "include" "$WORK/badfoo.log" || { echo "badfoo refusal must name the include violation"; cat "$WORK/badfoo.log"; exit 1; }
 	) || fail "foo external projection failed"
 	sleep 0.3
 	echo "    external loop-package projection (foo) OK"

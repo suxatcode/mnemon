@@ -88,9 +88,17 @@ func (c projectorCore) assets() fs.FS {
 // so the binding is derived host-side (PD4). The asset-carrying external package thus projects with
 // the same machinery as a builtin.
 func resolveLoopAndBinding(host, loopName, projectRoot, configDir string) (manifest.LoopManifest, manifest.BindingManifest, error) {
-	loop, err := manifest.LoadLoop(newLoopAssetOverlay(projectRoot), loopName)
+	overlay := newLoopAssetOverlay(projectRoot)
+	loop, err := manifest.LoadLoop(overlay, loopName)
 	if err != nil {
 		return manifest.LoopManifest{}, manifest.BindingManifest{}, err
+	}
+	// External package (no embedded loop.json): screen its host assets at load (the external-trust
+	// rules — reviewed first-party loops skip this).
+	if _, serr := fs.Stat(assets.FS, "loops/"+loopName+"/loop.json"); errors.Is(serr, fs.ErrNotExist) {
+		if verr := validateExternalLoopAssets(overlay, loop); verr != nil {
+			return manifest.LoopManifest{}, manifest.BindingManifest{}, verr
+		}
 	}
 	binding, err := manifest.LoadBinding(assets.FS, host, loopName)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -100,6 +108,56 @@ func resolveLoopAndBinding(host, loopName, projectRoot, configDir string) (manif
 		return manifest.LoopManifest{}, manifest.BindingManifest{}, err
 	}
 	return loop, binding, nil
+}
+
+// validateExternalLoopAssets enforces loop-package-v2's external-trust rules on an external package's
+// host assets at load (PD3/PD4, red-team MUST): the package may carry intents/skills, but the code
+// faces stay closed —
+//   - an `include` intent section is rejected (hook fragments are embedded-only);
+//   - a control-observe action's event_type must be the shared bootstrap (session.observed) or the
+//     package's OWN <kind>.* family — never another loop's family (the confused-deputy guard); and
+//   - a skill template's external_id_recipe is rejected (a shell recipe spliced into a bash fence).
+func validateExternalLoopAssets(fsys fs.FS, loop manifest.LoopManifest) error {
+	pkg := ".mnemon/loops/" + loop.Name
+	ownFamily := loop.Name + "."
+	if raw, err := fs.ReadFile(fsys, "loops/"+loop.Name+"/hooks/intents.json"); err == nil {
+		intents, derr := decodeHookIntents(raw)
+		if derr != nil {
+			return fmt.Errorf("external package %s: parse hooks/intents.json: %w", pkg, derr)
+		}
+		for timing, ti := range intents.Hooks {
+			for _, section := range ti.Sections {
+				if section.Type == sectionInclude {
+					return fmt.Errorf("external package %s: hook intents (%s) declare an `include` section; fragments are embedded-only (fail-closed)", pkg, timing)
+				}
+				for _, action := range section.Actions {
+					if action.Type == actionObserve && action.EventType != "session.observed" && !strings.HasPrefix(action.EventType, ownFamily) {
+						return fmt.Errorf("external package %s: hook observe event_type %q must be session.observed or the package's own %s* family (confused-deputy; fail-closed)", pkg, action.EventType, ownFamily)
+					}
+				}
+			}
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("external package %s: read hooks/intents.json: %w", pkg, err)
+	}
+	for _, skill := range loop.Assets.Skills {
+		tmplPath := "loops/" + loop.Name + "/" + path.Dir(skill) + "/template.json"
+		raw, err := fs.ReadFile(fsys, tmplPath)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("external package %s: read %s: %w", pkg, tmplPath, err)
+		}
+		tmpl, derr := decodeSkillTemplate(raw)
+		if derr != nil {
+			return fmt.Errorf("external package %s: parse %s: %w", pkg, tmplPath, derr)
+		}
+		if strings.TrimSpace(tmpl.ExternalIDRecipe) != "" {
+			return fmt.Errorf("external package %s: skill template %s declares external_id_recipe (a shell recipe); embedded-only (fail-closed)", pkg, tmplPath)
+		}
+	}
+	return nil
 }
 
 // deriveBinding builds a host-side projection binding for an external loop package (which ships no

@@ -57,7 +57,7 @@ the package path:
 The first (fragment directory presence) and the prose scan below are enforced by the capability
 loader (PD3). The deeper intents/template checks (the `include` section, the recipe, and that each
 control-observe action's `event_type` equals the package's own `observed_type`) are enforced by the
-boot-time projector loader where the schema-aware parsers live (PD4) — still fail-loud at load.
+projection loader where the schema-aware parsers live (setup/refresh) — fail-loud at load (PD4).
 
 ## Prose scanning (documentation-grade)
 
@@ -84,9 +84,9 @@ The dead `host_adapters` field is removed in the same revision.
 | external package carries host assets | ALLOWED (v2) — `hooks/`/`skills/` presence no longer rejects |
 | `hooks/fragments/` present → fail closed | capability loader: directory presence rejected (PD3) |
 | GUIDE.md / SKILL.md prose | capability loader: documentation-grade injection scan (PD3) |
-| `include` intent → fail closed | projector loader at boot: rejected, fail-loud (PD4) |
-| `template.json` `external_id_recipe` → fail closed | projector loader at boot: rejected (PD4) |
-| control-observe `event_type` == own `observed_type` | projector loader at boot: confused-deputy guard (PD4) |
+| `include` intent → fail closed | projection loader: rejected at setup/refresh, fail-loud (PD4 ✓) |
+| `template.json` `external_id_recipe` → fail closed | projection loader: rejected (PD4 ✓) |
+| control-observe `event_type` ∈ {session.observed, own family} | projection loader: confused-deputy guard (PD4 ✓) |
 | loop.json `env` shell-safe grammar + namespaced names | projector env sink: closed grammar (PD4) |
 | strict spec decode / no shadowing / untrusted spec surfaces / no symlinks | unchanged from v1 (capability loader) |
 
