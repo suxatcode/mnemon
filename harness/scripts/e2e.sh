@@ -494,9 +494,39 @@ run_foo_external() {
 # port (covering the bare default path); claude-code deliberately runs on a NON-default port to
 # pin the stage-0 promise that a bare `local run` listens where setup's --control-url pointed.
 
+# write_journal_pkg installs an EXTERNAL, declared-kind capability package ("journal") into a
+# project's .mnemon/loops. journal is memory-shaped (items_field "entries", memory-entry-list
+# render) and opts into Remote Workspace import via the closed-set entry-dedup strategy — a kind
+# whose name appears NOWHERE in the platform code. It is the PD6 proof object: that a novel kind
+# syncs end-to-end (produce -> hub accept -> pull -> import) purely by declaring sync.importable in
+# its descriptor, exercising the descriptor-derived produce surface (RuntimeConfig.SyncableKinds),
+# the grant-scope hub accept, and the catalog-derived import dispatch.
+write_journal_pkg() {
+	local dir="$1"
+	mkdir -p "$dir/.mnemon/loops/journal"
+	cat >"$dir/.mnemon/loops/journal/capability.json" <<-'JSONEOF'
+	{"schema_version":1,"name":"journal","observed_type":"journal.write_candidate.observed",
+	"proposed_type":"journal.write.proposed","resource_kind":"journal","items_field":"entries",
+	"fields":[{"name":"content","validators":[{"id":"required","params":{"missing_style":"empty"}},{"id":"safety:secret"},{"id":"safety:injection"}]},
+	{"name":"source","validators":[{"id":"required","params":{"missing_style":"missing"}}]},
+	{"name":"confidence","validators":[{"id":"required","params":{"missing_style":"missing"}}]}],
+	"render":{"content":{"member":"memory-entry-list"}},
+	"sync":{"importable":true,"merge":"entry-dedup"}}
+	JSONEOF
+	cat >"$dir/.mnemon/loops/journal/loop.json" <<-'JSONEOF'
+	{"schema_version":2,"name":"journal","surfaces":{"projection":[],"observation":[]},
+	"assets":{"guide":"GUIDE.md","env":"env.sh","skills":[],"subagents":[]}}
+	JSONEOF
+	printf '# Journal\n\nA declared external loop that syncs across replicas.\n' >"$dir/.mnemon/loops/journal/GUIDE.md"
+	printf '#!/usr/bin/env bash\n' >"$dir/.mnemon/loops/journal/env.sh"
+}
+
 # run_sync_pair proves the stage-6 Remote MVP on the product path: two replicas (A, B) sync
 # through a standalone mnemon-hub over TLS — A writes, the in-process sync worker pushes, B's
 # worker pulls and the content arrives via B's governed pull (attribution carried end to end).
+# It carries TWO kinds: embedded memory AND an external declared kind (journal) — the journal
+# round-trip is the PD6 proof that the descriptor-derived sync path is kind-agnostic (no kind
+# literal anywhere on the produce/accept/import surfaces).
 # Offline leg pins I13 (hub down = local fully functional); the bad-token leg pins authn on the
 # wire. Conflict adjudication (hub idempotency + B-side import conflict) is pinned at the Go
 # integration layer (syncserver_test.go, sync_import_test.go) per the v1.1 redefinition.
@@ -520,9 +550,9 @@ run_sync_pair() {
 	  "schema_version": 1,
 	  "replicas": [
 	    {"principal": "replica-a@hub", "credential_ref": "replica-a.token",
-	     "scopes": [{"kind": "memory", "id": "project"}, {"kind": "skill", "id": "project"}]},
+	     "scopes": [{"kind": "memory", "id": "project"}, {"kind": "skill", "id": "project"}, {"kind": "journal", "id": "project"}]},
 	    {"principal": "replica-b@hub", "credential_ref": "replica-b.token",
-	     "scopes": [{"kind": "memory", "id": "project"}]}
+	     "scopes": [{"kind": "memory", "id": "project"}, {"kind": "journal", "id": "project"}]}
 	  ]
 	}
 	JSON
@@ -536,11 +566,14 @@ run_sync_pair() {
 
 	local proja="$WORK/proj-sync-a" projb="$WORK/proj-sync-b"
 	mkdir -p "$proja" "$projb"
+	write_journal_pkg "$proja"
+	write_journal_pkg "$projb"
 	local apid="" bpid=""
 	(
 		cd "$proja"
 		local tok=".mnemon/harness/channel/credentials/codex-project.token"
 		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
+		"$MH" setup --host codex --loop journal --principal codex@project --control-url http://127.0.0.1:8787 >/dev/null
 		"$MH" sync connect hub --remote-url https://127.0.0.1:9787 \
 			--token-file "$hubdir/replica-a.token" --ca-file "$tlsdir/cert.pem" >/dev/null
 		"$MH" local run --sync-interval 100ms >"$WORK/run-sync-a.log" 2>&1 &
@@ -554,6 +587,11 @@ run_sync_pair() {
 		"$MH" control observe --addr http://127.0.0.1:8787 --principal codex@project --token-file "$tok" \
 			--type memory.write_candidate.observed --external-id sp1 \
 			--payload '{"content":"sync pair payload from replica A","source":"user","confidence":"high"}' >/dev/null
+		# journal (external declared kind): the PD6 kind-agnostic produce surface emits a sync commit
+		# for it exactly because its descriptor declares sync.importable — no kind literal in code.
+		"$MH" control observe --addr http://127.0.0.1:8787 --principal codex@project --token-file "$tok" \
+			--type journal.write_candidate.observed --external-id jp1 \
+			--payload '{"content":"journal entry from replica A","source":"user","confidence":"high"}' >/dev/null
 	) || fail "replica A flow failed (see $WORK/run-sync-a.log / $WORK/mnemon-hub.log)"
 	apid="$(cat "$WORK/sync-a.pid")"
 
@@ -561,22 +599,26 @@ run_sync_pair() {
 		cd "$projb"
 		local tok=".mnemon/harness/channel/credentials/codex-project.token"
 		"$MH" setup --host codex --memory --principal codex@project --control-url http://127.0.0.1:8899 >/dev/null
+		"$MH" setup --host codex --loop journal --principal codex@project --control-url http://127.0.0.1:8899 >/dev/null
 		"$MH" sync connect hub --remote-url https://127.0.0.1:9787 \
 			--token-file "$hubdir/replica-b.token" --ca-file "$tlsdir/cert.pem" >/dev/null
 		"$MH" local run --sync-interval 100ms >"$WORK/run-sync-b.log" 2>&1 &
 		echo $! >"$WORK/sync-b.pid"
-		local up=0 i seen=0
+		local up=0 i seen=0 jseen=0
 		for i in $(seq 1 60); do
 			"$MH" control status --addr http://127.0.0.1:8899 --principal codex@project --token-file "$tok" >/dev/null 2>&1 && { up=1; break; }
 			sleep 0.1
 		done
 		[ "$up" = 1 ] || { cat "$WORK/run-sync-b.log"; exit 1; }
 		# A worker pushes -> hub -> B worker pulls -> import re-enters intake -> governed pull sees it.
+		# Both the embedded memory entry AND the external journal entry must arrive — the journal arm
+		# proves the descriptor-derived sync path carries a kind the platform code never names.
 		for i in $(seq 1 100); do
-			if "$MH" control pull --json --addr http://127.0.0.1:8899 --principal codex@project --token-file "$tok" 2>/dev/null | grep -q "sync pair payload from replica A"; then
-				seen=1
-				break
-			fi
+			local bpull
+			bpull="$("$MH" control pull --json --addr http://127.0.0.1:8899 --principal codex@project --token-file "$tok" 2>/dev/null)"
+			case "$bpull" in *"sync pair payload from replica A"*) seen=1 ;; esac
+			case "$bpull" in *"journal entry from replica A"*) jseen=1 ;; esac
+			[ "$seen" = 1 ] && [ "$jseen" = 1 ] && break
 			sleep 0.2
 		done
 		# Diagnosable-flake margin (LOW-11): assert the hub actually RECEIVED A's push, separately
@@ -592,7 +634,8 @@ run_sync_pair() {
 			*'"hub_commits_received":'*) ;;
 			*) echo "unexpected hub status: $hubstatus"; exit 1 ;;
 		esac
-		[ "$seen" = 1 ] || { echo "B never saw A's commit within 20s (hub received the push: $hubstatus -> pull side failed)"; tail -5 "$WORK/run-sync-b.log"; exit 1; }
+		[ "$seen" = 1 ] || { echo "B never saw A's memory commit within 20s (hub received the push: $hubstatus -> pull side failed)"; tail -5 "$WORK/run-sync-b.log"; exit 1; }
+		[ "$jseen" = 1 ] || { echo "B never saw A's external journal commit within 20s (descriptor-derived sync path failed for a declared kind)"; tail -5 "$WORK/run-sync-b.log"; exit 1; }
 		# attribution: the import preserves A's entries VERBATIM (faithful provenance) and the
 		# write itself is attributed to the sync importer; the full origin chain (replica id,
 		# decision id) lives in B's event log + decisions, pinned by sync_import Go tests.
@@ -650,4 +693,4 @@ run_external_goal
 run_foo_external
 run_sync_pair
 
-echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair)"
+echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair[memory+journal])"
