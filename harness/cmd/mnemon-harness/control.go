@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/capability"
 	"github.com/mnemon-dev/mnemon/harness/internal/channel"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
@@ -149,8 +151,43 @@ var controlStatusCmd = &cobra.Command{
 		fmt.Fprintf(cmd.OutOrStdout(), "Agent Integration: %s\n", st.Principal)
 		fmt.Fprintf(cmd.OutOrStdout(), "Local Mnemon: ready (resources=%d, digest=%s)\n", st.Resources, st.Digest)
 		fmt.Fprintf(cmd.OutOrStdout(), "Sync: %d pending, %d synced, %d conflicts (local accepted, remote pending)\n", st.SyncPending, st.SyncSynced, st.SyncConflicts)
+		// FIELD section (P3d, the minimal Control Tower seed): the coordination entry counts derived
+		// client-side from a pull. The runtime stays capability-free, so kind-aware counts live here,
+		// over the default-enabled coordination kinds. Best-effort: a principal not bound to pull just
+		// omits the line rather than failing the status report. (agents / pending / diagnostics =
+		// server-side aggregation, deferred to the P6 Control Tower.)
+		fmt.Fprintln(cmd.OutOrStdout(), coordinationFieldLine(client, contract.ActorID(controlPrincipal)))
 		return nil
 	},
+}
+
+// coordinationFieldLine renders "Field: <kind>=<n>, …" over the default-enabled coordination kinds,
+// counting each kind's entries in the principal's pulled projection.
+func coordinationFieldLine(client *channel.Client, principal contract.ActorID) string {
+	proj, err := client.PullProjection(principal, contract.Subscription{Actor: principal})
+	if err != nil {
+		return "Field: (unavailable)"
+	}
+	var caps []capability.Capability
+	for _, c := range capability.EmbeddedCatalog() {
+		if c.DefaultEnabled {
+			caps = append(caps, c)
+		}
+	}
+	sort.Slice(caps, func(i, j int) bool { return caps[i].ResourceKind < caps[j].ResourceKind })
+	var parts []string
+	for _, c := range caps {
+		count := 0
+		for _, rc := range proj.Content {
+			if rc.Ref.Kind == c.ResourceKind {
+				if items, ok := rc.Fields[c.ItemsField].([]any); ok {
+					count = len(items)
+				}
+			}
+		}
+		parts = append(parts, fmt.Sprintf("%s=%d", strings.ReplaceAll(string(c.ResourceKind), "_", " "), count))
+	}
+	return "Field: " + strings.Join(parts, ", ")
 }
 
 func init() {
