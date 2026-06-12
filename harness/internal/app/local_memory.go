@@ -156,7 +156,9 @@ func withDefaultEnabledGrants(bindings []channel.ChannelBinding, catalog map[str
 	}
 	out := make([]channel.ChannelBinding, len(bindings))
 	for i, b := range bindings {
-		if b.ActorKind == contract.KindHostAgent {
+		// host-agents AND control-agents (operators) both govern the default-enabled kinds — an operator
+		// proposes loopdefs and approves high-risk candidates, so it needs the same default grant (P3e).
+		if b.ActorKind == contract.KindHostAgent || b.ActorKind == contract.KindControlAgent {
 			// An EMPTY AllowedObservedTypes already means allow-all (AllowsObservedType returns true),
 			// so coordination is permitted without listing it — and appending here would flip the
 			// binding to an explicit allow-list that EXCLUDES everything else. Only extend an explicit
