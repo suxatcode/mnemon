@@ -266,8 +266,8 @@ func (p claudeProjector) installLoop(ctx context.Context, loop manifest.LoopMani
 	p.printf("Installed Mnemon %s loop for Claude Code.\n", loop.Name)
 	p.printf("Config:       %s\n", p.paths.configDir)
 	p.printf("State:        %s\n", p.stateDir(loop.Name))
-	if loop.Name == "memory" {
-		p.printf("Memory:       %s\n", pathJoin(p.stateDir(loop.Name), "MEMORY.md"))
+	for _, runtimeFile := range loop.Assets.RuntimeFiles {
+		p.printf("Mirror:       %s\n", pathJoin(p.stateDir(loop.Name), runtimeFile))
 	}
 	if hostSkills := p.hostSkillsDir(loop.Name); hostSkills != "" {
 		p.printf("Host skills:  %s\n", hostSkills)
