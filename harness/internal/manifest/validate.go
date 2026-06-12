@@ -148,6 +148,18 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 		}
 	}
 
+	if raw, ok := data["env"]; ok {
+		var envs []EnvVar
+		if err := json.Unmarshal(raw, &envs); err != nil {
+			return fmt.Errorf("loop manifest invalid env: %s: %w", manifest, err)
+		}
+		for _, e := range envs {
+			if err := validateEnvVar(e.Name, e.Value); err != nil {
+				return fmt.Errorf("loop manifest %s: %w", manifest, err)
+			}
+		}
+	}
+
 	v.lines = append(v.lines, fmt.Sprintf("ok %s", name))
 	return nil
 }
@@ -345,7 +357,7 @@ func readManifest(fsys fs.FS, name string, target any) error {
 var (
 	allowedLoopKeys = map[string]bool{
 		"schema_version": true, "name": true, "version": true, "description": true,
-		"surfaces": true, "assets": true, "store": true, "state_dirs": true,
+		"surfaces": true, "assets": true, "store": true, "state_dirs": true, "env": true,
 	}
 	allowedLoopStoreKeys = map[string]bool{"native": true}
 	allowedLoopAssetKeys = map[string]bool{

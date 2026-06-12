@@ -22,6 +22,18 @@ type LoopManifest struct {
 	// install (declarative replacement for the hardcoded skill-loop scaffolding; PD4). Each is a
 	// safe relative path (no absolute, no "..").
 	StateDirs []string `json:"state_dirs,omitempty"`
+	// Env are the loop's extra runtime env vars, rendered into the runtime env.sh as
+	// `export NAME="VALUE"` (declarative replacement for the hardcoded per-loop env switch; PD4).
+	// Names are namespaced (^MNEMON_...) and values use a CLOSED shell-safe grammar — closed
+	// projector variables (${state_dir}, ${host_skills_dir}) the projector substitutes, runtime bash
+	// refs ${VAR} / ${VAR:-default}, and safe literals — so an external package can never inject
+	// shell into a sourced file (the env injection lock).
+	Env []EnvVar `json:"env,omitempty"`
+}
+
+type EnvVar struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type LoopStore struct {
@@ -56,6 +68,12 @@ func LoadLoop(fsys fs.FS, loop string) (LoopManifest, error) {
 	var manifest LoopManifest
 	if err := readManifest(fsys, path.Join("loops", loop, "loop.json"), &manifest); err != nil {
 		return LoopManifest{}, err
+	}
+	// Env injection lock on the struct decode path too (G6 — both paths agree, fail-closed).
+	for _, e := range manifest.Env {
+		if err := validateEnvVar(e.Name, e.Value); err != nil {
+			return LoopManifest{}, fmt.Errorf("loop %s: %w", loop, err)
+		}
 	}
 	return manifest, nil
 }

@@ -142,6 +142,25 @@ func TestLoopStateDirsDeclaration(t *testing.T) {
 	}
 }
 
+// PD4 env sink (injection lock): a loop.json env value carrying shell metacharacters fails closed
+// on both decode paths (struct LoadLoop + map ValidateFS).
+func TestLoopEnvInjectionRejected(t *testing.T) {
+	root := t.TempDir()
+	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")
+	writeFile(t, filepath.Join(root, "loops", "memory", "loop.json"), `{
+  "schema_version": 2, "name": "memory",
+  "surfaces": { "projection": [], "observation": [] },
+  "assets": { "guide": "GUIDE.md", "env": "env.sh", "runtime_files": ["MEMORY.md"], "skills": ["skills/memory-get/SKILL.md"], "subagents": [] },
+  "env": [ { "name": "MNEMON_X", "value": "$(rm -rf /)" } ]
+}`)
+	if _, err := LoadLoop(os.DirFS(root), "memory"); err == nil || !strings.Contains(err.Error(), "env value") {
+		t.Fatalf("LoadLoop must reject a shell-injection env value (struct path); got %v", err)
+	}
+	if _, err := ValidateFS(os.DirFS(root)); err == nil || !strings.Contains(err.Error(), "env value") {
+		t.Fatalf("ValidateFS must reject a shell-injection env value (map path); got %v", err)
+	}
+}
+
 func TestValidateHarnessRejectsUnknownLoopKey(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureHarness(t, root, "skills/memory-get/SKILL.md")

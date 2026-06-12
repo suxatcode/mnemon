@@ -31,5 +31,8 @@
   },
   "store": {
     "native": true
-  }
+  },
+  "env": [
+    { "name": "MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES", "value": "${MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES:-200}" }
+  ]
 }

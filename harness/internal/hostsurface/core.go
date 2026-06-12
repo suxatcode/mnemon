@@ -368,6 +368,11 @@ func (p projectorCore) writeLoopStatus(loop manifest.LoopManifest, binding manif
 	return p.writeJSON(pathJoin(p.stateDir(loop.Name), "status.json"), status, 0o644)
 }
 
+// runtimeEnvContent renders the loop's runtime env.sh from its DECLARATIONS (PD4 — no loop.Name
+// switch): the structural base (env-file + loop-dir vars) plus each declared env var, with the
+// closed projector variables (${state_dir}, ${host_skills_dir}) substituted to real paths and the
+// runtime ${VAR:-default} refs passed through for bash. Values are validated at load (the env
+// injection lock), so they splice safely into this sourced file.
 func (p projectorCore) runtimeEnvContent(loop manifest.LoopManifest, binding manifest.BindingManifest) []byte {
 	envName := loopEnvName(loop.Name)
 	loopDirVar := loopDirVarName(loop.Name)
@@ -377,22 +382,15 @@ func (p projectorCore) runtimeEnvContent(loop manifest.LoopManifest, binding man
 		exportLine(envName, pathJoin(stateDir, "env.sh")),
 		exportLine(loopDirVar, stateDir),
 	}
-	switch loop.Name {
-	case "memory":
-		lines = append(lines, `export MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES="${MNEMON_MEMORY_LOOP_MAX_NON_EMPTY_LINES:-200}"`)
-	case "skill":
-		hostSkillsDir := p.hostSkillsDir(loop.Name)
-		lines = append(lines,
-			exportLine("MNEMON_SKILL_LOOP_LIBRARY_DIR", pathJoin(stateDir, "skills")),
-			exportLine("MNEMON_SKILL_LOOP_ACTIVE_DIR", pathJoin(stateDir, "skills/active")),
-			exportLine("MNEMON_SKILL_LOOP_STALE_DIR", pathJoin(stateDir, "skills/stale")),
-			exportLine("MNEMON_SKILL_LOOP_ARCHIVED_DIR", pathJoin(stateDir, "skills/archived")),
-			exportLine("MNEMON_SKILL_LOOP_USAGE_FILE", pathJoin(stateDir, "skills/.usage.jsonl")),
-			exportLine("MNEMON_SKILL_LOOP_PROPOSALS_DIR", pathJoin(stateDir, "proposals")),
-			exportLine("MNEMON_SKILL_LOOP_HOST_SKILLS_DIR", hostSkillsDir),
-			`export MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS="${MNEMON_SKILL_LOOP_REVIEW_MIN_EVENTS:-20}"`,
-			`export MNEMON_SKILL_LOOP_PROTECTED_SKILLS="${MNEMON_SKILL_LOOP_PROTECTED_SKILLS:-skill-observe,skill-curate,skill-author,skill-manage,memory-get,memory-set}"`,
-		)
+	// Escape the projector-var PATH substitutions (matching the original exportLine behavior for
+	// these values); the declared literals and runtime ${VAR:-default} refs are validated safe and
+	// pass through raw so bash still expands them.
+	projVars := map[string]string{
+		"state_dir":       escapeDoubleQuoted(stateDir),
+		"host_skills_dir": escapeDoubleQuoted(p.hostSkillsDir(loop.Name)),
+	}
+	for _, e := range loop.Env {
+		lines = append(lines, `export `+e.Name+`="`+manifest.SubstituteEnvValue(e.Value, projVars)+`"`)
 	}
 	content := strings.Join(lines, "\n") + "\n"
 	return []byte(content)
