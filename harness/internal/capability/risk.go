@@ -31,3 +31,20 @@ func RiskEvidenceGate(cap Capability, principal contract.ActorID) rule.Rule {
 			return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
 		})
 }
+
+// RiskOperatorGate is the high-risk governance gate (P3e): it DENIES the gated principal's candidate
+// with a durable diagnostic — the agent's high-risk proposal lands in the Inbox, and a human/operator
+// (a control-agent principal) re-submits the same candidate through the normal admission path. The
+// assembler builds this gate ONLY for NON-operator (host-agent) principals, so the operator's own
+// high-risk candidate is never gated. Like the evidence gate, the deny outranks the admission propose
+// (rule.Evaluate is deny-priority) — no new kernel verdict or held state (the M1 correction).
+func RiskOperatorGate(cap Capability, principal contract.ActorID) rule.Rule {
+	return rule.NewNativeRule("risk-operator:"+cap.Name+":"+string(principal), principal, "", []string{cap.ObservedType},
+		func(in rule.RuleInput) (contract.RuleDecision, error) {
+			if in.Event.Actor != principal {
+				return contract.RuleDecision{Verdict: contract.VerdictAllow}, nil
+			}
+			return contract.RuleDecision{Verdict: contract.VerdictDeny, Reasons: []string{
+				fmt.Sprintf("high-risk %s candidate denied: needs operator approval (re-submit as a control-agent)", cap.ResourceKind)}}, nil
+		})
+}

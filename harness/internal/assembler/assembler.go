@@ -64,7 +64,10 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding, catalog map[st
 			return runtime.RuntimeConfig{}, fmt.Errorf("capability %q: %w", name, err)
 		}
 		for _, b := range bindings {
-			if b.ActorKind != contract.KindHostAgent {
+			// host-agents are the ordinary submitters; control-agents are operators, who submit too —
+			// they are the principal a high-risk candidate must be re-submitted as (P3e). Both get an
+			// admission rule + kernel write authority; replica-agents (sync) never submit host candidates.
+			if b.ActorKind != contract.KindHostAgent && b.ActorKind != contract.KindControlAgent {
 				continue
 			}
 			if !b.Allows(channel.VerbObserve) || !b.AllowsObservedType(cap.ObservedType) {
@@ -75,11 +78,16 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding, catalog map[st
 				continue // unscoped for this kind: no rule, no authority (it could never pull what it writes)
 			}
 			rules = append(rules, cap.Rule(b.Principal, ref, capability.Limits{MaxPayloadBytes: cc.MaxPayloadBytes}))
-			// Mid-risk kinds get a governance gate alongside their admission rule (P3): it denies a
-			// candidate lacking `evidence`, and rule.Evaluate's deny-priority makes that deny outrank
-			// the admission propose. (High-risk gating lands in P3e with loopdef + the operator binding.)
-			if cap.Risk == "mid" {
+			// Risk gate alongside the admission rule (P3): the gate's deny outranks the admission propose
+			// (rule.Evaluate is deny-priority). mid → evidence required; high → the operator-only gate,
+			// built ONLY for non-operator (host-agent) principals so an operator (control-agent) is exempt.
+			switch cap.Risk {
+			case "mid":
 				rules = append(rules, capability.RiskEvidenceGate(cap, b.Principal))
+			case "high":
+				if b.ActorKind != contract.KindControlAgent {
+					rules = append(rules, capability.RiskOperatorGate(cap, b.Principal))
+				}
 			}
 			allow[b.Principal] = appendKind(allow[b.Principal], cap.ResourceKind)
 		}
