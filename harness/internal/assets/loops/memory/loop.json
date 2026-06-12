@@ -28,9 +28,5 @@
       "skills/memory-set/SKILL.md"
     ],
     "subagents": []
-  },
-  "host_adapters": {
-    "claude-code": "../../hosts/claude-code",
-    "codex": "../../hosts/codex"
   }
 }

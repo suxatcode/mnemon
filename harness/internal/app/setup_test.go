@@ -45,8 +45,7 @@ func writeMemoryFixture(t *testing.T, root string) {
   "schema_version": 2, "name": "memory",
   "surfaces": {"projection": [], "observation": []},
   "assets": {"guide": "GUIDE.md", "env": "env.sh", "runtime_files": ["MEMORY.md"],
-    "skills": ["skills/memory-get/SKILL.md"], "subagents": []},
-  "host_adapters": {"codex": "../../hosts/codex"}}`)
+    "skills": ["skills/memory-get/SKILL.md"], "subagents": []}}`)
 	write(filepath.Join(hostDir, "host.json"), `{
   "schema_version": 2, "name": "codex",
   "surfaces": {"projection": [".codex/skills", ".codex/hooks", ".codex/hooks.json", ".codex/mnemon-memory"], "observation": []},

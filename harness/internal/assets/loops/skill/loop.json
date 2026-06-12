@@ -33,9 +33,5 @@
     "subagents": [
       "subagents/curator.md"
     ]
-  },
-  "host_adapters": {
-    "claude-code": "../../hosts/claude-code",
-    "codex": "../../hosts/codex"
   }
 }

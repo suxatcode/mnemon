@@ -125,22 +125,6 @@ func (v *harnessValidator) validateLoop(loopDir string) error {
 		}
 	}
 
-	hostAdapters, err := stringMapField(data, "host_adapters")
-	if err != nil {
-		return fmt.Errorf("loop manifest invalid host_adapters: %s: %w", manifest, err)
-	}
-	for _, rel := range hostAdapters {
-		if rel == "" {
-			continue
-		}
-		if _, err := fs.Stat(v.fsys, path.Join(loopDir, rel)); err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("missing %s host adapter path: %s", name, rel)
-			}
-			return fmt.Errorf("stat %s host adapter path %s: %w", name, rel, err)
-		}
-	}
-
 	v.lines = append(v.lines, fmt.Sprintf("ok %s", name))
 	return nil
 }
@@ -338,7 +322,7 @@ func readManifest(fsys fs.FS, name string, target any) error {
 var (
 	allowedLoopKeys = map[string]bool{
 		"schema_version": true, "name": true, "version": true, "description": true,
-		"surfaces": true, "assets": true, "host_adapters": true,
+		"surfaces": true, "assets": true,
 	}
 	allowedLoopAssetKeys = map[string]bool{
 		"guide": true, "env": true, "runtime_files": true, "skills": true, "subagents": true,

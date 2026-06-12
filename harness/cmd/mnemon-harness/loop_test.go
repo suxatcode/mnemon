@@ -69,9 +69,6 @@ func writeLoopValidateFixture(t *testing.T, root string) {
     "runtime_files": ["MEMORY.md"],
     "skills": ["skills/memory-get/SKILL.md"],
     "subagents": []
-  },
-  "host_adapters": {
-    "codex": "../../hosts/codex"
   }
 }`)
 

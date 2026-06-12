@@ -68,7 +68,6 @@ func TestLoadLoopRejectsUnknownKey(t *testing.T) {
   "name": "memory",
   "surfaces": { "projection": [], "observation": [] },
   "assets": { "guide": "GUIDE.md", "env": "env.sh", "skills": [], "subagents": [] },
-  "host_adapters": {},
   "lifecycle_events": ["prime"]
 }`)
 
@@ -85,7 +84,6 @@ func TestValidateHarnessRejectsUnknownLoopKey(t *testing.T) {
   "name": "memory",
   "surfaces": { "projection": [], "observation": [] },
   "assets": { "guide": "GUIDE.md", "env": "env.sh", "skills": [], "subagents": [] },
-  "host_adapters": {},
   "controllers": []
 }`)
 
@@ -102,8 +100,7 @@ func TestValidateHarnessRejectsUnknownAssetsKey(t *testing.T) {
   "schema_version": 2,
   "name": "memory",
   "surfaces": { "projection": [], "observation": [] },
-  "assets": { "guide": "GUIDE.md", "env": "env.sh", "skills": [], "subagents": [], "hook_prompts": {} },
-  "host_adapters": {}
+  "assets": { "guide": "GUIDE.md", "env": "env.sh", "skills": [], "subagents": [], "hook_prompts": {} }
 }`)
 
 	_, err := ValidateFS(os.DirFS(root))
@@ -193,9 +190,6 @@ func writeFixtureHarness(t *testing.T, root, skillPath string) {
     "runtime_files": ["MEMORY.md"],
     "skills": [`+quote(skillPath)+`],
     "subagents": []
-  },
-  "host_adapters": {
-    "codex": "../../hosts/codex"
   }
 }`)
 

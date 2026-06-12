@@ -14,7 +14,6 @@ type LoopManifest struct {
 	Description   string            `json:"description,omitempty"`
 	Surfaces      Surfaces          `json:"surfaces"`
 	Assets        LoopAssets        `json:"assets"`
-	HostAdapters  map[string]string `json:"host_adapters"`
 }
 
 type LoopAssets struct {
