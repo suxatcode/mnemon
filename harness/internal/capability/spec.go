@@ -77,19 +77,32 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 			return Capability{}, fmt.Errorf("capability spec %q: missing %s", spec.Name, req.name)
 		}
 	}
-	// Event-type grammar lock: the Shape section of capability-spec-v1 PROMISES
-	// <name>.write_candidate.observed / <name>.write.proposed — enforce it, or a spec with a
-	// free-form proposed_type compiles, its rule fires, the bridge mints the proposal as a
-	// trusted event, and the reconciler (which consumes ONLY *.proposed) silently skips the
-	// canonical write: bootable but irreducible. The name doubles as the event-family segment,
-	// so it must use the intake type charset (lowercase, digits, underscore — no dash).
+	// Event-type grammar lock (capability-spec v2 §Grammar): the platform's event types are a
+	// CLOSED table of forms over the spec's family segment (eventTypeGrammar). A spec may DECLARE
+	// only the two declarable forms — observed_type = <kind>.write_candidate.observed and
+	// proposed_type = <kind>.write.proposed — each validated for EQUALITY against the form
+	// instantiated with the spec's OWN family, so the event family is bound to the kind, never an
+	// open parameter. Without this, a free-form proposed_type compiles, its rule fires, the bridge
+	// mints the proposal as a trusted event, and the reconciler (which consumes ONLY *.proposed)
+	// silently skips the canonical write: bootable but irreducible. The name doubles as the
+	// family segment, so it must use the intake type charset (lowercase, digits, underscore).
 	if !specNamePattern.MatchString(spec.Name) {
 		return Capability{}, fmt.Errorf("capability spec %q: name must match %s (it is the event-family segment)", spec.Name, specNamePattern.String())
 	}
-	if want := spec.Name + ".write_candidate.observed"; spec.ObservedType != want {
+	// Reservation: the system-derived forms (e.g. <kind>.remote_commit.observed, the sync-import
+	// observation the platform mints) are NEVER spec-declarable — reject them before the equality
+	// check so the error names the real reason, not a generic grammar miss.
+	for _, decl := range []struct{ role, val string }{{"observed_type", spec.ObservedType}, {"proposed_type", spec.ProposedType}} {
+		for _, form := range eventTypeGrammar {
+			if !form.declarable && decl.val == spec.Name+form.suffix {
+				return Capability{}, fmt.Errorf("capability spec %q: %s %q is a system-derived form, not spec-declarable", spec.Name, decl.role, decl.val)
+			}
+		}
+	}
+	if want := spec.Name + eventTypeObservedSuffix; spec.ObservedType != want {
 		return Capability{}, fmt.Errorf("capability spec %q: observed_type %q must be %q (frozen type grammar)", spec.Name, spec.ObservedType, want)
 	}
-	if want := spec.Name + ".write.proposed"; spec.ProposedType != want {
+	if want := spec.Name + eventTypeProposedSuffix; spec.ProposedType != want {
 		return Capability{}, fmt.Errorf("capability spec %q: proposed_type %q must be %q (frozen type grammar; the reconciler consumes only *.proposed)", spec.Name, spec.ProposedType, want)
 	}
 	if !contract.KindCatalog[contract.ResourceKind(spec.ResourceKind)] {
@@ -209,6 +222,28 @@ func decodeSpec(raw []byte) (CapabilitySpec, error) {
 // specNamePattern pins capability names to the intake event-type segment charset (server-side
 // validateObservedType allows [a-z0-9._]) — a name is the event-family segment by frozen grammar.
 var specNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// eventTypeGrammar is the CLOSED table of event-type forms the platform recognises, each a suffix
+// over a capability's family segment (= its kind). `declarable` forms are what a capability author
+// may write in a spec (observed_type / proposed_type), validated for equality against the family;
+// non-declarable forms are SYSTEM-DERIVED — the platform mints them and FromSpec rejects any spec
+// that tries to declare one. New event families are added here (a table row), not by reshaping the
+// compile path — the G7 extension point. The sync-import observation form is wired in PD6.
+type eventTypeForm struct {
+	suffix     string
+	declarable bool
+}
+
+var eventTypeGrammar = []eventTypeForm{
+	{suffix: eventTypeObservedSuffix, declarable: true},
+	{suffix: eventTypeProposedSuffix, declarable: true},
+	{suffix: ".remote_commit.observed", declarable: false}, // sync-import observation (system-derived; PD6)
+}
+
+const (
+	eventTypeObservedSuffix = ".write_candidate.observed"
+	eventTypeProposedSuffix = ".write.proposed"
+)
 
 type paramSchema struct{ required, optional []string }
 

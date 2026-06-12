@@ -45,6 +45,19 @@ func TestFromSpecFailsClosed(t *testing.T) {
 	mutate("foreign observed family", func(s *CapabilitySpec) {
 		s.ObservedType = "other.write_candidate.observed"
 	}, "frozen type grammar")
+	// Bijection pin (capability-spec v2): the event family is the spec's OWN kind, never an open
+	// parameter — a well-formed-but-mismatched-prefix observed_type is rejected, not just free text.
+	mutate("mismatched observed prefix", func(s *CapabilitySpec) {
+		s.ObservedType = "bar.write_candidate.observed"
+	}, "frozen type grammar")
+	// System-derived forms (capability-spec v2 grammar table): the platform mints
+	// <kind>.remote_commit.observed (the sync-import observation); a spec may NEVER declare it.
+	mutate("system-derived observed form", func(s *CapabilitySpec) {
+		s.ObservedType = "note.remote_commit.observed"
+	}, "system-derived")
+	mutate("system-derived proposed form", func(s *CapabilitySpec) {
+		s.ProposedType = "note.remote_commit.observed"
+	}, "system-derived")
 	mutate("free-form proposed type", func(s *CapabilitySpec) {
 		s.ProposedType = "note.write.done"
 	}, "reconciler consumes only *.proposed")

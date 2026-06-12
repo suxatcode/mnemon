@@ -1,5 +1,11 @@
 # Capability Spec v1 (frozen)
 
+> Superseded by `capability-spec-v2.md` (P2, 2026-06-12). v2 formalizes the type grammar as a
+> closed table (reserving the system-derived `<kind>.remote_commit.observed` form), defines how a
+> declared kind's required fields derive, and — per the R1 no-forward-compat revision channel —
+> moves the KindCatalog membership check to the assembly-time declared set. This document remains
+> the v1 record; the live compile path follows v2.
+
 The DATA form of a built-in capability: `assets/capabilities/<name>.json`, compiled by
 `capability.FromSpec` against two CLOSED catalogs. A spec can only SELECT compiled members —
 it never defines behavior (define≠select); everything unknown fails closed. A new capability's
