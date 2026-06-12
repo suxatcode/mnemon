@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/assets"
 	"github.com/mnemon-dev/mnemon/harness/internal/capability"
@@ -132,6 +133,63 @@ func (h *Harness) LoopSchema(kind string) (CapabilityInfo, error) {
 		}
 	}
 	return CapabilityInfo{}, fmt.Errorf("unknown capability kind %q (run `mnemon-harness loop capabilities` to list)", kind)
+}
+
+// observeSkillJudgment is the HAND-WRITTEN half of the mnemon-observe skill (decision F): the
+// when/why a HostAgent records an observation, the part no spec can render. The mechanism half (which
+// kinds exist, how to submit) is generated from the catalog by RenderObserveSkill.
+const observeSkillJudgment = `# mnemon-observe
+
+Record a governed observation when you learn a concrete, durable fact worth keeping. The platform
+admits or denies each observation through its rules and leaves a durable diagnostic either way — you
+never write a resource directly, and a denied observation is a signal, not a failure.
+
+## When to record (judgment — yours to apply)
+
+- Record a specific, reusable fact, decision, or skill — something a future session would benefit
+  from. Prefer the concrete over the vague ("the deploy step needs FOO=1" beats "deploys are tricky").
+- One observation per distinct fact; do not batch unrelated facts into one.
+- Never record secrets, credentials, tokens, or transient state — the safety rules will deny them,
+  and the denial is durable.
+- If you are unsure a fact is durable, it probably is not. Skip it.
+`
+
+// observeSkillSubmit is the static submit/discovery footer (mechanism that does not vary by kind).
+const observeSkillSubmit = `## How to submit
+
+    mnemon-harness control observe \
+      --type <kind>.write_candidate.observed \
+      --payload '{ "<field>": "<value>", ... }' \
+      --external-id <unique-id>
+
+The exact payload fields for a kind are discoverable — never guess:
+
+    mnemon-harness loop capabilities          # list every kind you can record
+    mnemon-harness loop schema --type <kind>  # one kind's required fields + sync
+`
+
+// RenderObserveSkill generates the mnemon-observe skill (decision F: a directory-level generated
+// skill). The judgment half is hand-written (observeSkillJudgment); the mechanism half — which kinds
+// this project enables and the event type to observe for each — is RENDERED from the resolved
+// catalog, so the skill never drifts from the live capability set and never hardcodes per-kind fields
+// (it points the agent at `loop schema` for those). It is the generic counterpart to per-loop skills:
+// one skill teaches recording an observation for ANY kind.
+func (h *Harness) RenderObserveSkill() (string, error) {
+	infos, err := h.LoopCapabilities()
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	b.WriteString(observeSkillJudgment)
+	b.WriteString("\n## What you can record (generated from this project's catalog)\n\n")
+	b.WriteString("| kind | observe this event type | source |\n")
+	b.WriteString("|------|-------------------------|--------|\n")
+	for _, info := range infos {
+		b.WriteString(fmt.Sprintf("| %s | %s | %s |\n", info.Kind, info.ObservedType, info.Source))
+	}
+	b.WriteString("\n")
+	b.WriteString(observeSkillSubmit)
+	return b.String(), nil
 }
 
 // LoopAdd registers an external capability package from srcDir into the project's external loop root

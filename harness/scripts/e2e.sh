@@ -471,6 +471,12 @@ run_foo_external() {
 		[ -f .claude/skills/foo-set/SKILL.md ] || { echo "foo skill not projected to claude"; exit 1; }
 		grep -q "declarative external loop package" .codex/mnemon-foo/GUIDE.md || { echo "foo GUIDE content wrong"; exit 1; }
 
+		# Discoverability (PD7): the generic mnemon-observe skill is generated from the live catalog,
+		# so a freshly-added external kind appears in its mechanism section without any per-kind code.
+		"$MH" loop observe-skill | grep -q "foo.write_candidate.observed" \
+			|| { echo "observe-skill did not reflect the external foo kind"; exit 1; }
+		"$MH" loop capabilities | grep -q "^foo " || { echo "loop capabilities missing foo"; exit 1; }
+
 		# NEGATIVE (loop-package-v2 external-trust): an external package whose hook intents declare an
 		# `include` section (the fragment code face) must REFUSE projection, naming the violation.
 		mkdir -p .mnemon/loops/badfoo/hooks

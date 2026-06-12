@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/capability"
@@ -114,5 +115,29 @@ func TestLoopCapabilitiesAndSchema(t *testing.T) {
 	}
 	if _, err := New(root).LoopSchema("nope"); err == nil {
 		t.Fatal("loop schema must error on an unknown kind, not return an empty success")
+	}
+}
+
+// The generic observe skill renders its mechanism from the live catalog (every enabled kind's
+// observe event type) and carries the hand-written judgment + discovery pointers.
+func TestRenderObserveSkill(t *testing.T) {
+	root := t.TempDir()
+	writeExternalGoalPackage(t, root, "widget", widgetPackageSpec)
+
+	skill, err := New(root).RenderObserveSkill()
+	if err != nil {
+		t.Fatalf("render observe skill: %v", err)
+	}
+	for _, want := range []string{
+		"# mnemon-observe",
+		"When to record",                    // judgment (hand-written)
+		"memory.write_candidate.observed",   // embedded mechanism (catalog-rendered)
+		"widget.write_candidate.observed",   // external mechanism (catalog-rendered)
+		"mnemon-harness loop schema --type", // discovery pointer, not hardcoded fields
+		"mnemon-harness control observe",    // submit shape
+	} {
+		if !strings.Contains(skill, want) {
+			t.Fatalf("observe skill missing %q:\n%s", want, skill)
+		}
 	}
 }

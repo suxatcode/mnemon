@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/app"
@@ -10,9 +12,10 @@ import (
 )
 
 var (
-	loopRoot       string
-	loopCapsJSON   bool
-	loopSchemaType string
+	loopRoot         string
+	loopCapsJSON     bool
+	loopSchemaType   string
+	loopObserveWrite string
 )
 
 var loopCmd = &cobra.Command{
@@ -46,14 +49,41 @@ var loopSchemaCmd = &cobra.Command{
 	RunE:  runLoopSchema,
 }
 
+var loopObserveSkillCmd = &cobra.Command{
+	Use:   "observe-skill",
+	Short: "Generate the generic mnemon-observe skill from this project's catalog",
+	RunE:  runLoopObserveSkill,
+}
+
 func init() {
 	loopCmd.PersistentFlags().StringVar(&loopRoot, "root", ".", "repository root containing harness declarations")
 	loopCapabilitiesCmd.Flags().BoolVar(&loopCapsJSON, "json", false, "emit the capability list as JSON")
 	loopSchemaCmd.Flags().StringVar(&loopSchemaType, "type", "", "resource kind to describe")
 	loopSchemaCmd.Flags().BoolVar(&loopCapsJSON, "json", false, "emit the schema as JSON")
-	loopCmd.AddCommand(loopValidateCmd, loopAddCmd, loopCapabilitiesCmd, loopSchemaCmd)
+	loopObserveSkillCmd.Flags().StringVar(&loopObserveWrite, "write", "", "write SKILL.md into this directory instead of stdout")
+	loopCmd.AddCommand(loopValidateCmd, loopAddCmd, loopCapabilitiesCmd, loopSchemaCmd, loopObserveSkillCmd)
 	loopCmd.GroupID = groupSpine
 	rootCmd.AddCommand(loopCmd)
+}
+
+func runLoopObserveSkill(cmd *cobra.Command, args []string) error {
+	content, err := app.New(loopRoot).RenderObserveSkill()
+	if err != nil {
+		return err
+	}
+	if loopObserveWrite == "" {
+		fmt.Fprint(cmd.OutOrStdout(), content)
+		return nil
+	}
+	if err := os.MkdirAll(loopObserveWrite, 0o755); err != nil {
+		return err
+	}
+	path := filepath.Join(loopObserveWrite, "SKILL.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", path)
+	return nil
 }
 
 func runLoopCapabilities(cmd *cobra.Command, args []string) error {
