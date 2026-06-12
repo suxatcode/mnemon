@@ -26,7 +26,7 @@ const DefaultSyncTimeout = 10 * time.Second
 type SyncClientConfig struct {
 	Token         string
 	Timeout       time.Duration // <= 0 defaults to DefaultSyncTimeout
-	CAFile        string        // PEM bundle for the remote's TLS root (e.g. mnemond --dev-selfsigned cert)
+	CAFile        string        // PEM bundle for the remote's TLS root (e.g. mnemon-hub --dev-selfsigned cert)
 	AllowInsecure bool          // explicit T2 downgrade override for a plaintext non-loopback endpoint
 }
 

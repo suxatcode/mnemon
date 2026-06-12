@@ -17,13 +17,13 @@ import (
 const maxSyncBodyBytes = 8 << 20
 
 // Authenticator resolves the authenticated principal from a request. syncserver carries its OWN
-// seam (not channel's) so the standalone hub never imports channel; mnemond plugs in
+// seam (not channel's) so the standalone hub never imports channel; mnemon-hub plugs in
 // BearerAuthenticator, tests may plug fakes.
 type Authenticator interface {
 	Authenticate(r *http.Request) (contract.ActorID, error)
 }
 
-// BearerAuthenticator resolves the principal from a static bearer-token map — the mnemond
+// BearerAuthenticator resolves the principal from a static bearer-token map — the mnemon-hub
 // authenticator built from replicas.json credential_refs. A missing, empty, or unknown token is
 // rejected; the request body never names identity.
 type BearerAuthenticator struct {

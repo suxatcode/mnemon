@@ -8,7 +8,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/syncserver"
 )
 
-// The runtime's sync verbs are the CO-HOSTED hub form: the same syncserver adjudication mnemond
+// The runtime's sync verbs are the CO-HOSTED hub form: the same syncserver adjudication mnemon-hub
 // hosts standalone, authorized here by adapting the channel bindings to replica grants (the
 // dual-form rule, sync-abi-v1 §2). Zero hub logic lives in the runtime anymore — only the adapter.
 
@@ -46,7 +46,7 @@ func (g bindingGrants) Grant(principal contract.ActorID, verb string) (contract.
 	if !ok || b.ActorKind != contract.KindReplicaAgent || !b.Allows(channel.Verb(verb)) {
 		return contract.ReplicaGrant{}, false
 	}
-	// Fail closed on an empty sync scope (parity with mnemond's replicas.json gate,
+	// Fail closed on an empty sync scope (parity with mnemon-hub's replicas.json gate,
 	// replicas.go:80). An empty grant scope would otherwise reach RemoteSyncCommitsAfter, whose
 	// "no scope filter = serve all" SQL bypasses scope authorization — an empty-scope replica
 	// binding must grant NOTHING, never the whole hub log. ClampRefs already denies explicit refs

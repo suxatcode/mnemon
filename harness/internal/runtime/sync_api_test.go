@@ -184,7 +184,7 @@ func TestClampSyncScopesEnforcesBindingScope(t *testing.T) {
 
 // HIGH-1 / LOW-9: an EMPTY-scope replica binding must be fully fail-closed on the co-hosted runtime
 // hub — Pull, Push, AND Status are all rejected (no grant), because an empty grant scope would reach
-// RemoteSyncCommitsAfter's serve-all SQL and bypass scope authorization (the standalone mnemond
+// RemoteSyncCommitsAfter's serve-all SQL and bypass scope authorization (the standalone mnemon-hub
 // path fail-closes empty scope at replicas.json load; this pins the dual-form parity on the runtime
 // side). A scoped replica binding works; an in-scope push is accepted; an empty-scope push is fully
 // rejected (the push==subscribe-scope contract).

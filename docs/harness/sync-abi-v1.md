@@ -2,12 +2,15 @@
 
 > Frozen 2026-06-12: the dual-replica e2e (run_sync_pair — push/pull roundtrip over TLS
 > with attribution, offline I13, authn baseline) passed; per the stage-6 precondition the ABI
-> freezes at stage close against TWO consumers (runtime co-hosted hub + mnemond), not one.
+> freezes at stage close against TWO consumers (runtime co-hosted hub + mnemon-hub), not one.
+> Naming (2026-06-12): the standalone hub binary, named `mnemond` when this ABI froze, builds as
+> `mnemon-hub`; the `mnemond` name now belongs to the local governance daemon, which is not a
+> consumer of this wire. Binary name only — no wire field, verb, or semantic changed.
 
 The Remote Workspace sync wire: how a Local Mnemon replica pushes its accepted local commits to a
 hub, pulls other replicas' commits back, and how both sides keep the attribution chain intact. The
 hub is either a co-hosted Local Mnemon runtime (`mnemon-harness local run` serving `/sync/*`) or the
-standalone `mnemond` binary — ONE wire, two hostings.
+standalone `mnemon-hub` binary — ONE wire, two hostings.
 
 Status: **FROZEN**. Freeze condition: the dual-replica e2e (`run_sync_pair`) passes. Until then field
 additions are allowed only additively; nothing here is load-bearing for external integrators yet.
@@ -35,7 +38,7 @@ The grant has exactly two on-disk forms with the SAME fields and semantics:
 - **Co-hosted hub** (runtime): a `replica-agent` entry in the channel bindings file
   (`.mnemon/harness/channel/bindings.json`): `principal`, `credential_ref`, `subscription_scope`
   (= the grant scopes), `allowed_verbs` (the three sync verbs).
-- **mnemond**: an entry in `replicas.json`:
+- **mnemon-hub**: an entry in `replicas.json`:
 
 ```json
 {
@@ -52,9 +55,9 @@ The grant has exactly two on-disk forms with the SAME fields and semantics:
 
 `replicas.json` rules: strict-decoded (unknown fields rejected); `credential_ref` is a bearer-token
 file path, resolved relative to the replicas.json directory (or absolute); `scopes` MUST be
-non-empty (fail closed — mnemond refuses an empty grant); the file MUST NOT be world-readable
-(mnemond refuses to start; keep it 0600 in a 0700 directory, like the channel credential files).
-Rotation = edit the credential file (or the entry) + restart mnemond. The file is operator-supplied;
+non-empty (fail closed — mnemon-hub refuses an empty grant); the file MUST NOT be world-readable
+(mnemon-hub refuses to start; keep it 0600 in a 0700 directory, like the channel credential files).
+Rotation = edit the credential file (or the entry) + restart mnemon-hub. The file is operator-supplied;
 nothing writes it.
 
 **Scope clamp.** There is ONE clamp implementation — `contract.ClampRefs` — shared by the channel
@@ -209,7 +212,7 @@ puller's import decision carries the same origin identity through the event payl
 
 ## 8. T2 boundary honesty
 
-- Transport auth is a **bearer token** over TLS. mnemond serves TLS natively (`--tls-cert/--tls-key`);
+- Transport auth is a **bearer token** over TLS. mnemon-hub serves TLS natively (`--tls-cert/--tls-key`);
   `--dev-selfsigned` generates a dev/e2e certificate pair — this is honest dev tooling, not a
   production PKI story.
 - Clients refuse a plaintext `http://` endpoint with a non-loopback host unless explicitly
@@ -221,7 +224,7 @@ puller's import decision carries the same origin identity through the event payl
   protect it at rest; there is no per-request nonce in v1.
 - **Batch replay** is idempotent by design (§4) — replaying a captured push cannot duplicate or
   mutate hub state; replaying a pull yields data the credential was already entitled to.
-- mnemond emits one audit line per request to stdout: timestamp, principal, verb, result. `result`
+- mnemon-hub emits one audit line per request to stdout: timestamp, principal, verb, result. `result`
   is the **request-level** outcome only — `unauthorized` (401), `bad_request` (400 — malformed JSON,
   a missing/invalid field, or a disallowed HTTP method), `denied` (403 — no replica grant or an
   out-of-scope clamp), or `ok`. The PER-COMMIT `accepted` / `rejected` / `conflict` verdicts ride
@@ -230,7 +233,7 @@ puller's import decision carries the same origin identity through the event payl
 
 ## 9. Hub store ownership
 
-One mnemond per hub store: `mnemond` opens its SQLite store with the same single-writer flock the
+One mnemon-hub per hub store: `mnemon-hub` opens its SQLite store with the same single-writer flock the
 local store uses. Concurrent pushes from multiple replicas are serialized by the store transaction
 (single connection); both land, in arrival order.
 

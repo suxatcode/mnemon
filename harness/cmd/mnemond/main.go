@@ -1,8 +1,9 @@
-// mnemond is the standalone Remote Workspace hub: the syncserver wire (sync.push / sync.pull /
-// sync.status) over its own store, authenticated by bearer tokens from an operator-supplied
-// replicas.json. It is a SEPARATE trust domain from the local runtime: it imports contract/store/
-// syncserver only — never channel / runtime / app / hostsurface (pinned by the syncserver boundary
-// test). One mnemond per hub store (the store's single-writer flock enforces it).
+// mnemond is the LOCAL governance daemon: the standalone-daemon packaging of the exact
+// `mnemon-harness local run` boot path (P1 D13 — the mnemond name now belongs to the local
+// trust domain; the remote hub binary builds as mnemon-hub). It is the LOCAL trust domain
+// main: it imports internal/app and shares the boot face in app/localboot.go with `local run`,
+// so flags, banner, T1 loopback floor, and serve behavior stay alias-identical. One daemon per
+// project store (the store's single-writer flock enforces it).
 package main
 
 import (
@@ -10,16 +11,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/store"
-	"github.com/mnemon-dev/mnemon/harness/internal/syncserver"
+	"github.com/mnemon-dev/mnemon/harness/internal/app"
 )
 
 func main() {
@@ -31,97 +28,52 @@ func main() {
 	}
 }
 
-// run is the whole binary behind a testable seam: parse flags, handle the --dev-selfsigned
-// generator exit, load replicas.json (fail-closed), take the hub store's single-writer lock, and
-// serve the three sync verbs (TLS when both cert+key are set) until ctx cancels.
+// run is the whole daemon behind a testable seam: parse the `local run`-equivalent flag face,
+// resolve the SAME boot chain (app.ResolveLocalBoot: setup config discovery, endpoint-derived
+// listen address, T1 loopback validation), print the same banner, and serve Local Mnemon until
+// ctx cancels.
 func run(ctx context.Context, args []string, out, errw io.Writer) error {
 	fs := flag.NewFlagSet("mnemond", flag.ContinueOnError)
 	fs.SetOutput(errw)
-	addr := fs.String("addr", "127.0.0.1:9787", "listen address")
-	storePath := fs.String("store", "", "hub store path (sqlite; mnemond takes its single-writer lock)")
-	replicasPath := fs.String("replicas", "", "replicas.json path (operator-supplied; 0600 file in a 0700 dir)")
-	tlsCert := fs.String("tls-cert", "", "TLS certificate file (TLS is served when --tls-cert and --tls-key are both set)")
-	tlsKey := fs.String("tls-key", "", "TLS private key file")
-	devSelfsigned := fs.String("dev-selfsigned", "", "generate a self-signed dev/e2e cert+key pair into this directory, print their paths, and exit")
+	root := fs.String("root", ".", "project root")
+	addr := fs.String("addr", "127.0.0.1:8787", "listen address")
+	syncInterval := fs.Duration("sync-interval", 0, "sync worker cadence (0 = default 30s)")
+	allowNonLoopback := fs.Bool("allow-nonloopback", false, "explicitly allow listening on a non-loopback address (T1: loopback-only by default)")
+	ignoreExternal := fs.Bool("ignore-external", false, "boot the embedded-only capability catalog, ignoring external packages under .mnemon/loops (each ignored package is named on stderr)")
+	allowInsecureRemote := fs.Bool("allow-insecure-remote", false, "let the background sync worker use a plaintext http:// Remote Workspace endpoint with a non-loopback host (T2: fail-closed by default)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *devSelfsigned != "" {
-		certPath, keyPath, err := generateSelfSigned(*devSelfsigned)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "mnemond: dev TLS cert %s\n", certPath)
-		fmt.Fprintf(out, "mnemond: dev TLS key %s\n", keyPath)
-		return nil
+	projectRoot := "."
+	if *root != "" {
+		projectRoot = filepath.Clean(*root)
 	}
-	if *storePath == "" || *replicasPath == "" {
-		return fmt.Errorf("--store and --replicas are required")
-	}
-	if (*tlsCert == "") != (*tlsKey == "") {
-		return fmt.Errorf("--tls-cert and --tls-key must be set together")
-	}
-	grants, tokens, err := loadReplicas(*replicasPath)
+	boot, err := app.ResolveLocalBoot(projectRoot, "", "")
 	if err != nil {
 		return err
 	}
-	if dir := filepath.Dir(*storePath); dir != "" && dir != "." {
-		// T1 floor: the hub store dir is private state — owner-only, like every local creation site.
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return fmt.Errorf("create hub store dir: %w", err)
+	listenAddr := *addr
+	addrChanged := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "addr" {
+			addrChanged = true
 		}
+	})
+	if !addrChanged {
+		listenAddr = app.ListenAddrFromEndpoint(boot.Config.Endpoint, *addr)
 	}
-	st, err := store.OpenStore(*storePath)
-	if err != nil {
-		return fmt.Errorf("open hub store: %w", err)
-	}
-	defer st.Close()
-	now := func() string { return time.Now().UTC().Format(time.RFC3339) }
-	// Audit goes to out (stdout in main): one line per request — ts, principal, verb, result.
-	handler := syncserver.NewHTTPHandler(syncserver.New(st, grants, now), syncserver.BearerAuthenticator{Tokens: tokens}, out)
-	return serveHub(ctx, *addr, handler, *tlsCert, *tlsKey, *storePath, out)
-}
-
-// serveHub listens (so the bound address is printable before any request) and serves until ctx
-// cancels, then shuts down cleanly. With cert+key it serves TLS natively.
-func serveHub(ctx context.Context, addr string, handler http.Handler, certFile, keyFile, storePath string, out io.Writer) error {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
+	if err := app.ValidateListenAddr(listenAddr, *allowNonLoopback); err != nil {
 		return err
 	}
-	// Timeouts harden the FIRST network-facing daemon against slowloris (a slow/idle peer holding a
-	// connection open indefinitely). The loopback-only local control server is left unchanged.
-	srv := &http.Server{
-		Handler:           handler,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       120 * time.Second,
-	}
-	scheme := "http"
-	if certFile != "" {
-		scheme = "https"
-	}
-	errc := make(chan error, 1)
-	go func() {
-		if certFile != "" {
-			errc <- srv.ServeTLS(ln, certFile, keyFile)
-			return
-		}
-		errc <- srv.Serve(ln)
-	}()
-	fmt.Fprintf(out, "mnemond: listening on %s://%s (store %s)\n", scheme, ln.Addr(), storePath)
-	select {
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
-		fmt.Fprintln(out, "mnemond: shut down")
-		return nil
-	case serveErr := <-errc:
-		if serveErr == http.ErrServerClosed {
-			return nil
-		}
-		return serveErr
-	}
+	fmt.Fprintln(out, "Local Mnemon: ready")
+	fmt.Fprintln(out, "Remote Workspace: "+app.RemoteWorkspaceStatus(projectRoot))
+	return app.RunLocalHTTPServerWithBindings(ctx, listenAddr, boot.StorePath, boot.Loaded, app.ServeOptions{
+		Loops:               boot.Config.Loops,
+		Hosts:               boot.Config.Hosts,
+		ProjectRoot:         projectRoot,
+		MirrorMode:          boot.Config.MirrorMode,
+		IgnoreExternal:      *ignoreExternal,
+		AllowInsecureRemote: *allowInsecureRemote,
+		SyncInterval:        *syncInterval,
+	}, io.Discard)
 }

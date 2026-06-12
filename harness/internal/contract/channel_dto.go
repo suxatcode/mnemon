@@ -23,7 +23,7 @@ const (
 const SyncImportActor = ActorID("sync@local")
 
 // The three Remote Workspace sync wire verbs (sync-abi-v1 §1). They live in contract because the ABI
-// names them: the channel binding layer and the standalone hub (syncserver/mnemond) must agree on the
+// names them: the channel binding layer and the standalone hub (syncserver/mnemon-hub) must agree on the
 // strings without either importing the other. Deliberately untyped so channel can alias them into its
 // Verb space unchanged.
 const (
@@ -33,7 +33,7 @@ const (
 )
 
 // ReplicaGrant is the replica-credential scope record both hub forms share (sync-abi-v1 §2 dual-form
-// rule): a co-hosted hub derives it from a replica-agent channel binding entry; mnemond derives it
+// rule): a co-hosted hub derives it from a replica-agent channel binding entry; mnemon-hub derives it
 // from a replicas.json entry. Same fields, same semantics. Token is the optional bearer credential
 // (resolved from credential_ref); it is empty when the transport authenticates another way (e.g. the
 // co-hosted hub's binding authenticator already resolved the principal).

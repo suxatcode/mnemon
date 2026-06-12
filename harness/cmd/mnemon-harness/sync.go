@@ -69,7 +69,7 @@ func init() {
 	syncCmd.PersistentFlags().StringVar(&syncRemoteURL, "remote-url", "", "Remote Workspace sync endpoint")
 	syncCmd.PersistentFlags().StringVar(&syncRemoteToken, "token", "", "Remote Workspace sync token")
 	syncCmd.PersistentFlags().StringVar(&syncRemoteTokenFile, "token-file", "", "Remote Workspace sync token file")
-	syncCmd.PersistentFlags().StringVar(&syncCAFile, "ca-file", "", "PEM bundle pinning the Remote Workspace TLS root (e.g. the mnemond --dev-selfsigned cert)")
+	syncCmd.PersistentFlags().StringVar(&syncCAFile, "ca-file", "", "PEM bundle pinning the Remote Workspace TLS root (e.g. the mnemon-hub --dev-selfsigned cert)")
 	syncCmd.PersistentFlags().BoolVar(&syncAllowInsecure, "allow-insecure-remote", false, "explicitly allow a plaintext http:// Remote Workspace endpoint with a non-loopback host (T2: fail-closed by default)")
 	_ = syncCmd.PersistentFlags().MarkHidden("store")
 	_ = syncCmd.PersistentFlags().MarkHidden("remotes")

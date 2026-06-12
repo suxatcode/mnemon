@@ -45,7 +45,7 @@ func TestLocalBootAutoDiscoversSetupConfig(t *testing.T) {
 	restoreLocalFlags(t)
 	localRoot = projectRoot
 
-	boot, err := resolveLocalBoot()
+	boot, err := app.ResolveLocalBoot(projectRoot, localStorePath, localBindingsPath)
 	if err != nil {
 		t.Fatalf("resolve local boot from setup config: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestLocalBootAutoDiscoversSetupConfig(t *testing.T) {
 func TestLocalBootMissingSetupShowsProductRemediation(t *testing.T) {
 	restoreLocalFlags(t)
 	localRoot = t.TempDir()
-	_, err := resolveLocalBoot()
+	_, err := app.ResolveLocalBoot(localRoot, localStorePath, localBindingsPath)
 	if err == nil {
 		t.Fatal("local boot without setup must fail")
 	}
@@ -125,8 +125,8 @@ func TestListenAddrFromEndpoint(t *testing.T) {
 		{"schemeless host:port falls back (no host parsed)", "127.0.0.1:9001", "127.0.0.1:8787", "127.0.0.1:8787"},
 	}
 	for _, c := range cases {
-		if got := listenAddrFromEndpoint(c.endpoint, c.fallback); got != c.want {
-			t.Fatalf("%s: listenAddrFromEndpoint(%q,%q) = %q, want %q", c.name, c.endpoint, c.fallback, got, c.want)
+		if got := app.ListenAddrFromEndpoint(c.endpoint, c.fallback); got != c.want {
+			t.Fatalf("%s: app.ListenAddrFromEndpoint(%q,%q) = %q, want %q", c.name, c.endpoint, c.fallback, got, c.want)
 		}
 	}
 }
@@ -145,16 +145,16 @@ func TestReadLocalConfigMirrorMode(t *testing.T) {
 		}
 	}
 	write(`{"schema_version":1,"mode":"local"}`) // 旧安装:缺省
-	cfg, err := readLocalConfig(root)
+	cfg, err := app.ReadLocalConfig(root)
 	if err != nil || cfg.MirrorMode != "prime-refresh" {
 		t.Fatalf("absent mirror_mode must default to prime-refresh; got %q err=%v", cfg.MirrorMode, err)
 	}
 	write(`{"schema_version":1,"mode":"local","mirror_mode":"manual"}`)
-	if cfg, err = readLocalConfig(root); err != nil || cfg.MirrorMode != "manual" {
+	if cfg, err = app.ReadLocalConfig(root); err != nil || cfg.MirrorMode != "manual" {
 		t.Fatalf("manual must round-trip; got %q err=%v", cfg.MirrorMode, err)
 	}
 	write(`{"schema_version":1,"mode":"local","mirror_mode":"bogus"}`)
-	if _, err = readLocalConfig(root); err == nil {
+	if _, err = app.ReadLocalConfig(root); err == nil {
 		t.Fatal("unknown mirror_mode must fail closed")
 	}
 }
@@ -162,15 +162,15 @@ func TestReadLocalConfigMirrorMode(t *testing.T) {
 // T1 回环地板:非回环监听地址 fail-closed,--allow-nonloopback 显式越权。
 func TestValidateListenAddrLoopbackOnly(t *testing.T) {
 	for _, ok := range []string{"127.0.0.1:8787", "localhost:8787", "[::1]:8787"} {
-		if err := validateListenAddr(ok, false); err != nil {
+		if err := app.ValidateListenAddr(ok, false); err != nil {
 			t.Fatalf("%s must be allowed: %v", ok, err)
 		}
 	}
 	for _, bad := range []string{"0.0.0.0:8787", "192.168.1.10:8787", ":8787"} {
-		if err := validateListenAddr(bad, false); err == nil {
+		if err := app.ValidateListenAddr(bad, false); err == nil {
 			t.Fatalf("%s must be refused without --allow-nonloopback", bad)
 		}
-		if err := validateListenAddr(bad, true); err != nil {
+		if err := app.ValidateListenAddr(bad, true); err != nil {
 			t.Fatalf("%s must pass with explicit override: %v", bad, err)
 		}
 	}

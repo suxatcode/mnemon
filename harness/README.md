@@ -8,7 +8,7 @@ The current product surface is intentionally small:
 - `setup` installs memory/skill integration assets into Codex or Claude Code.
 - `local run` starts the project-local Mnemon service.
 - `status` reports Agent Integration, Local Mnemon, and sync status.
-- `sync` connects Local Mnemon to a Remote Workspace (`mnemond`) and pushes/pulls
+- `sync` connects Local Mnemon to a Remote Workspace (`mnemon-hub`) and pushes/pulls
   governed commits with attribution preserved.
 - `loop validate` remains hidden and is used by `make harness-validate`.
 

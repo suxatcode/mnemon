@@ -1,10 +1,10 @@
 // Package syncserver is the hub half of Remote Workspace sync (sync-abi-v1): push adjudication
 // against the append-only sync_remote_commits log, pull serving with the ONE scope clamp, and the
-// status counters. It is extracted from the runtime so the standalone hub binary (mnemond) can host
+// status counters. It is extracted from the runtime so the standalone hub binary (mnemon-hub) can host
 // the same wire without the runtime: it imports ONLY contract + store (+stdlib) — never channel /
 // runtime / app / hostsurface (the trust-domain import boundary, pinned by a test). Replica
 // authorization enters through the Grants seam; the co-hosted runtime adapts its channel bindings to
-// grants, mnemond builds grants from replicas.json — same fields, same semantics (dual-form rule).
+// grants, mnemon-hub builds grants from replicas.json — same fields, same semantics (dual-form rule).
 package syncserver
 
 import (
@@ -50,7 +50,7 @@ type Grants interface {
 	Grant(principal contract.ActorID, verb string) (ReplicaGrant, bool)
 }
 
-// GrantMap is the static Grants form mnemond builds from replicas.json: every listed replica holds
+// GrantMap is the static Grants form mnemon-hub builds from replicas.json: every listed replica holds
 // all three sync verbs (a replica credential is sync-only by construction; per-verb narrowing is the
 // co-hosted binding form's concern).
 type GrantMap map[contract.ActorID]ReplicaGrant

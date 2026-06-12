@@ -17,7 +17,7 @@ cleanup() {
 	for f in "$WORK"/*.pid; do
 		[ -f "$f" ] && kill "$(cat "$f")" 2>/dev/null || true
 	done
-	pkill -f "$WORK/mnemond" 2>/dev/null || true
+	pkill -f "$WORK/mnemon-hub" 2>/dev/null || true
 	rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -408,20 +408,20 @@ run_external_goal() {
 # pin the stage-0 promise that a bare `local run` listens where setup's --control-url pointed.
 
 # run_sync_pair proves the stage-6 Remote MVP on the product path: two replicas (A, B) sync
-# through a standalone mnemond hub over TLS — A writes, the in-process sync worker pushes, B's
+# through a standalone mnemon-hub over TLS — A writes, the in-process sync worker pushes, B's
 # worker pulls and the content arrives via B's governed pull (attribution carried end to end).
 # Offline leg pins I13 (hub down = local fully functional); the bad-token leg pins authn on the
 # wire. Conflict adjudication (hub idempotency + B-side import conflict) is pinned at the Go
 # integration layer (syncserver_test.go, sync_import_test.go) per the v1.1 redefinition.
 run_sync_pair() {
 	CUR_HOST="sync-pair"
-	echo "=== E2E sync pair via mnemond (TLS) ==="
+	echo "=== E2E sync pair via mnemon-hub (TLS) ==="
 	local hubdir="$WORK/hub" tlsdir="$WORK/synctls"
 	mkdir -p "$hubdir" "$tlsdir"
 
-	go build -o "$WORK/mnemond" ./harness/cmd/mnemond
+	go build -o "$WORK/mnemon-hub" ./harness/cmd/mnemon-hub
 
-	"$WORK/mnemond" --dev-selfsigned "$tlsdir" >/dev/null
+	"$WORK/mnemon-hub" --dev-selfsigned "$tlsdir" >/dev/null
 	[ -f "$tlsdir/cert.pem" ] && [ -f "$tlsdir/key.pem" ] || fail "dev-selfsigned did not write cert/key"
 
 	# hub credentials: two replicas, distinct principals (multi-replica acceptance).
@@ -441,11 +441,11 @@ run_sync_pair() {
 	JSON
 	chmod 600 "$hubdir/replicas.json"
 
-	"$WORK/mnemond" --addr 127.0.0.1:9787 --store "$hubdir/hub.db" --replicas "$hubdir/replicas.json" \
-		--tls-cert "$tlsdir/cert.pem" --tls-key "$tlsdir/key.pem" >"$WORK/mnemond.log" 2>&1 &
+	"$WORK/mnemon-hub" --addr 127.0.0.1:9787 --store "$hubdir/hub.db" --replicas "$hubdir/replicas.json" \
+		--tls-cert "$tlsdir/cert.pem" --tls-key "$tlsdir/key.pem" >"$WORK/mnemon-hub.log" 2>&1 &
 	local hubpid=$!
 	sleep 0.5
-	kill -0 "$hubpid" 2>/dev/null || { cat "$WORK/mnemond.log"; fail "mnemond did not start"; }
+	kill -0 "$hubpid" 2>/dev/null || { cat "$WORK/mnemon-hub.log"; fail "mnemon-hub did not start"; }
 
 	local proja="$WORK/proj-sync-a" projb="$WORK/proj-sync-b"
 	mkdir -p "$proja" "$projb"
@@ -467,7 +467,7 @@ run_sync_pair() {
 		"$MH" control observe --addr http://127.0.0.1:8787 --principal codex@project --token-file "$tok" \
 			--type memory.write_candidate.observed --external-id sp1 \
 			--payload '{"content":"sync pair payload from replica A","source":"user","confidence":"high"}' >/dev/null
-	) || fail "replica A flow failed (see $WORK/run-sync-a.log / $WORK/mnemond.log)"
+	) || fail "replica A flow failed (see $WORK/run-sync-a.log / $WORK/mnemon-hub.log)"
 	apid="$(cat "$WORK/sync-a.pid")"
 
 	(
@@ -511,7 +511,7 @@ run_sync_pair() {
 		# decision id) lives in B's event log + decisions, pinned by sync_import Go tests.
 		"$MH" control pull --json --addr http://127.0.0.1:8899 --principal codex@project --token-file "$tok" | grep -q '"sync@local"' \
 			|| { echo "imported resource lacks sync@local attribution"; exit 1; }
-	) || fail "replica B flow failed (see $WORK/run-sync-b.log / $WORK/mnemond.log)"
+	) || fail "replica B flow failed (see $WORK/run-sync-b.log / $WORK/mnemon-hub.log)"
 	bpid="$(cat "$WORK/sync-b.pid")"
 
 	# offline leg (I13): hub down, A stays fully functional on the product path.
@@ -529,8 +529,8 @@ run_sync_pair() {
 	# authn leg: with A's server stopped (lock released), a manual push with the WRONG token is refused.
 	{ kill "$apid" 2>/dev/null; wait "$apid"; } 2>/dev/null || true
 	{ kill "$bpid" 2>/dev/null; wait "$bpid"; } 2>/dev/null || true
-	"$WORK/mnemond" --addr 127.0.0.1:9787 --store "$hubdir/hub.db" --replicas "$hubdir/replicas.json" \
-		--tls-cert "$tlsdir/cert.pem" --tls-key "$tlsdir/key.pem" >>"$WORK/mnemond.log" 2>&1 &
+	"$WORK/mnemon-hub" --addr 127.0.0.1:9787 --store "$hubdir/hub.db" --replicas "$hubdir/replicas.json" \
+		--tls-cert "$tlsdir/cert.pem" --tls-key "$tlsdir/key.pem" >>"$WORK/mnemon-hub.log" 2>&1 &
 	hubpid=$!
 	sleep 0.5
 	(
@@ -538,7 +538,7 @@ run_sync_pair() {
 		# sp-offline is still pending (hub was down when it was written), so the push really
 		# sends a request. The stored credential is what the client uses - corrupt it for the
 		# negative, restore for the positive (true product-path authn probe).
-		# connect stored the absolute --token-file path as credential_ref; mnemond loaded the
+		# connect stored the absolute --token-file path as credential_ref; mnemon-hub loaded the
 		# token into memory at boot, so editing the file flips only the CLIENT side.
 		local cred="$hubdir/replica-a.token"
 		cp "$cred" "$WORK/cred.bak"
@@ -551,7 +551,7 @@ run_sync_pair() {
 	) || fail "authn leg failed"
 	kill "$hubpid" 2>/dev/null; wait "$hubpid" 2>/dev/null || true
 	rm -f "$PIDFILE"
-	echo "    sync pair via mnemond OK"
+	echo "    sync pair via mnemon-hub OK"
 }
 
 run_host codex codex@project 8787 .codex

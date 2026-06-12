@@ -12,7 +12,7 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/syncserver"
 )
 
-// replicas.json is the mnemond form of the replica grant (sync-abi-v1 §2, dual-form rule): the same
+// replicas.json is the mnemon-hub form of the replica grant (sync-abi-v1 §2, dual-form rule): the same
 // fields and semantics as a replica-agent channel binding entry — principal, credential_ref, scopes.
 // It is operator-supplied (nothing writes it); rotation = edit the credential file + restart.
 

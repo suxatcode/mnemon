@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,13 +42,13 @@ func runProductStatus(cmd *cobra.Command, args []string) error {
 	}
 	projectRoot = filepath.Clean(projectRoot)
 
-	if cfg, err := readLocalConfig(projectRoot); err == nil {
+	if cfg, err := app.ReadLocalConfig(projectRoot); err == nil {
 		principal := statusPrincipal
 		if principal == "" {
 			principal = cfg.Principal
 		}
 		if st, ok := localServiceStatus(projectRoot, cfg, principal); ok {
-			printProductStatus(cmd, true, true, remoteWorkspaceStatus(projectRoot), st.SyncPending, st.SyncSynced, st.SyncConflicts)
+			printProductStatus(cmd, true, true, app.RemoteWorkspaceStatus(projectRoot), st.SyncPending, st.SyncSynced, st.SyncConflicts)
 			return nil
 		}
 	}
@@ -58,7 +57,7 @@ func runProductStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	remote := remoteWorkspaceStatus(projectRoot)
+	remote := app.RemoteWorkspaceStatus(projectRoot)
 	for _, l := range lines {
 		if strings.HasPrefix(l, "Remote Workspace:") {
 			continue
@@ -71,7 +70,7 @@ func runProductStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func localServiceStatus(projectRoot string, cfg localConfig, principal string) (contract.ChannelStatus, bool) {
+func localServiceStatus(projectRoot string, cfg app.LocalConfig, principal string) (contract.ChannelStatus, bool) {
 	if strings.TrimSpace(cfg.Endpoint) == "" || strings.TrimSpace(principal) == "" {
 		return contract.ChannelStatus{}, false
 	}
@@ -79,7 +78,7 @@ func localServiceStatus(projectRoot string, cfg localConfig, principal string) (
 	if bindingFile == "" {
 		bindingFile = channel.DefaultBindingFile
 	}
-	loaded, err := channel.LoadBindingFile(projectRoot, resolveProjectPath(projectRoot, bindingFile))
+	loaded, err := channel.LoadBindingFile(projectRoot, app.ResolveProjectPath(projectRoot, bindingFile))
 	if err != nil {
 		return contract.ChannelStatus{}, false
 	}
@@ -107,32 +106,6 @@ func printProductStatus(cmd *cobra.Command, installed, ready bool, remote string
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "Remote Workspace: "+remote)
 	fmt.Fprintf(cmd.OutOrStdout(), "Sync: %d pending, %d synced, %d conflicts\n", pending, synced, conflicts)
-}
-
-func remoteWorkspaceStatus(projectRoot string) string {
-	remote, ok := currentRemoteWorkspace(projectRoot)
-	if !ok {
-		return "not connected"
-	}
-	return "connected " + remote
-}
-
-func currentRemoteWorkspace(projectRoot string) (string, bool) {
-	raw, err := os.ReadFile(filepath.Join(projectRoot, ".mnemon", "harness", "sync", "remotes.json"))
-	if err != nil {
-		return "", false
-	}
-	var doc remotesync.RemotesDoc
-	if err := json.Unmarshal(raw, &doc); err != nil || doc.SchemaVersion != 1 {
-		return "", false
-	}
-	if strings.TrimSpace(doc.Current) != "" {
-		return strings.TrimSpace(doc.Current), true
-	}
-	if len(doc.Remotes) == 1 && strings.TrimSpace(doc.Remotes[0].ID) != "" {
-		return strings.TrimSpace(doc.Remotes[0].ID), true
-	}
-	return "", false
 }
 
 func tokenForPrincipal(tokens map[string]contract.ActorID, principal contract.ActorID) string {

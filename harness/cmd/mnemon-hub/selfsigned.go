@@ -34,7 +34,7 @@ func generateSelfSigned(dir string) (string, string, error) {
 	now := time.Now()
 	tmpl := x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{CommonName: "mnemond dev"},
+		Subject:               pkix.Name{CommonName: "mnemon-hub dev"},
 		NotBefore:             now.Add(-time.Hour),
 		NotAfter:              now.Add(30 * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,

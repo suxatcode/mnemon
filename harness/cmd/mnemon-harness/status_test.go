@@ -65,7 +65,7 @@ func TestProductStatusUsesReachableLocalMnemon(t *testing.T) {
 	setupProductIntegration(t, projectRoot)
 	restoreLocalFlags(t)
 	localRoot = projectRoot
-	boot, err := resolveLocalBoot()
+	boot, err := app.ResolveLocalBoot(projectRoot, localStorePath, localBindingsPath)
 	if err != nil {
 		t.Fatalf("resolve local boot: %v", err)
 	}
@@ -156,7 +156,7 @@ func restoreStatusFlags(t *testing.T) {
 	statusPrincipal = ""
 }
 
-func writeLocalConfigForTest(t *testing.T, projectRoot string, cfg localConfig) {
+func writeLocalConfigForTest(t *testing.T, projectRoot string, cfg app.LocalConfig) {
 	t.Helper()
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
