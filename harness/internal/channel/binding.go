@@ -45,6 +45,7 @@ type ChannelBinding struct {
 	AllowedObservedTypes []string               // observed event types this principal may Ingest ("" or "*" = any)
 	SubscriptionScope    []contract.ResourceRef // the refs this principal may pull
 	IdempotencyNamespace string                 // prefix isolating this principal's ExternalIDs (cross-principal dedup isolation)
+	Budget               contract.BudgetTier    // context-budget tier for this endpoint's derived mirror (P4); empty = hot (full)
 }
 
 // Validate checks the binding is well-formed: a principal, a known kind, at least one verb.
@@ -57,6 +58,9 @@ func (b ChannelBinding) Validate() error {
 	}
 	if len(b.AllowedVerbs) == 0 {
 		return fmt.Errorf("channel binding %q grants no verbs", b.Principal)
+	}
+	if _, err := contract.ResolveBudgetTier(b.Budget); err != nil {
+		return fmt.Errorf("channel binding %q: %w", b.Principal, err)
 	}
 	return nil
 }

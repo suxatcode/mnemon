@@ -41,6 +41,7 @@ type bindingFileEntry struct {
 	SubscriptionScope    []bindingRef `json:"subscription_scope"`
 	IdempotencyNamespace string       `json:"idempotency_namespace"`
 	CredentialRef        string       `json:"credential_ref"`
+	Budget               string       `json:"budget,omitempty"` // context-budget tier (P4): hot|warm|digest-only; empty = hot
 }
 
 type bindingRef struct {
@@ -132,6 +133,7 @@ func (e bindingFileEntry) toBinding() (ChannelBinding, error) {
 		AllowedObservedTypes: e.AllowedObservedTypes,
 		SubscriptionScope:    scope,
 		IdempotencyNamespace: e.IdempotencyNamespace,
+		Budget:               contract.BudgetTier(e.Budget), // empty stays empty (= hot); Validate rejects an unknown tier
 	}
 	if err := b.Validate(); err != nil {
 		return ChannelBinding{}, err
@@ -205,6 +207,7 @@ func toEntry(b ChannelBinding, credentialRef string) bindingFileEntry {
 		SubscriptionScope:    scope,
 		IdempotencyNamespace: b.IdempotencyNamespace,
 		CredentialRef:        credentialRef,
+		Budget:               string(b.Budget),
 	}
 }
 
@@ -369,7 +372,7 @@ func writeBindingDoc(path string, doc bindingFileDoc) error {
 func SubsFromBindings(bindings []ChannelBinding) map[contract.ActorID]contract.Subscription {
 	subs := make(map[contract.ActorID]contract.Subscription, len(bindings))
 	for _, b := range bindings {
-		subs[b.Principal] = contract.Subscription{Actor: b.Principal, Refs: b.SubscriptionScope}
+		subs[b.Principal] = contract.Subscription{Actor: b.Principal, Refs: b.SubscriptionScope, Budget: b.Budget}
 	}
 	return subs
 }
