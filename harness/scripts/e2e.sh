@@ -763,12 +763,16 @@ run_coordination() {
 		[ "$up" = 1 ] || { cat "$WORK/run-coord.log"; exit 1; }
 		# all three coordination kinds govern (observe → admit) with no --loop having named them
 		local out
+		# project_intent + assignment are mid-risk (P3c): the candidate must carry evidence.
 		out="$("$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
-			--type project_intent.write_candidate.observed --external-id ci1 --payload '{"statement":"ship the AgentTeam beta"}')"
+			--type project_intent.write_candidate.observed --external-id ci1 --payload '{"statement":"ship the AgentTeam beta","evidence":"roadmap-q3"}')"
 		case "$out" in *ticked=true*) ;; *) echo "project_intent observe: $out"; exit 1 ;; esac
 		out="$("$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
-			--type assignment.write_candidate.observed --external-id ci2 --payload '{"scope":"fix projection","ttl":"2h","assignee":"codex@impl"}')"
+			--type assignment.write_candidate.observed --external-id ci2 --payload '{"scope":"fix projection","ttl":"2h","assignee":"codex@impl","evidence":"ticket-123"}')"
 		case "$out" in *ticked=true*) ;; *) echo "assignment observe: $out"; exit 1 ;; esac
+		# mid-risk gate: an assignment WITHOUT evidence is denied (resource count stays at the 2 above).
+		"$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
+			--type assignment.write_candidate.observed --external-id ci2b --payload '{"scope":"no evidence","ttl":"1h","assignee":"codex@impl"}' >/dev/null
 		out="$("$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
 			--type progress_digest.write_candidate.observed --external-id ci3 --payload '{"summary":"projection 80 percent done"}')"
 		case "$out" in *ticked=true*) ;; *) echo "progress_digest observe: $out"; exit 1 ;; esac

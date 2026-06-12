@@ -75,6 +75,12 @@ func Assemble(cfg config.File, bindings []channel.ChannelBinding, catalog map[st
 				continue // unscoped for this kind: no rule, no authority (it could never pull what it writes)
 			}
 			rules = append(rules, cap.Rule(b.Principal, ref, capability.Limits{MaxPayloadBytes: cc.MaxPayloadBytes}))
+			// Mid-risk kinds get a governance gate alongside their admission rule (P3): it denies a
+			// candidate lacking `evidence`, and rule.Evaluate's deny-priority makes that deny outrank
+			// the admission propose. (High-risk gating lands in P3e with loopdef + the operator binding.)
+			if cap.Risk == "mid" {
+				rules = append(rules, capability.RiskEvidenceGate(cap, b.Principal))
+			}
 			allow[b.Principal] = appendKind(allow[b.Principal], cap.ResourceKind)
 		}
 	}

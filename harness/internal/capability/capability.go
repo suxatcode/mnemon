@@ -42,7 +42,10 @@ type Capability struct {
 	// DefaultEnabled opts the kind into governance on every local boot without an explicit --loop
 	// (P3 coordination package). The app boot grants it to every host-agent principal.
 	DefaultEnabled bool
-	Limits         Limits
+	// Risk is the kind's governance risk tier ("low"|"mid"|"high"; P3). The assembler builds the
+	// matching risk-gate rule per binding (mid = evidence required; high = operator-only).
+	Risk   string
+	Limits Limits
 }
 
 type SyncOptions struct {

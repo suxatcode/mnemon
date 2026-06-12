@@ -40,6 +40,12 @@ type CapabilitySpec struct {
 	// every host-agent principal the kind's observe + scope, so a default-enabled kind is governable
 	// from setup alone. Omitted = opt-in (enabled only when named in config.loops / a binding scope).
 	DefaultEnabled bool `json:"default_enabled,omitempty"`
+	// Risk is the kind's governance risk tier (P3, CLOSED set): "" / "low" = no gate; "mid" requires
+	// the candidate to carry non-empty `evidence`; "high" requires an operator (control-agent)
+	// principal — an agent's high-risk candidate is denied with a durable diagnostic (Inbox) and a
+	// human re-submits. The tier maps to a generated risk-gate rule (define≠select), never a new
+	// kernel verdict/state.
+	Risk string `json:"risk,omitempty"`
 }
 
 // SyncSpec is the sync-import descriptor: a kind opts into remote import (Importable) and selects a
@@ -52,6 +58,9 @@ type SyncSpec struct {
 
 // syncMergeStrategies is the CLOSED set of remote-import merge strategies a spec may select.
 var syncMergeStrategies = map[string]bool{"entry-dedup": true, "declaration-dedup": true}
+
+// riskTiers is the CLOSED set of governance risk tiers a spec may select (empty = low = no gate).
+var riskTiers = map[string]bool{"low": true, "mid": true, "high": true}
 
 type FieldSpec struct {
 	Name       string         `json:"name"`
@@ -223,6 +232,15 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 		}
 	}
 
+	// Risk tier: select from the CLOSED set (empty = low = no gate).
+	risk := spec.Risk
+	if risk == "" {
+		risk = "low"
+	}
+	if !riskTiers[risk] {
+		return Capability{}, fmt.Errorf("capability spec %q: risk %q not in the closed set (low|mid|high)", spec.Name, spec.Risk)
+	}
+
 	return Capability{
 		Name:           spec.Name,
 		ObservedType:   spec.ObservedType,
@@ -232,6 +250,7 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 		Decode:         compileDecode(spec),
 		Header:         compileHeader(spec),
 		RequiredHeader: required,
+		Risk:           risk,
 		Sync:           sync,
 		DefaultEnabled: spec.DefaultEnabled,
 	}, nil

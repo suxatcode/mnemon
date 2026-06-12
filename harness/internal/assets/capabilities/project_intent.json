@@ -19,6 +19,14 @@
           "id": "safety:unsafe"
         }
       ]
+    },
+    {
+      "name": "evidence",
+      "validators": [
+        {
+          "id": "safety:unsafe"
+        }
+      ]
     }
   ],
   "render": {
@@ -30,5 +38,6 @@
       }
     }
   },
-  "default_enabled": true
+  "default_enabled": true,
+  "risk": "mid"
 }

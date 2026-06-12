@@ -35,7 +35,7 @@ func TestCoordinationAssignmentGoverns(t *testing.T) {
 	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
 		ExternalID: "a1",
 		Event: contract.Event{Type: "assignment.write_candidate.observed", Payload: map[string]any{
-			"scope": "fix projection", "ttl": "2h", "assignee": "codex@impl",
+			"scope": "fix projection", "ttl": "2h", "assignee": "codex@impl", "evidence": "ticket-123",
 		}},
 	}); err != nil {
 		t.Fatalf("ingest assignment: %v", err)
@@ -51,11 +51,12 @@ func TestCoordinationAssignmentGoverns(t *testing.T) {
 		t.Fatalf("assignment content missing the candidate scope: %q", content)
 	}
 
-	// negative: scope is required (§569) — a candidate without it is rejected, version unchanged.
+	// negative: scope is required (§569) — a candidate WITH evidence but no scope is rejected, version
+	// unchanged (evidence present so the only failure is the missing required scope).
 	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
 		ExternalID: "a2",
 		Event: contract.Event{Type: "assignment.write_candidate.observed", Payload: map[string]any{
-			"ttl": "1h", "assignee": "codex@impl",
+			"ttl": "1h", "assignee": "codex@impl", "evidence": "ticket-123",
 		}},
 	}); err != nil {
 		t.Fatalf("ingest scopeless assignment: %v", err)
@@ -66,6 +67,55 @@ func TestCoordinationAssignmentGoverns(t *testing.T) {
 	v2, _, _ := rt.Resource(ref)
 	if v2 != v {
 		t.Fatalf("a scopeless assignment must be rejected (required scope), version moved %d -> %d", v, v2)
+	}
+}
+
+// P3c risk-tier: assignment is mid-risk, so a complete candidate that lacks `evidence` is DENIED by
+// the risk gate (the gate's deny outranks the admission propose), never written.
+func TestCoordinationMidRiskRequiresEvidence(t *testing.T) {
+	ref := contract.ResourceRef{Kind: "assignment", ID: "project"}
+	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{ref})
+	binding.AllowedObservedTypes = []string{"assignment.write_candidate.observed"}
+	rc, err := LocalRuntimeConfigFromBindings([]channel.ChannelBinding{binding}, nil)
+	if err != nil {
+		t.Fatalf("boot config: %v", err)
+	}
+	rt, err := runtime.OpenRuntime(filepath.Join(t.TempDir(), "risk.db"), rc)
+	if err != nil {
+		t.Fatalf("open runtime: %v", err)
+	}
+	defer rt.Close()
+
+	// complete assignment (scope/ttl/assignee) but NO evidence → mid-risk gate denies.
+	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
+		ExternalID: "r1",
+		Event: contract.Event{Type: "assignment.write_candidate.observed", Payload: map[string]any{
+			"scope": "evidence-less work", "ttl": "2h", "assignee": "codex@impl",
+		}},
+	}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if _, err := rt.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	if v, _, _ := rt.Resource(ref); v != 0 {
+		t.Fatalf("a mid-risk assignment without evidence must be denied, but it admitted (v=%d)", v)
+	}
+
+	// the same candidate WITH evidence is admitted.
+	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
+		ExternalID: "r2",
+		Event: contract.Event{Type: "assignment.write_candidate.observed", Payload: map[string]any{
+			"scope": "evidence-backed work", "ttl": "2h", "assignee": "codex@impl", "evidence": "PR-42",
+		}},
+	}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if _, err := rt.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	if v, _, _ := rt.Resource(ref); v == 0 {
+		t.Fatal("a mid-risk assignment WITH evidence must admit")
 	}
 }
 
@@ -94,7 +144,7 @@ func TestCoordinationDefaultEnabled(t *testing.T) {
 	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
 		ExternalID: "de1",
 		Event: contract.Event{Type: "assignment.write_candidate.observed", Payload: map[string]any{
-			"scope": "default-enabled work", "ttl": "2h", "assignee": "codex@impl",
+			"scope": "default-enabled work", "ttl": "2h", "assignee": "codex@impl", "evidence": "ticket-9",
 		}},
 	}); err != nil {
 		t.Fatalf("default-enabled assignment observe must be authorized: %v", err)
@@ -136,7 +186,7 @@ func TestCoordinationProjectIntentGoverns(t *testing.T) {
 	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
 		ExternalID: "p1",
 		Event: contract.Event{Type: "project_intent.write_candidate.observed", Payload: map[string]any{
-			"statement": "ship the AgentTeam beta",
+			"statement": "ship the AgentTeam beta", "evidence": "roadmap-q3",
 		}},
 	}); err != nil {
 		t.Fatalf("ingest project_intent: %v", err)
