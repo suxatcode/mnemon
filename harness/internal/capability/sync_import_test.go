@@ -31,3 +31,27 @@ func TestSyncImportSkippedRuleDeniesNamingKind(t *testing.T) {
 		t.Fatalf("a foreign principal's event must pass through, got %+v err=%v", foreign, err)
 	}
 }
+
+// The first-party importable set is descriptor-derived (PD6, replacing the former hardcoded
+// contract.SyncableResourceKinds): the embedded catalog opts exactly memory + skill into Remote
+// Workspace import, each under its declared closed-set merge strategy. This is the pin the deleted
+// contract.clamp_test invariant moved to — its home is now the catalog that declares it.
+func TestEmbeddedImportableKindsAreMemoryAndSkill(t *testing.T) {
+	kinds := ImportableKinds(EmbeddedCatalog())
+	if len(kinds) != 2 || kinds[0] != "memory" || kinds[1] != "skill" {
+		t.Fatalf("embedded importable kinds must be exactly [memory skill] (sorted): %v", kinds)
+	}
+	cat := EmbeddedCatalog()
+	if cat["memory"].Sync.Merge != "entry-dedup" || cat["skill"].Sync.Merge != "declaration-dedup" {
+		t.Fatalf("merge strategies must match the descriptors: memory=%q skill=%q", cat["memory"].Sync.Merge, cat["skill"].Sync.Merge)
+	}
+	if got := cat["memory"].RemoteCommitObserved(); got != "memory.remote_commit.observed" {
+		t.Fatalf("remote-commit observation must be the system-derived form, got %q", got)
+	}
+	if _, ok := RemoteImportRule(cat["memory"], contract.SyncImportActor); !ok {
+		t.Fatal("an importable capability must yield a remote-import rule")
+	}
+	if r, ok := RemoteImportRule(cat["memory"], contract.SyncImportActor); !ok || !r.Handles("memory.remote_commit.observed") {
+		t.Fatalf("the memory import rule must handle its derived observation type, ok=%v", ok)
+	}
+}

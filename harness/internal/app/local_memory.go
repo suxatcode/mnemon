@@ -60,11 +60,14 @@ func withSyncImport(rc runtime.RuntimeConfig, bindings []channel.ChannelBinding,
 	if rc.Subs == nil {
 		rc.Subs = map[contract.ActorID]contract.Subscription{}
 	}
-	rc.Subs[contract.SyncImportActor] = contract.Subscription{Actor: contract.SyncImportActor, Refs: syncableScopeRefs(bindings)}
+	rc.Subs[contract.SyncImportActor] = contract.Subscription{Actor: contract.SyncImportActor, Refs: syncableScopeRefs(bindings, catalog)}
 	if rc.Authority.Allow == nil {
 		rc.Authority.Allow = map[contract.ActorID][]contract.ResourceKind{}
 	}
 	rc.Authority.Allow[contract.SyncImportActor] = capability.ImportableKinds(catalog)
+	// Inject the produce surface: this replica emits sync commits for exactly the kinds its catalog
+	// imports (sync-abi-v2 §4). The runtime stays capability-free — the app fills the kind slice.
+	rc.SyncableKinds = capability.ImportableKinds(catalog)
 	return rc
 }
 
@@ -78,14 +81,19 @@ func resolveSyncCatalog(catalog map[string]capability.Capability) map[string]cap
 	return catalog
 }
 
-// syncableScopeRefs collects the deduped binding-scope refs of syncable kinds — the resources a
-// pulled commit may target on this replica (the same canonical refs the host loops govern).
-func syncableScopeRefs(bindings []channel.ChannelBinding) []contract.ResourceRef {
+// syncableScopeRefs collects the deduped binding-scope refs of importable kinds — the resources a
+// pulled commit may target on this replica (the same canonical refs the host loops govern). The
+// importable-kind set is descriptor-derived from the catalog (PD6), not a hardcoded constant.
+func syncableScopeRefs(bindings []channel.ChannelBinding, catalog map[string]capability.Capability) []contract.ResourceRef {
+	syncable := map[contract.ResourceKind]bool{}
+	for _, k := range capability.ImportableKinds(catalog) {
+		syncable[k] = true
+	}
 	seen := map[contract.ResourceRef]bool{}
 	var refs []contract.ResourceRef
 	for _, b := range bindings {
 		for _, ref := range b.SubscriptionScope {
-			if contract.SyncableResourceKinds[ref.Kind] && !seen[ref] {
+			if syncable[ref.Kind] && !seen[ref] {
 				seen[ref] = true
 				refs = append(refs, ref)
 			}

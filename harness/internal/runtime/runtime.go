@@ -53,6 +53,14 @@ type RuntimeConfig struct {
 	// every principal must have a binding granting the verb / observed type / pull scope it uses. The
 	// zero (nil) leaves the API unbound — correct for a trusted in-process owner (embedded coreengine).
 	Bindings []channel.ChannelBinding
+
+	// SyncableKinds names the resource kinds this replica PRODUCES Remote Workspace sync commits for —
+	// the produce surface (sync-abi-v2 §4). The assembler injects the catalog's importable kinds
+	// (capability.ImportableKinds), so the produce set is descriptor-derived, never a hardcoded
+	// constant (PD6 replaced contract.SyncableResourceKinds). The zero (nil) produces no sync commits
+	// — correct for a runtime with no Remote Workspace. The runtime stays capability-free: this is a
+	// plain contract.ResourceKind slice the app layer fills.
+	SyncableKinds []contract.ResourceKind
 }
 
 func (cfg RuntimeConfig) withDefaults() RuntimeConfig {
@@ -100,6 +108,7 @@ func OpenRuntime(storePath string, cfg RuntimeConfig) (*Runtime, error) {
 	cfg = cfg.withDefaults()
 	k := kernel.NewKernel(store, cfg.SchemaGuard, cfg.Authority)
 	cs := New(store, k, cfg.Rules, cfg.Subs, cfg.Modes, cfg.NewID, cfg.Now)
+	cs.syncableKinds = kindSet(cfg.SyncableKinds)
 	rt := &Runtime{store: store, cs: cs, api: cs, storePath: storePath}
 	if len(cfg.Bindings) > 0 {
 		bindings, err := channel.NewBindingSet(cfg.Bindings...)

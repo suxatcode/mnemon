@@ -203,9 +203,12 @@ func (s *Server) Status(principal contract.ActorID) (contract.SyncStatusResponse
 	return resp, nil
 }
 
-// validateSyncCommit is the hub's per-commit validation (sync-abi-v1 §4): provenance, resource ref,
-// kind in the shared syncable set, fields present, digest matching. Returns "" when valid, else the
-// rejection diagnostic.
+// validateSyncCommit is the hub's per-commit STRUCTURAL validation (sync-abi-v2 §4): provenance,
+// resource ref present, fields present, digest matching. It carries NO notion of "syncable kinds":
+// the accept surface is the replica's grant scope, enforced by the ref-level grant clamp
+// (contract.ClampRefs) at the call site — a commit whose ref is outside the grant is rejected there
+// (PD6 removed the hardcoded contract.SyncableResourceKinds; the grant scope is the sole accept
+// authority). Returns "" when valid, else the rejection diagnostic.
 func validateSyncCommit(commit contract.LocalCommit) string {
 	switch {
 	case strings.TrimSpace(commit.OriginReplicaID) == "":
@@ -216,8 +219,6 @@ func validateSyncCommit(commit contract.LocalCommit) string {
 		return "actor is required"
 	case strings.TrimSpace(string(commit.ResourceRef.Kind)) == "" || strings.TrimSpace(string(commit.ResourceRef.ID)) == "":
 		return "resource_ref is required"
-	case !contract.SyncableResourceKinds[commit.ResourceRef.Kind]:
-		return fmt.Sprintf("resource kind %q is not syncable", commit.ResourceRef.Kind)
 	case commit.Fields == nil:
 		return "fields are required"
 	case strings.TrimSpace(commit.FieldsDigest) == "":

@@ -40,11 +40,12 @@ func localRuntimeConfigT(bindings []channel.ChannelBinding) RuntimeConfig {
 		}
 	}
 	return RuntimeConfig{
-		Bindings:    bindings,
-		Subs:        channel.SubsFromBindings(bindings),
-		Rules:       rule.NewRuleSet(rules...),
-		Authority:   kernel.AuthorityRules{Allow: allow},
-		SchemaGuard: kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}}),
+		Bindings:      bindings,
+		Subs:          channel.SubsFromBindings(bindings),
+		Rules:         rule.NewRuleSet(rules...),
+		Authority:     kernel.AuthorityRules{Allow: allow},
+		SchemaGuard:   kernel.SchemaGuardWith(map[contract.ResourceKind][]string{"memory": {"content"}, "skill": {"name"}}),
+		SyncableKinds: capability.ImportableKinds(capability.EmbeddedCatalog()),
 	}
 }
 

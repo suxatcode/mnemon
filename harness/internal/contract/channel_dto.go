@@ -43,14 +43,6 @@ type ReplicaGrant struct {
 	Scopes    []ResourceRef
 }
 
-// SyncableResourceKinds names the resource kinds Remote Workspace sync carries (sync-abi-v1 §4). It
-// is shared by the hub's push validation (syncserver) AND the local decision sink that produces sync
-// commits (runtime), so the accept surface and the produce surface can never drift.
-var SyncableResourceKinds = map[ResourceKind]bool{
-	"memory": true,
-	"skill":  true,
-}
-
 // ClampRefs clamps a requested ref set to a principal's granted scope — the team-scale authorization
 // ceiling, implemented ONCE for pull / sync / status (hand-rolled copies had already diverged on
 // empty-scope handling). channel.ChannelBinding.ClampRefs and the syncserver hub both delegate here.

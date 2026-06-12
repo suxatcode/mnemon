@@ -29,10 +29,3 @@ func TestContractClampRefsSemantics(t *testing.T) {
 		t.Fatalf("empty scope + empty requested must clamp to nothing: %v err=%v", got, err)
 	}
 }
-
-// The syncable-kind set is ABI surface (sync-abi-v1 §4): hub accept + local produce share it.
-func TestSyncableResourceKindsAreMemoryAndSkill(t *testing.T) {
-	if len(SyncableResourceKinds) != 2 || !SyncableResourceKinds["memory"] || !SyncableResourceKinds["skill"] {
-		t.Fatalf("syncable kinds must be exactly {memory, skill}: %v", SyncableResourceKinds)
-	}
-}

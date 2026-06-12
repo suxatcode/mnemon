@@ -39,6 +39,22 @@ type ControlServer struct {
 	modes      contract.Modes
 	newID      func() string
 	now        func() string
+	// syncableKinds is the produce surface: the resource kinds a host decision becomes a pending sync
+	// commit for (sync-abi-v2 §4). Descriptor-derived and injected by OpenRuntime from
+	// RuntimeConfig.SyncableKinds; nil = produce no sync commits.
+	syncableKinds map[contract.ResourceKind]bool
+}
+
+// kindSet builds the produce-surface lookup from the configured syncable kinds.
+func kindSet(kinds []contract.ResourceKind) map[contract.ResourceKind]bool {
+	if len(kinds) == 0 {
+		return nil
+	}
+	set := make(map[contract.ResourceKind]bool, len(kinds))
+	for _, k := range kinds {
+		set[k] = true
+	}
+	return set
 }
 
 func New(s *store.Store, k *kernel.Kernel, rules rule.RuleSet, subs map[contract.ActorID]contract.Subscription, modes contract.Modes, newID, now func() string) *ControlServer {
@@ -298,10 +314,13 @@ func (cs *ControlServer) processDecisionSideEffects() error {
 					if err := tx.EnqueueOutbox(store.OutboxRow{ID: key, Kind: "invalidation", EventSeq: d.IngestSeq, Target: "projection", Payload: string(payload), IdempotencyKey: key}); err != nil {
 						return err
 					}
-					// contract.SyncableResourceKinds: the produce surface shares the hub's accept
-					// set (sync-abi-v1 §4), so the two can never drift.
+					// cs.syncableKinds is the produce surface, descriptor-derived from the replica's
+					// capability catalog (sync-abi-v2 §4): a host decision on a syncable kind becomes a
+					// pending sync commit. The hub's accept surface is its per-replica grant scope; the
+					// two align by configuration (a mismatch surfaces as a per-commit rejection, never a
+					// silent drop). The sync-import principal is excluded — imported writes never re-emit.
 					if d.Actor != contract.SyncImportActor {
-						if err := tx.RecordSyncCommitsTx(d, contract.SyncableResourceKinds); err != nil {
+						if err := tx.RecordSyncCommitsTx(d, cs.syncableKinds); err != nil {
 							return err
 						}
 					}
