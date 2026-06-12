@@ -740,6 +740,48 @@ run_daemon() {
 	echo "    mnemond daemon lifecycle OK"
 }
 
+# run_coordination proves the AgentTeam coordination package is default-enabled (P3b): `setup --host
+# codex` with NO --loop wires a host that governs project_intent/assignment/progress_digest out of the
+# box — the §3.7 row-A 普通使用者 flow. No coordination kind is named anywhere on the setup line.
+run_coordination() {
+	CUR_HOST="coordination"
+	local proj="$WORK/proj-coord" addr="127.0.0.1:8790"
+	mkdir -p "$proj"
+	echo "=== E2E coordination kinds default-enabled (no --loop) ==="
+	(
+		cd "$proj"
+		local tok=".mnemon/harness/channel/credentials/codex-project.token"
+		"$MH" setup --host codex --principal codex@project --control-url "http://$addr" >/dev/null
+		"$MH" local run >"$WORK/run-coord.log" 2>&1 &
+		local runpid=$!
+		echo "$runpid" >"$PIDFILE"
+		local up=0 i
+		for i in $(seq 1 60); do
+			"$MH" control status --addr "http://$addr" --principal codex@project --token-file "$tok" >/dev/null 2>&1 && { up=1; break; }
+			sleep 0.1
+		done
+		[ "$up" = 1 ] || { cat "$WORK/run-coord.log"; exit 1; }
+		# all three coordination kinds govern (observe → admit) with no --loop having named them
+		local out
+		out="$("$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
+			--type project_intent.write_candidate.observed --external-id ci1 --payload '{"statement":"ship the AgentTeam beta"}')"
+		case "$out" in *ticked=true*) ;; *) echo "project_intent observe: $out"; exit 1 ;; esac
+		out="$("$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
+			--type assignment.write_candidate.observed --external-id ci2 --payload '{"scope":"fix projection","ttl":"2h","assignee":"codex@impl"}')"
+		case "$out" in *ticked=true*) ;; *) echo "assignment observe: $out"; exit 1 ;; esac
+		out="$("$MH" control observe --addr "http://$addr" --principal codex@project --token-file "$tok" \
+			--type progress_digest.write_candidate.observed --external-id ci3 --payload '{"summary":"projection 80 percent done"}')"
+		case "$out" in *ticked=true*) ;; *) echo "progress_digest observe: $out"; exit 1 ;; esac
+		# all three governed resources are pullable in the default coordination scope
+		out="$("$MH" control pull --addr "http://$addr" --principal codex@project --token-file "$tok")"
+		case "$out" in *resources=3*) ;; *) echo "coordination pull (want resources=3): $out"; exit 1 ;; esac
+		{ kill "$runpid" 2>/dev/null; wait "$runpid"; } 2>/dev/null || true
+		rm -f "$PIDFILE"
+	) || fail "coordination flow failed (see $WORK/run-coord.log)"
+	sleep 0.3
+	echo "    coordination kinds default-enabled OK"
+}
+
 run_host codex codex@project 8787 .codex
 run_host claude-code claude@project 8899 .claude
 run_skill codex codex@project
@@ -749,5 +791,6 @@ run_external_goal
 run_foo_external
 run_sync_pair
 run_daemon
+run_coordination
 
-echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair[memory+journal] + daemon)"
+echo "E2E PASS (codex + claude-code; memory + skill + note-external-package + external-goal + foo-projection + sync-pair[memory+journal] + daemon + coordination)"

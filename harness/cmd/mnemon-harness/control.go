@@ -113,7 +113,16 @@ var controlPullCmd = &cobra.Command{
 			enc.SetIndent("", "  ")
 			return enc.Encode(proj)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "projection ref=%s digest=%s resources=%d\n", proj.Ref, proj.Digest, len(proj.Resources))
+		// Count WRITTEN resources (version > 0), not every scoped ref: a host's scope now includes the
+		// default-enabled coordination kinds (P3b), so an unwritten coordination ref must not inflate
+		// "you have N resources". proj.Resources lists the full scope; the written ones carry a version.
+		written := 0
+		for _, r := range proj.Resources {
+			if r.Version > 0 {
+				written++
+			}
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "projection ref=%s digest=%s resources=%d\n", proj.Ref, proj.Digest, written)
 		return nil
 	},
 }

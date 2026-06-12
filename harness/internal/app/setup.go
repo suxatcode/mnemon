@@ -123,23 +123,27 @@ func (h *Harness) Setup(ctx context.Context, out, errw io.Writer, opts SetupOpti
 	if opts.Host == "" {
 		return SetupResult{}, fmt.Errorf("setup requires --host")
 	}
-	if len(opts.Loops) == 0 {
-		return SetupResult{}, fmt.Errorf("setup requires at least one --loop (e.g. --loop memory --loop skill)")
-	}
+	// No --loop is valid (P3): the coordination package (project_intent/assignment/progress_digest)
+	// is default-enabled at boot, so `setup --host codex` alone wires a host that can govern the
+	// AgentTeam nouns out of the box. --loop adds the optional packages (memory/skill) on top.
 	if err := validateProductLoops(opts.Host, opts.Loops, opts.ProjectRoot); err != nil {
 		return SetupResult{}, err
 	}
 	projectRoot := opts.ProjectRoot
 
-	// 1. Project loop assets. Dry-run lowers to the projector's own --dry-run
-	//    so projection changes print without writing.
-	action, hostArgs := "install", []string(nil)
-	if opts.DryRun {
-		hostArgs = []string{"--dry-run"}
-	}
-	var projectorOut bytes.Buffer
-	if err := h.LoopProject(ctx, &projectorOut, errw, action, projectRoot, opts.Host, opts.Loops, hostArgs); err != nil {
-		return SetupResult{}, fmt.Errorf("setup: project loop assets: %w", err)
+	// 1. Project loop assets. Dry-run lowers to the projector's own --dry-run so projection changes
+	//    print without writing. Skipped when no --loop is named (P3): the default-enabled coordination
+	//    package is governance-only — there are no host assets to project — and step 2 still wires the
+	//    channel so the host can govern the coordination kinds.
+	if len(opts.Loops) > 0 {
+		action, hostArgs := "install", []string(nil)
+		if opts.DryRun {
+			hostArgs = []string{"--dry-run"}
+		}
+		var projectorOut bytes.Buffer
+		if err := h.LoopProject(ctx, &projectorOut, errw, action, projectRoot, opts.Host, opts.Loops, hostArgs); err != nil {
+			return SetupResult{}, fmt.Errorf("setup: project loop assets: %w", err)
+		}
 	}
 
 	// 2. Channel artifacts.

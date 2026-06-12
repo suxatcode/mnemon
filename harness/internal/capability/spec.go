@@ -35,6 +35,11 @@ type CapabilitySpec struct {
 	// Sync declares whether this capability's kind is imported from Remote Workspace pulls, and which
 	// CLOSED merge strategy the import uses (capability-spec v2 §Sync). Omitted = not importable.
 	Sync *SyncSpec `json:"sync,omitempty"`
+	// DefaultEnabled opts the kind into governance on EVERY local boot, without an explicit `--loop`
+	// (P3: the coordination package is on out of the box; memory/skill stay opt-in). The boot grants
+	// every host-agent principal the kind's observe + scope, so a default-enabled kind is governable
+	// from setup alone. Omitted = opt-in (enabled only when named in config.loops / a binding scope).
+	DefaultEnabled bool `json:"default_enabled,omitempty"`
 }
 
 // SyncSpec is the sync-import descriptor: a kind opts into remote import (Importable) and selects a
@@ -228,6 +233,7 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 		Header:         compileHeader(spec),
 		RequiredHeader: required,
 		Sync:           sync,
+		DefaultEnabled: spec.DefaultEnabled,
 	}, nil
 }
 

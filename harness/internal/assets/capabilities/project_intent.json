@@ -29,5 +29,6 @@
         "field": "statement"
       }
     }
-  }
+  },
+  "default_enabled": true
 }

@@ -33,14 +33,17 @@ import (
 // The assembled policy is then merged with the sync-import half (withSyncImport), so the SERVING
 // runtime can import pulled commits in-process (v1.1 #2) without a second runtime boot.
 func OpenLocalRuntime(storePath string, loaded channel.LoadedBindings, loops []string, catalog map[string]capability.Capability) (*runtime.Runtime, error) {
+	cat := resolveSyncCatalog(catalog)
 	if len(loops) == 0 {
-		loops = loopsFromBindings(loaded.Bindings, catalog)
+		loops = loopsFromBindings(loaded.Bindings, cat)
 	}
-	rc, err := assembler.Assemble(capabilityFileFromLoops(loops), loaded.Bindings, catalog)
+	loops = withDefaultEnabledLoops(loops, cat)
+	bindings := withDefaultEnabledGrants(loaded.Bindings, cat)
+	rc, err := assembler.Assemble(capabilityFileFromLoops(loops), bindings, cat)
 	if err != nil {
 		return nil, err
 	}
-	return runtime.OpenRuntime(storePath, withSyncImport(rc, loaded.Bindings, catalog))
+	return runtime.OpenRuntime(storePath, withSyncImport(rc, bindings, cat))
 }
 
 // withSyncImport merges the sync-import half into an assembled runtime policy (v1.1 #2): sync@local
@@ -112,7 +115,83 @@ func syncableScopeRefs(bindings []channel.ChannelBinding, catalog map[string]cap
 // bindings alone (enablement = binding scope kinds ∩ catalog; nil = Builtins). It is the
 // bindings-only convenience over the same select-only assembly OpenLocalRuntime uses.
 func LocalRuntimeConfigFromBindings(bindings []channel.ChannelBinding, catalog map[string]capability.Capability) (runtime.RuntimeConfig, error) {
-	return assembler.Assemble(capabilityFileFromLoops(loopsFromBindings(bindings, catalog)), bindings, catalog)
+	cat := resolveSyncCatalog(catalog)
+	loops := withDefaultEnabledLoops(loopsFromBindings(bindings, cat), cat)
+	return assembler.Assemble(capabilityFileFromLoops(loops), withDefaultEnabledGrants(bindings, cat), cat)
+}
+
+// defaultEnabledCaps returns the catalog's default-enabled capabilities (the coordination package),
+// sorted by kind for determinism — the kinds the local boot governs without an explicit --loop (P3).
+func defaultEnabledCaps(catalog map[string]capability.Capability) []capability.Capability {
+	var caps []capability.Capability
+	for _, c := range catalog {
+		if c.DefaultEnabled {
+			caps = append(caps, c)
+		}
+	}
+	sort.Slice(caps, func(i, j int) bool { return caps[i].ResourceKind < caps[j].ResourceKind })
+	return caps
+}
+
+// withDefaultEnabledLoops unions the catalog's default-enabled kinds into the enabled-loops list, so
+// the assembler builds their rules even when no --loop named them.
+func withDefaultEnabledLoops(loops []string, catalog map[string]capability.Capability) []string {
+	for _, c := range defaultEnabledCaps(catalog) {
+		if !containsLoop(loops, c.Name) {
+			loops = append(loops, c.Name)
+		}
+	}
+	return loops
+}
+
+// withDefaultEnabledGrants grants every host-agent binding the default-enabled kinds' observe type +
+// project-scope ref (in-memory, never rewriting the on-disk binding): the catalog-driven IMPLICIT
+// grant that sits beside the binding's EXPLICIT --loop grants, so a default-enabled kind is
+// governable + pullable from setup alone (P3). The assembler and the channel authorizer both read
+// this same augmented list, so rules, authority, and authz stay consistent.
+func withDefaultEnabledGrants(bindings []channel.ChannelBinding, catalog map[string]capability.Capability) []channel.ChannelBinding {
+	defaults := defaultEnabledCaps(catalog)
+	if len(defaults) == 0 {
+		return bindings
+	}
+	out := make([]channel.ChannelBinding, len(bindings))
+	for i, b := range bindings {
+		if b.ActorKind == contract.KindHostAgent {
+			// An EMPTY AllowedObservedTypes already means allow-all (AllowsObservedType returns true),
+			// so coordination is permitted without listing it — and appending here would flip the
+			// binding to an explicit allow-list that EXCLUDES everything else. Only extend an explicit
+			// (non-empty) list, which is what setup writes.
+			explicitTypes := len(b.AllowedObservedTypes) > 0
+			for _, c := range defaults {
+				if explicitTypes {
+					b.AllowedObservedTypes = appendUniqueString(b.AllowedObservedTypes, c.ObservedType)
+				}
+				b.SubscriptionScope = appendUniqueRef(b.SubscriptionScope, contract.ResourceRef{Kind: c.ResourceKind, ID: "project"})
+			}
+		}
+		out[i] = b
+	}
+	return out
+}
+
+// appendUniqueString / appendUniqueRef append v only if absent, returning a NEW backing array when
+// they grow (so augmenting a binding copy never mutates the caller's slice).
+func appendUniqueString(s []string, v string) []string {
+	for _, x := range s {
+		if x == v {
+			return s
+		}
+	}
+	return append(append([]string(nil), s...), v)
+}
+
+func appendUniqueRef(s []contract.ResourceRef, v contract.ResourceRef) []contract.ResourceRef {
+	for _, x := range s {
+		if x == v {
+			return s
+		}
+	}
+	return append(append([]contract.ResourceRef(nil), s...), v)
 }
 
 // capabilityFileFromLoops constructs the in-memory config.File for the enabled loops. The on-disk

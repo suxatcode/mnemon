@@ -38,8 +38,11 @@ type Capability struct {
 	// Sync, when Importable, opts the kind into Remote Workspace import under the named (closed-set)
 	// merge strategy. The sync-import path derives its rules and syncable-kind set from this, so the
 	// importable kinds are no longer a hardcoded list (PD6).
-	Sync   SyncOptions
-	Limits Limits
+	Sync SyncOptions
+	// DefaultEnabled opts the kind into governance on every local boot without an explicit --loop
+	// (P3 coordination package). The app boot grants it to every host-agent principal.
+	DefaultEnabled bool
+	Limits         Limits
 }
 
 type SyncOptions struct {

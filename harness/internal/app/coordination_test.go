@@ -69,6 +69,54 @@ func TestCoordinationAssignmentGoverns(t *testing.T) {
 	}
 }
 
+// P3b default-enablement: a host whose binding enables ONLY memory (explicit allow-list + scope, as
+// setup writes) STILL governs the coordination kinds — the boot grants them to every host-agent
+// principal without an explicit --loop. This pins the "coordination package is on out of the box".
+func TestCoordinationDefaultEnabled(t *testing.T) {
+	memRef := contract.ResourceRef{Kind: "memory", ID: "project"}
+	binding := channel.HostAgentBinding("codex@project", "http://127.0.0.1:8787", []contract.ResourceRef{memRef})
+	// explicit allow-list (like setup): memory only — coordination is NOT named here.
+	binding.AllowedObservedTypes = []string{"session.observed", "memory.write_candidate.observed"}
+
+	rc, err := LocalRuntimeConfigFromBindings([]channel.ChannelBinding{binding}, nil)
+	if err != nil {
+		t.Fatalf("boot config: %v", err)
+	}
+	rt, err := runtime.OpenRuntime(filepath.Join(t.TempDir(), "de.db"), rc)
+	if err != nil {
+		t.Fatalf("open runtime: %v", err)
+	}
+	defer rt.Close()
+
+	// an assignment candidate — never named in the binding's --loop scope — is admitted, because the
+	// boot default-enabled it.
+	assignRef := contract.ResourceRef{Kind: "assignment", ID: "project"}
+	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
+		ExternalID: "de1",
+		Event: contract.Event{Type: "assignment.write_candidate.observed", Payload: map[string]any{
+			"scope": "default-enabled work", "ttl": "2h", "assignee": "codex@impl",
+		}},
+	}); err != nil {
+		t.Fatalf("default-enabled assignment observe must be authorized: %v", err)
+	}
+	if _, err := rt.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	v, _, err := rt.Resource(assignRef)
+	if err != nil || v == 0 {
+		t.Fatalf("default-enabled assignment must admit without an explicit --loop (v=%d err=%v)", v, err)
+	}
+	// memory still governs (default-enablement did not disturb the explicit grant).
+	if _, _, err := rt.API().Ingest("codex@project", contract.ObservationEnvelope{
+		ExternalID: "de2",
+		Event: contract.Event{Type: "memory.write_candidate.observed", Payload: map[string]any{
+			"content": "still works", "source": "user", "confidence": "high",
+		}},
+	}); err != nil {
+		t.Fatalf("memory must still be observable alongside default-enabled coordination: %v", err)
+	}
+}
+
 // project_intent governs through the same path — a quick admit pin so all three coordination kinds
 // are exercised (assignment above carries the required-field negative).
 func TestCoordinationProjectIntentGoverns(t *testing.T) {

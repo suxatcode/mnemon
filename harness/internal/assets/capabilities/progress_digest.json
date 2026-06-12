@@ -29,5 +29,6 @@
         "field": "summary"
       }
     }
-  }
+  },
+  "default_enabled": true
 }
