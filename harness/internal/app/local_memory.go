@@ -393,6 +393,14 @@ func serveReproject(rt *runtime.Runtime, loaded channel.LoadedBindings, hosts ma
 				return fmt.Errorf("re-project %s: %w", host, err)
 			}
 		}
+		// D-loop materialize (Δ2/G5): an admitted loopdef draft writes its managed package to
+		// .mnemon/loops/ — the driver bridge, not the runtime. Writes only; activation is a separate
+		// explicit reload (G1/G3).
+		if refsTouchKind(refs, "loopdef") {
+			if err := materializeLoopdefs(rt, projectRoot); err != nil {
+				return fmt.Errorf("materialize loopdefs: %w", err)
+			}
+		}
 		if mirrorMode == "manual" || !refsTouchKind(refs, "memory") {
 			return nil
 		}
