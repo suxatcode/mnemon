@@ -50,14 +50,18 @@ GOVERNANCE kinds (`lease`/`budget`/`receipt`/`coordination`) compiled, but user 
 the **assembly-time declared set**: the resolved capability catalog contributes its kinds, and a
 kind's kernel-required fields DERIVE from the spec rather than a parallel hand-written line —
 
-> **Required-derivation rule.** A kind's kernel-required fields are exactly the resource-header
-> keys the spec's `render` produces on every write: the `static` map keys plus `content` when a
-> content render member is present. Because the capability emits its full header on every propose,
-> these are precisely the fields every write of the kind carries. (memory: render content →
-> `{content}`; skill: render static `{"name":"project"}` → `{name}` — matching the v1 hand-written
-> `DefaultSchemaGuard` lines exactly.) A spec that declares no render produces no required header
-> fields. The lockstep test becomes: governance kinds stay bidirectionally pinned in code; user
-> kinds have a single source — the assembled catalog.
+> **Required-derivation rule.** The render-produced header keys (the `static` map keys plus
+> `content` when a content render member is present) are the CLOSED SET a kind's kernel-required
+> fields are selected from — a kind can never require a field its writes do not carry. A spec's
+> optional `required` array SELECTS a subset of those produced keys; omitted, every produced key is
+> required. Because the capability emits its full header on every propose, the produced keys are
+> exactly the fields every write carries, so the default reproduces the v1 hand-written
+> `DefaultSchemaGuard` lines (memory render content → `{content}`; skill render static
+> `{"name":"project"}` → `{name}`), and `required` narrows it where v1 hand-picked a subset (goal
+> renders `{content, statement}` but required only `{statement}` → declares `"required":
+> ["statement"]`). FromSpec rejects a `required` entry the render does not produce. The lockstep
+> test becomes: governance kinds stay bidirectionally pinned in code; user kinds have a single
+> source — the capability spec, read through the assembled catalog.
 
 The mechanism (splitting `KindCatalog` into compiled governance kinds + an assembled declared set,
 and threading the resulting `SchemaGuard` through both the live kernel and replay so a log produced

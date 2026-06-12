@@ -31,7 +31,11 @@ type Capability struct {
 	ItemsField   string // resource field holding the item list
 	Decode       func(payload map[string]any) (Item, error)
 	Header       func(items []Item) map[string]any // resource fields besides the item list + updated_by
-	Limits       Limits
+	// RequiredHeader is the kind's kernel-required header fields, derived from the spec (the
+	// render-produced keys, or the declared `required` subset). The assembler reads it to build the
+	// assembly-time SchemaGuard so a declared kind's required set has ONE source — the capability.
+	RequiredHeader []string
+	Limits         Limits
 }
 
 // Rule builds the capability's admission rule for one principal + resource ref. limits bounds the

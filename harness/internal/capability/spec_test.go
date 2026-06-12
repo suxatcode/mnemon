@@ -25,6 +25,30 @@ func TestFromSpecCompilesMinimal(t *testing.T) {
 	}
 }
 
+// Required-derivation rule (capability-spec v2): a kind's kernel-required header fields are the
+// spec's render-produced keys when `required` is omitted, else exactly the declared subset.
+func TestFromSpecRequiredDerivation(t *testing.T) {
+	// Default: render produces "content" (bullet-list), no `required` → RequiredHeader = ["content"].
+	cap, err := FromSpec(minimalSpec())
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	if got := cap.RequiredHeader; len(got) != 1 || got[0] != "content" {
+		t.Fatalf("default RequiredHeader = render-produced keys, want [content], got %v", got)
+	}
+	// Subset selection: render produces {content, statement}; required selects only statement.
+	s := minimalSpec()
+	s.Render.Static = map[string]string{"statement": "project"}
+	s.Required = []string{"statement"}
+	cap, err = FromSpec(s)
+	if err != nil {
+		t.Fatalf("compile with required subset: %v", err)
+	}
+	if got := cap.RequiredHeader; len(got) != 1 || got[0] != "statement" {
+		t.Fatalf("declared required selects the subset, want [statement], got %v", got)
+	}
+}
+
 // 每条 fail-closed 路径一例:unknown 成员、参数缺失/未知、schema_version、重复字段、
 // 前向 default-from、list 独占、render 键冲突、kind 不在 KindCatalog。
 func TestFromSpecFailsClosed(t *testing.T) {
@@ -97,4 +121,7 @@ func TestFromSpecFailsClosed(t *testing.T) {
 	mutate("missing render param", func(s *CapabilitySpec) {
 		delete(s.Render.Content.Params, "title")
 	}, "missing param")
+	mutate("required names unproduced key", func(s *CapabilitySpec) {
+		s.Required = []string{"ghost"}
+	}, "not one the render produces")
 }

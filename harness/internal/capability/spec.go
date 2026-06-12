@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
@@ -26,6 +27,11 @@ type CapabilitySpec struct {
 	ItemsField    string      `json:"items_field"`
 	Fields        []FieldSpec `json:"fields"`
 	Render        RenderSpec  `json:"render"`
+	// Required SELECTS the kind's kernel-required header fields from the render-produced keys
+	// (capability-spec v2 §Declared kind). Omitted = every produced key is required; when present,
+	// each entry must be a render-produced key (a kind cannot require a field its writes never carry).
+	// It is the single source the assembly-time SchemaGuard derives a user kind's required set from.
+	Required []string `json:"required,omitempty"`
 }
 
 type FieldSpec struct {
@@ -171,15 +177,45 @@ func FromSpec(spec CapabilitySpec) (Capability, error) {
 		}
 	}
 
+	// Required-derivation (capability-spec v2): a kind's kernel-required header fields are the
+	// render-produced keys, or — when `required` is declared — exactly that subset. A declared
+	// field that the render never produces is unsatisfiable (no write would carry it), so reject it.
+	required, err := requiredHeader(spec, produced)
+	if err != nil {
+		return Capability{}, err
+	}
+
 	return Capability{
-		Name:         spec.Name,
-		ObservedType: spec.ObservedType,
-		ProposedType: spec.ProposedType,
-		ResourceKind: contract.ResourceKind(spec.ResourceKind),
-		ItemsField:   spec.ItemsField,
-		Decode:       compileDecode(spec),
-		Header:       compileHeader(spec),
+		Name:           spec.Name,
+		ObservedType:   spec.ObservedType,
+		ProposedType:   spec.ProposedType,
+		ResourceKind:   contract.ResourceKind(spec.ResourceKind),
+		ItemsField:     spec.ItemsField,
+		Decode:         compileDecode(spec),
+		Header:         compileHeader(spec),
+		RequiredHeader: required,
 	}, nil
+}
+
+// requiredHeader resolves a spec's kernel-required header fields: the declared `required` subset
+// (each entry validated to be a render-produced key), or every produced key sorted when omitted.
+func requiredHeader(spec CapabilitySpec, produced map[string]bool) ([]string, error) {
+	if len(spec.Required) > 0 {
+		out := make([]string, 0, len(spec.Required))
+		for _, f := range spec.Required {
+			if !produced[f] {
+				return nil, fmt.Errorf("capability spec %q: required field %q is not one the render produces (fail-closed)", spec.Name, f)
+			}
+			out = append(out, f)
+		}
+		return out, nil
+	}
+	out := make([]string, 0, len(produced))
+	for k := range produced {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 // LoadSpec reads capabilities/<name>.json from fsys and strictly decodes it into its DATA form,
