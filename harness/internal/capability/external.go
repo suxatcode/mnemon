@@ -87,17 +87,10 @@ func loadExternalPackage(fsys fs.FS, name string, requiredFields map[contract.Re
 	if !specNamePattern.MatchString(name) {
 		return Capability{}, fmt.Errorf("external package %s: directory name must match %s (fail-closed)", pkg, specNamePattern)
 	}
-	// Class ⑥, deliberately WIDER than loop-package-v1's minimum (fragments/include/template.json):
-	// hooks/ or skills/ present AT ALL — empty or not — rejects the whole package. v1 external
-	// packages carry NO host projection assets; admission-equal-rights only. An unknown stat
-	// error is never treated as absence — only fs.ErrNotExist means "not there"; anything else
-	// fails closed on the error itself.
-	for _, sub := range []string{"hooks", "skills"} {
-		if _, err := fs.Stat(fsys, path.Join(name, sub)); err == nil {
-			return Capability{}, fmt.Errorf("external package %s: %s/ is forbidden in an external package (v1 carries no host projection assets; fail-closed)", pkg, sub)
-		} else if !errors.Is(err, fs.ErrNotExist) {
-			return Capability{}, fmt.Errorf("external package %s: stat %s/: %w", pkg, sub, err)
-		}
+	// Class ⑥ (loop-package-v2): an external package MAY carry host assets, but the hook-fragment
+	// CODE face stays embedded-only and every projected prose asset is injection-scanned.
+	if err := scanExternalPackageAssets(fsys, name, pkg); err != nil {
+		return Capability{}, err
 	}
 	raw, err := fs.ReadFile(fsys, path.Join(name, "capability.json"))
 	if err != nil {
@@ -191,6 +184,64 @@ func scanExternalSpecText(spec CapabilitySpec) error {
 		if containsSecretLikeContent(s.text) || containsPromptInjectionShape(s.text) {
 			return fmt.Errorf("unsafe spec text in %s (secret-like or prompt-injection-shaped; external spec text is untrusted input)", s.where)
 		}
+	}
+	return nil
+}
+
+// scanExternalPackageAssets is the loop-package-v2 host-asset safety gate at the capability-loader
+// level (class ⑥, no longer a blanket reject): an external package MAY carry host assets, but
+//   - the hook-fragment CODE face stays embedded-only: hooks/fragments/ presence fails closed (the
+//     renderer never reads an external fragment, but its presence must fail LOUD, not silently
+//     no-op), and
+//   - every projected prose asset (GUIDE.md, hooks/intents.json, skills/**) is scanned for
+//     prompt-injection SHAPE — documentation-grade (containsPromptInjectionShape), NOT the content
+//     secret scan, since honest documentation may discuss secrets.
+//
+// The deeper STRUCTURAL checks — the `include` intent, a template `external_id_recipe`, and that a
+// control-observe action's event_type equals the package's own observed_type — run in the projector
+// loader where the schema-aware parsers live (loop-package-v2 enforcement map); a capability leaf
+// must not duplicate the hostsurface intents/template schema.
+func scanExternalPackageAssets(fsys fs.FS, name, pkg string) error {
+	if _, err := fs.Stat(fsys, path.Join(name, "hooks", "fragments")); err == nil {
+		return fmt.Errorf("external package %s: hooks/fragments/ is forbidden (shell fragments are embedded-only; fail-closed)", pkg)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("external package %s: stat hooks/fragments/: %w", pkg, err)
+	}
+	for _, rel := range []string{"GUIDE.md", path.Join("hooks", "intents.json")} {
+		if err := scanExternalAssetText(fsys, path.Join(name, rel), pkg); err != nil {
+			return err
+		}
+	}
+	skillsRoot := path.Join(name, "skills")
+	if info, err := fs.Stat(fsys, skillsRoot); err == nil && info.IsDir() {
+		if err := fs.WalkDir(fsys, skillsRoot, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			return scanExternalAssetText(fsys, p, pkg)
+		}); err != nil {
+			return fmt.Errorf("external package %s: scan skills/: %w", pkg, err)
+		}
+	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("external package %s: stat skills/: %w", pkg, err)
+	}
+	return nil
+}
+
+// scanExternalAssetText injection-scans one projected text asset (absent = inert, skipped).
+func scanExternalAssetText(fsys fs.FS, full, pkg string) error {
+	raw, err := fs.ReadFile(fsys, full)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("external package %s: read %s: %w", pkg, full, err)
+	}
+	if containsPromptInjectionShape(string(raw)) {
+		return fmt.Errorf("external package %s: %s contains prompt-injection-shaped text (untrusted projected prose; fail-closed)", pkg, full)
 	}
 	return nil
 }

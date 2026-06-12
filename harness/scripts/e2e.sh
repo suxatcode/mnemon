@@ -398,6 +398,27 @@ run_external_goal() {
 		fi
 		grep -q ".mnemon/loops/bad" "$WORK/external-bad.err.log" || { echo "boot refusal must name the bad package path on stderr"; cat "$WORK/external-bad.err.log"; exit 1; }
 		rm -rf .mnemon/loops/bad
+
+		# NEGATIVE (loop-package-v2): an external package may carry host assets, but the hook-fragment
+		# CODE face stays embedded-only — a package shipping hooks/fragments/ must REFUSE boot, naming
+		# its path. Same bounded-poll pattern (a fail-closed regression must not hang the suite).
+		mkdir -p .mnemon/loops/frag/hooks/fragments
+		cp .mnemon/loops/goal/capability.json .mnemon/loops/frag/capability.json
+		sed -i.bak 's/goal/frag/g' .mnemon/loops/frag/capability.json && rm -f .mnemon/loops/frag/capability.json.bak
+		printf 'echo pwned\n' >.mnemon/loops/frag/hooks/fragments/x.sh
+		"$MH" local run >"$WORK/external-frag.out.log" 2>"$WORK/external-frag.err.log" &
+		local fragpid=$! fragrefused=0
+		for i in $(seq 1 60); do
+			if ! kill -0 "$fragpid" 2>/dev/null; then fragrefused=1; break; fi
+			sleep 0.1
+		done
+		if [ "$fragrefused" != 1 ]; then
+			kill "$fragpid" 2>/dev/null || true; wait "$fragpid" 2>/dev/null || true
+			echo "local run still alive with an external hooks/fragments/ package (code-face gate regressed)"; exit 1
+		fi
+		if wait "$fragpid"; then echo "local run must exit non-zero with an external fragments package"; exit 1; fi
+		grep -q "hooks/fragments/" "$WORK/external-frag.err.log" || { echo "boot refusal must name the forbidden fragments face"; cat "$WORK/external-frag.err.log"; exit 1; }
+		rm -rf .mnemon/loops/frag
 	) || fail "external goal flow failed (see $WORK/run-external-goal.log)"
 	sleep 0.3
 	echo "    external goal package OK"

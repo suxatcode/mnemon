@@ -1,5 +1,10 @@
 # Loop Package v1 (frozen) — the loop-author face
 
+> Superseded by `loop-package-v2.md` (P2, 2026-06-12). v2 lets an external package carry host
+> projection assets (this document's admission-equal-only restriction is lifted), while keeping the
+> three code faces — hook fragments, the `include` intent, and a `template.json` recipe — embedded-
+> only. This document remains the v1 record; the live loader/projector follow v2.
+
 What a loop package may carry and what each part means. Together with capability-spec-v1 this is
 the complete authoring surface for a loop; host-mechanics-v1 is the separate face host-adapter
 authors consume. Loop packages are 100% host-neutral — nothing in a package may name a host.
