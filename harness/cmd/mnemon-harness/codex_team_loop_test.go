@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/autopilot"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
@@ -19,7 +20,7 @@ const (
 // newLoopTestHarness builds a real in-process runtime (3 host-agents + operator, wide
 // project-level scope) and the scripted brains for the one-hop chain. The POC brain is the
 // ONLY place a routing decision (an assignment) is made — exactly as the model requires.
-func newLoopTestHarness(t *testing.T, withPOC bool) (*codexTeamRuntimeHandle, *governedLoop) {
+func newLoopTestHarness(t *testing.T, withPOC bool) (*codexTeamRuntimeHandle, *autopilot.Loop) {
 	t.Helper()
 	dir := t.TempDir()
 	bindings, tokens, err := codexTeamBindings(3, "http://127.0.0.1:0")
@@ -33,56 +34,56 @@ func newLoopTestHarness(t *testing.T, withPOC bool) (*codexTeamRuntimeHandle, *g
 	t.Cleanup(func() { _ = handle.Close() })
 
 	// worker: once it sees the goal (project_intent), it reports progress ONCE (idempotent ExternalID).
-	worker := scriptedBrain{principal: loopWorker, act: func(pkt turnPacket) []contract.ObservationEnvelope {
-		if !projectionHasKind(pkt.Projection, "project_intent") {
+	worker := autopilot.Scripted(loopWorker, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
+		if !autopilot.ProjectionHasKind(pkt.Projection, "project_intent") {
 			return nil
 		}
-		return []contract.ObservationEnvelope{codexLoopObs("progress_digest.write_candidate.observed", "worker-report-1",
+		return []contract.ObservationEnvelope{autopilot.Observe("progress_digest.write_candidate.observed", "worker-report-1",
 			map[string]any{"summary": "worker: built feature X", "evidence": "compiled and ran"})}
-	}}
+	})
 
 	// POC: the routing brain. For every worker progress item, it emits a GOVERNED assignment
 	// routing a review to the reviewer. THIS is the "who acts next" decision — in a governed event.
-	poc := scriptedBrain{principal: loopPOC, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+	poc := autopilot.Scripted(loopPOC, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
 		var out []contract.ObservationEnvelope
-		for _, item := range projectionItems(pkt.Projection, "progress_digest") {
-			if itemStr(item, "actor") != string(loopWorker) {
+		for _, item := range autopilot.ProjectionItems(pkt.Projection, "progress_digest") {
+			if autopilot.ItemStr(item, "actor") != string(loopWorker) {
 				continue
 			}
-			id := itemStr(item, "id")
-			out = append(out, codexLoopObs("assignment.write_candidate.observed", "route-"+id,
-				map[string]any{"scope": "review: " + itemStr(item, "summary"), "ttl": "30m",
+			id := autopilot.ItemStr(item, "id")
+			out = append(out, autopilot.Observe("assignment.write_candidate.observed", "route-"+id,
+				map[string]any{"scope": "review: " + autopilot.ItemStr(item, "summary"), "ttl": "30m",
 					"assignee": string(loopReviewer), "evidence": "routed by poc from " + id}))
 		}
 		return out
-	}}
+	})
 
 	// reviewer: acts ONLY on an assignment addressed to it, then reports the review.
-	reviewer := scriptedBrain{principal: loopReviewer, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+	reviewer := autopilot.Scripted(loopReviewer, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
 		var out []contract.ObservationEnvelope
-		for _, item := range projectionItems(pkt.Projection, "assignment") {
-			if itemStr(item, "assignee") != string(loopReviewer) {
+		for _, item := range autopilot.ProjectionItems(pkt.Projection, "assignment") {
+			if autopilot.ItemStr(item, "assignee") != string(loopReviewer) {
 				continue
 			}
-			id := itemStr(item, "id")
-			out = append(out, codexLoopObs("progress_digest.write_candidate.observed", "review-"+id,
-				map[string]any{"summary": "reviewer: reviewed " + itemStr(item, "scope"), "evidence": "checked claim " + id}))
+			id := autopilot.ItemStr(item, "id")
+			out = append(out, autopilot.Observe("progress_digest.write_candidate.observed", "review-"+id,
+				map[string]any{"summary": "reviewer: reviewed " + autopilot.ItemStr(item, "scope"), "evidence": "checked claim " + id}))
 		}
 		return out
-	}}
+	})
 
-	brains := []agentBrain{worker, reviewer}
+	brains := []autopilot.Agent{worker, reviewer}
 	if withPOC {
-		brains = []agentBrain{worker, poc, reviewer}
+		brains = []autopilot.Agent{worker, poc, reviewer}
 	}
-	loop := newGovernedLoop(handle, bindings, brains...)
+	loop := autopilot.NewLoop(handle, bindings, brains...)
 	return handle, loop
 }
 
 // kickoff seeds ONE project_intent under the operator — the human handing the cluster a goal.
 func kickoff(t *testing.T, handle *codexTeamRuntimeHandle) {
 	t.Helper()
-	_, _, _, err := handle.Submit(loopOperator, codexLoopObs("project_intent.write_candidate.observed", "kickoff",
+	_, _, _, err := handle.Submit(loopOperator, autopilot.Observe("project_intent.write_candidate.observed", "kickoff",
 		map[string]any{"statement": "ship feature X", "evidence": "goal from human"}))
 	if err != nil {
 		t.Fatalf("seed project_intent: %v", err)
@@ -230,8 +231,8 @@ func TestGovernedLoopDemoScenario(t *testing.T) {
 	t.Cleanup(func() { _ = handle.Close() })
 
 	cfg := defaultLoopDemoConfig()
-	loop := newGovernedLoop(handle, bindings, codexLoopDemoBrains(cfg)...)
-	if _, _, _, err := handle.Submit(cfg.Operator, codexLoopObs("project_intent.write_candidate.observed", "goal",
+	loop := autopilot.NewLoop(handle, bindings, codexLoopDemoBrains(cfg)...)
+	if _, _, _, err := handle.Submit(cfg.Operator, autopilot.Observe("project_intent.write_candidate.observed", "goal",
 		map[string]any{"statement": "ship feature X", "evidence": "goal"})); err != nil {
 		t.Fatalf("seed goal: %v", err)
 	}

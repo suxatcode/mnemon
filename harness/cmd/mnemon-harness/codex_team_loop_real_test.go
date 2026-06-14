@@ -77,7 +77,7 @@ func TestParseLoopRealRoles(t *testing.T) {
 	}
 }
 
-// TestCodexLoopBrainsSubstitution verifies a named role gets a real brain (same agentBrain
+// TestCodexLoopBrainsSubstitution verifies a named role gets a real brain (same autopilot.Agent
 // interface) while the rest stay scripted — no turn is run because Act is never called here.
 func TestCodexLoopBrainsSubstitution(t *testing.T) {
 	cfg := defaultLoopDemoConfig()
@@ -95,7 +95,7 @@ func TestCodexLoopBrainsSubstitution(t *testing.T) {
 	if _, ok := brains[0].(*realCodexBrain); !ok {
 		t.Fatalf("brain[0] should be *realCodexBrain")
 	}
-	if _, ok := brains[1].(scriptedBrain); !ok {
-		t.Fatalf("brain[1] (poc-build) should be scriptedBrain")
+	if _, isReal := brains[1].(*realCodexBrain); isReal {
+		t.Fatalf("brain[1] (poc-build) should be a scripted agent, not real")
 	}
 }

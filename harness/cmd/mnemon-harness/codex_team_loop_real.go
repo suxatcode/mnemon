@@ -5,14 +5,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/autopilot"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 )
 
 // ============================================================================
-// realCodexBrain: an agentBrain whose understanding/routing is a REAL Codex turn.
+// realCodexBrain: an autopilot.Agent whose understanding/routing is a REAL Codex turn.
 //
-// It is a drop-in for scriptedBrain — same interface, same engine. When the engine nudges it,
+// It is a drop-in for autopilot.Scripted — same interface, same engine. When the engine nudges it,
 // it first does a CHEAP, Go-level relevance pre-check (is there genuinely new work for me?) so
 // it never burns a Codex turn on an unrelated scope change. Only when there is new work does it
 // run one real Codex turn, then PARSE the model's output into a governed observation:
@@ -58,7 +59,7 @@ type realWorkItem struct {
 }
 
 // Act runs at most one real Codex turn per pending work item, then translates the output.
-func (b *realCodexBrain) Act(pkt turnPacket) []contract.ObservationEnvelope {
+func (b *realCodexBrain) Act(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
 	work := b.pendingWork(pkt.Projection)
 	if len(work) == 0 {
 		return nil // nothing new — no turn (content-blind nudge, brain-frugal)
@@ -86,11 +87,11 @@ func (b *realCodexBrain) Act(pkt turnPacket) []contract.ObservationEnvelope {
 				b.log(fmt.Sprintf("[%s] model declined to route %q", b.principal, w.id))
 				continue
 			}
-			out = append(out, codexLoopObs("assignment.write_candidate.observed", "real-route-"+w.id,
+			out = append(out, autopilot.Observe("assignment.write_candidate.observed", "real-route-"+w.id,
 				map[string]any{"scope": scope, "ttl": "30m", "assignee": assignee, "evidence": "real Codex POC routed from " + w.id}))
 		} else {
 			summary := parseRealReport(finalText)
-			out = append(out, codexLoopObs("progress_digest.write_candidate.observed", "real-"+b.role+"-"+w.id,
+			out = append(out, autopilot.Observe("progress_digest.write_candidate.observed", "real-"+b.role+"-"+w.id,
 				map[string]any{"summary": b.role + ": " + summary, "evidence": "real Codex turn by " + string(b.principal)}))
 		}
 	}
@@ -103,30 +104,30 @@ func (b *realCodexBrain) pendingWork(pkt projection.Projection) []realWorkItem {
 	var work []realWorkItem
 	switch {
 	case b.poc:
-		for _, item := range projectionItems(pkt, "progress_digest") {
-			if itemStr(item, "actor") == string(b.principal) {
+		for _, item := range autopilot.ProjectionItems(pkt, "progress_digest") {
+			if autopilot.ItemStr(item, "actor") == string(b.principal) {
 				continue // don't route my own reports
 			}
-			id := itemStr(item, "id")
+			id := autopilot.ItemStr(item, "id")
 			if id == "" || b.handled[id] {
 				continue
 			}
-			work = append(work, realWorkItem{id: id, context: "A teammate reported: " + itemStr(item, "summary") + " (progress id " + id + "). Decide who should act on it next, if anyone."})
+			work = append(work, realWorkItem{id: id, context: "A teammate reported: " + autopilot.ItemStr(item, "summary") + " (progress id " + id + "). Decide who should act on it next, if anyone."})
 		}
 	case b.role == "planner":
-		if projectionHasKind(pkt, "project_intent") && !b.handled["plan"] {
+		if autopilot.ProjectionHasKind(pkt, "project_intent") && !b.handled["plan"] {
 			work = append(work, realWorkItem{id: "plan", context: "The team has an intent (see the field). Produce a brief plan to achieve it."})
 		}
 	default: // builder / reviewer: act on assignments addressed to me
-		for _, item := range projectionItems(pkt, "assignment") {
-			if itemStr(item, "assignee") != string(b.principal) {
+		for _, item := range autopilot.ProjectionItems(pkt, "assignment") {
+			if autopilot.ItemStr(item, "assignee") != string(b.principal) {
 				continue
 			}
-			id := itemStr(item, "id")
+			id := autopilot.ItemStr(item, "id")
 			if id == "" || b.handled[id] {
 				continue
 			}
-			work = append(work, realWorkItem{id: id, context: "You were assigned: " + itemStr(item, "scope") + " (assignment id " + id + "). Do it and report what you accomplished."})
+			work = append(work, realWorkItem{id: id, context: "You were assigned: " + autopilot.ItemStr(item, "scope") + " (assignment id " + id + "). Do it and report what you accomplished."})
 		}
 	}
 	return work
@@ -285,16 +286,16 @@ func lastTaggedLine(text, tag string) (string, bool) {
 // realFieldRender renders the projection as a compact, human/LLM-legible field summary.
 func realFieldRender(pkt projection.Projection) string {
 	var lines []string
-	for _, it := range projectionItems(pkt, "project_intent") {
-		if s := itemStr(it, "statement"); s != "" {
+	for _, it := range autopilot.ProjectionItems(pkt, "project_intent") {
+		if s := autopilot.ItemStr(it, "statement"); s != "" {
 			lines = append(lines, "INTENT: "+s)
 		}
 	}
-	for _, it := range projectionItems(pkt, "assignment") {
-		lines = append(lines, fmt.Sprintf("ASSIGNMENT -> %s: %s", itemStr(it, "assignee"), itemStr(it, "scope")))
+	for _, it := range autopilot.ProjectionItems(pkt, "assignment") {
+		lines = append(lines, fmt.Sprintf("ASSIGNMENT -> %s: %s", autopilot.ItemStr(it, "assignee"), autopilot.ItemStr(it, "scope")))
 	}
-	for _, it := range projectionItems(pkt, "progress_digest") {
-		lines = append(lines, "PROGRESS: "+itemStr(it, "summary"))
+	for _, it := range autopilot.ProjectionItems(pkt, "progress_digest") {
+		lines = append(lines, "PROGRESS: "+autopilot.ItemStr(it, "summary"))
 	}
 	if len(lines) == 0 {
 		return "(the field is empty)"

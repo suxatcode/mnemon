@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mnemon-dev/mnemon/harness/internal/autopilot"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 )
 
@@ -120,7 +121,7 @@ func (c loopDemoConfig) roleOf(actor contract.ActorID) (string, bool) {
 // Each worker emits idempotently (fixed/derived ExternalIDs) so re-nudges on unrelated scope
 // changes re-emit harmlessly and the loop reaches quiescence. Each POC's routing is a GOVERNED
 // assignment — the only place a "who acts next" decision is made.
-func codexLoopDemoBrains(cfg loopDemoConfig) []agentBrain {
+func codexLoopDemoBrains(cfg loopDemoConfig) []autopilot.Agent {
 	brains, _ := codexLoopBrains(cfg, nil, "", "", "", 0, nil)
 	return brains
 }
@@ -150,8 +151,8 @@ func loopRoleOrder(cfg loopDemoConfig) []struct {
 // codexLoopBrains assembles the agent brains, substituting a real-Codex brain for any role named
 // in realRoles and a deterministic scripted brain otherwise. Returns the brains plus the real
 // brains (so the caller can Close their app-servers). With realRoles nil/empty it is all scripted.
-func codexLoopBrains(cfg loopDemoConfig, realRoles map[string]bool, workDir, codexCmd, sandbox string, turnTimeout time.Duration, log func(string)) ([]agentBrain, []*realCodexBrain) {
-	var brains []agentBrain
+func codexLoopBrains(cfg loopDemoConfig, realRoles map[string]bool, workDir, codexCmd, sandbox string, turnTimeout time.Duration, log func(string)) ([]autopilot.Agent, []*realCodexBrain) {
+	var brains []autopilot.Agent
 	var reals []*realCodexBrain
 	for _, o := range loopRoleOrder(cfg) {
 		if realRoles[o.role] {
@@ -166,48 +167,48 @@ func codexLoopBrains(cfg loopDemoConfig, realRoles map[string]bool, workDir, cod
 }
 
 // scriptedBrainForRole returns the deterministic brain for a role (the --simulate path).
-func scriptedBrainForRole(cfg loopDemoConfig, role string) scriptedBrain {
+func scriptedBrainForRole(cfg loopDemoConfig, role string) autopilot.Agent {
 	switch role {
 	case "planner":
-		return scriptedBrain{principal: cfg.Planner, act: func(pkt turnPacket) []contract.ObservationEnvelope {
-			if !projectionHasKind(pkt.Projection, "project_intent") {
+		return autopilot.Scripted(cfg.Planner, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
+			if !autopilot.ProjectionHasKind(pkt.Projection, "project_intent") {
 				return nil
 			}
-			return []contract.ObservationEnvelope{codexLoopObs("progress_digest.write_candidate.observed", "plan",
+			return []contract.ObservationEnvelope{autopilot.Observe("progress_digest.write_candidate.observed", "plan",
 				map[string]any{"summary": "planner: drafted a plan for the intent", "evidence": "broke the intent into build + review lanes"})}
-		}}
+		})
 	case "poc-build":
-		return scriptedBrain{principal: cfg.PocBuild, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+		return autopilot.Scripted(cfg.PocBuild, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
 			return routeProgress(pkt, "planner:", "build: ", cfg.Builder, "route-build-")
-		}}
+		})
 	case "builder":
-		return scriptedBrain{principal: cfg.Builder, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+		return autopilot.Scripted(cfg.Builder, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
 			return actOnAssignment(pkt, cfg.Builder, "builder: built ", "build-")
-		}}
+		})
 	case "poc-review":
-		return scriptedBrain{principal: cfg.PocReview, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+		return autopilot.Scripted(cfg.PocReview, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
 			return routeProgress(pkt, "builder:", "review: ", cfg.Reviewer, "route-review-")
-		}}
+		})
 	case "reviewer":
-		return scriptedBrain{principal: cfg.Reviewer, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+		return autopilot.Scripted(cfg.Reviewer, func(pkt autopilot.TurnPacket) []contract.ObservationEnvelope {
 			return actOnAssignment(pkt, cfg.Reviewer, "reviewer: reviewed ", "review-")
-		}}
+		})
 	}
-	return scriptedBrain{principal: "unknown"}
+	return autopilot.Scripted("unknown", nil)
 }
 
 // routeProgress is the POC routing primitive: for every progress item whose summary begins with
 // wantPrefix (agent-side relevance filtering over a wide scope), emit a governed assignment
 // addressing assignee. Idempotent via idPrefix+itemID.
-func routeProgress(pkt turnPacket, wantPrefix, scopePrefix string, assignee contract.ActorID, idPrefix string) []contract.ObservationEnvelope {
+func routeProgress(pkt autopilot.TurnPacket, wantPrefix, scopePrefix string, assignee contract.ActorID, idPrefix string) []contract.ObservationEnvelope {
 	var out []contract.ObservationEnvelope
-	for _, item := range projectionItems(pkt.Projection, "progress_digest") {
-		summary := itemStr(item, "summary")
+	for _, item := range autopilot.ProjectionItems(pkt.Projection, "progress_digest") {
+		summary := autopilot.ItemStr(item, "summary")
 		if len(summary) < len(wantPrefix) || summary[:len(wantPrefix)] != wantPrefix {
 			continue
 		}
-		id := itemStr(item, "id")
-		out = append(out, codexLoopObs("assignment.write_candidate.observed", idPrefix+id,
+		id := autopilot.ItemStr(item, "id")
+		out = append(out, autopilot.Observe("assignment.write_candidate.observed", idPrefix+id,
 			map[string]any{
 				"scope":    scopePrefix + summary,
 				"ttl":      "30m",
@@ -220,15 +221,15 @@ func routeProgress(pkt turnPacket, wantPrefix, scopePrefix string, assignee cont
 
 // actOnAssignment is the worker primitive: for every assignment addressed to me, report the work.
 // Idempotent via idPrefix+itemID.
-func actOnAssignment(pkt turnPacket, me contract.ActorID, summaryPrefix, idPrefix string) []contract.ObservationEnvelope {
+func actOnAssignment(pkt autopilot.TurnPacket, me contract.ActorID, summaryPrefix, idPrefix string) []contract.ObservationEnvelope {
 	var out []contract.ObservationEnvelope
-	for _, item := range projectionItems(pkt.Projection, "assignment") {
-		if itemStr(item, "assignee") != string(me) {
+	for _, item := range autopilot.ProjectionItems(pkt.Projection, "assignment") {
+		if autopilot.ItemStr(item, "assignee") != string(me) {
 			continue
 		}
-		id := itemStr(item, "id")
-		out = append(out, codexLoopObs("progress_digest.write_candidate.observed", idPrefix+id,
-			map[string]any{"summary": summaryPrefix + itemStr(item, "scope"), "evidence": "acted on assignment " + id}))
+		id := autopilot.ItemStr(item, "id")
+		out = append(out, autopilot.Observe("progress_digest.write_candidate.observed", idPrefix+id,
+			map[string]any{"summary": summaryPrefix + autopilot.ItemStr(item, "scope"), "evidence": "acted on assignment " + id}))
 	}
 	return out
 }
@@ -313,11 +314,11 @@ func runCodexTeamLoop(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	loop := newGovernedLoop(handle, bindings, brains...)
+	loop := autopilot.NewLoop(handle, bindings, brains...)
 	loop.Delay = codexLoopStepDelay
 
 	// Kickoff: the human hands the cluster ONE intent. Everything after is self-continuation.
-	if _, _, _, err := handle.Submit(cfg.Operator, codexLoopObs("project_intent.write_candidate.observed", "intent",
+	if _, _, _, err := handle.Submit(cfg.Operator, autopilot.Observe("project_intent.write_candidate.observed", "intent",
 		map[string]any{"statement": codexLoopIntent, "evidence": "intent handed to the cluster by the operator"})); err != nil {
 		return fmt.Errorf("seed intent: %w", err)
 	}
@@ -409,7 +410,7 @@ type loopSnapshot struct {
 	Nudges    []loopNudgeView `json:"nudges"`
 }
 
-func buildLoopSnapshot(handle *codexTeamRuntimeHandle, loop *governedLoop, cfg loopDemoConfig, intent string) (loopSnapshot, error) {
+func buildLoopSnapshot(handle *codexTeamRuntimeHandle, loop *autopilot.Loop, cfg loopDemoConfig, intent string) (loopSnapshot, error) {
 	ledger, err := handle.DecisionLedger()
 	if err != nil {
 		return loopSnapshot{}, err
@@ -488,7 +489,7 @@ func shortDigest(d string) string {
 	return d
 }
 
-func codexLoopMux(handle *codexTeamRuntimeHandle, loop *governedLoop, cfg loopDemoConfig, intent string) http.Handler {
+func codexLoopMux(handle *codexTeamRuntimeHandle, loop *autopilot.Loop, cfg loopDemoConfig, intent string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/snapshot", func(w http.ResponseWriter, r *http.Request) {
 		snap, err := buildLoopSnapshot(handle, loop, cfg, intent)
