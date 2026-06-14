@@ -1,6 +1,22 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+// TestSandboxGuidance guards the bug a real run exposed: a hardcoded "read-only" instruction
+// under a writable sandbox silently blocks all file work. The guidance must match the policy.
+func TestSandboxGuidance(t *testing.T) {
+	if g := sandboxGuidance("readOnly"); !strings.Contains(g, "do not modify") {
+		t.Fatalf("readOnly should forbid writes: %q", g)
+	}
+	for _, sb := range []string{"workspaceWrite", "dangerFullAccess"} {
+		if g := sandboxGuidance(sb); !strings.Contains(g, "create") {
+			t.Fatalf("%s should permit writes: %q", sb, g)
+		}
+	}
+}
 
 // These tests exercise the real-Codex brain's output parsing and role wiring WITHOUT spending a
 // real Codex turn — the model's text is supplied directly.

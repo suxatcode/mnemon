@@ -217,9 +217,19 @@ func (b *realCodexBrain) developerInstructions() string {
 	}
 	return strings.Join([]string{
 		"You are " + string(b.principal) + ", the " + b.role + " in a Mnemon-governed agent team.",
-		"Do the task you are given and report a concise, factual result. Read-only sandbox: do not modify files.",
+		"Do the task you are given and report a concise, factual result. " + sandboxGuidance(b.sandbox),
 		b.outputContract(),
 	}, "\n")
+}
+
+// sandboxGuidance states the file-write posture that matches the ACTUAL sandbox policy passed to
+// turn/start, so the developer instruction never contradicts the sandbox (a read-only instruction
+// under a writable sandbox silently blocks all work).
+func sandboxGuidance(sandbox string) string {
+	if sandbox == "readOnly" {
+		return "Read-only sandbox: do not modify files; inspect and report."
+	}
+	return "You may create, modify, and run files in the current working directory to complete the task."
 }
 
 func (b *realCodexBrain) outputContract() string {
