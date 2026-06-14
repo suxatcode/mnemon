@@ -7,8 +7,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"sort"
+	"strings"
 	"text/template"
 	"time"
 
@@ -32,12 +34,17 @@ import (
 // ============================================================================
 
 var (
-	codexLoopAddr      string
-	codexLoopStorePath string
-	codexLoopIntent    string
-	codexLoopMaxSteps  int
-	codexLoopStepDelay time.Duration
-	codexLoopSimulate  bool
+	codexLoopAddr        string
+	codexLoopStorePath   string
+	codexLoopIntent      string
+	codexLoopMaxSteps    int
+	codexLoopStepDelay   time.Duration
+	codexLoopSimulate    bool
+	codexLoopRealRoles   string
+	codexLoopTurnTimeout time.Duration
+	codexLoopCodexCmd    string
+	codexLoopSandbox     string
+	codexLoopOnce        bool
 )
 
 var codexTeamLoopCmd = &cobra.Command{
@@ -56,7 +63,12 @@ func init() {
 	codexTeamLoopCmd.Flags().StringVar(&codexLoopIntent, "intent", "ship feature X with a reviewed, governed handoff", "the single intent handed to the cluster")
 	codexTeamLoopCmd.Flags().IntVar(&codexLoopMaxSteps, "max-steps", 200, "runaway guard: maximum nudge passes")
 	codexTeamLoopCmd.Flags().DurationVar(&codexLoopStepDelay, "step-delay", 700*time.Millisecond, "pacing between nudge passes (so the UI shows it self-continue)")
-	codexTeamLoopCmd.Flags().BoolVar(&codexLoopSimulate, "simulate", true, "use deterministic scripted brains (no real Codex turns)")
+	codexTeamLoopCmd.Flags().BoolVar(&codexLoopSimulate, "simulate", true, "use deterministic scripted brains (no real Codex turns) for roles not in --real-roles")
+	codexTeamLoopCmd.Flags().StringVar(&codexLoopRealRoles, "real-roles", "", "comma-separated roles backed by REAL Codex turns (planner,poc-build,builder,poc-review,reviewer); uses quota")
+	codexTeamLoopCmd.Flags().DurationVar(&codexLoopTurnTimeout, "turn-timeout", 4*time.Minute, "timeout for each real Codex turn")
+	codexTeamLoopCmd.Flags().StringVar(&codexLoopCodexCmd, "codex-command", "codex", "Codex CLI command used to start real app-servers")
+	codexTeamLoopCmd.Flags().StringVar(&codexLoopSandbox, "codex-sandbox", "readOnly", "Codex turn sandbox policy: readOnly, workspaceWrite, or dangerFullAccess")
+	codexTeamLoopCmd.Flags().BoolVar(&codexLoopOnce, "once", false, "headless: run the loop to quiescence, print the chain as JSON, and exit (no Web UI)")
 	codexTeamLoopCmd.GroupID = groupAdvanced
 	rootCmd.AddCommand(codexTeamLoopCmd)
 }
@@ -109,31 +121,79 @@ func (c loopDemoConfig) roleOf(actor contract.ActorID) (string, bool) {
 // changes re-emit harmlessly and the loop reaches quiescence. Each POC's routing is a GOVERNED
 // assignment — the only place a "who acts next" decision is made.
 func codexLoopDemoBrains(cfg loopDemoConfig) []agentBrain {
-	planner := scriptedBrain{principal: cfg.Planner, act: func(pkt turnPacket) []contract.ObservationEnvelope {
-		if !projectionHasKind(pkt.Projection, "project_intent") {
-			return nil
+	brains, _ := codexLoopBrains(cfg, nil, "", "", "", 0, nil)
+	return brains
+}
+
+// loopRoleOrder is the fixed agent order: 3 workers + 2 POCs.
+func loopRoleOrder(cfg loopDemoConfig) []struct {
+	role      string
+	principal contract.ActorID
+	poc       bool
+	teammates []contract.ActorID
+} {
+	workers := []contract.ActorID{cfg.Planner, cfg.Builder, cfg.Reviewer}
+	return []struct {
+		role      string
+		principal contract.ActorID
+		poc       bool
+		teammates []contract.ActorID
+	}{
+		{"planner", cfg.Planner, false, nil},
+		{"poc-build", cfg.PocBuild, true, workers},
+		{"builder", cfg.Builder, false, nil},
+		{"poc-review", cfg.PocReview, true, workers},
+		{"reviewer", cfg.Reviewer, false, nil},
+	}
+}
+
+// codexLoopBrains assembles the agent brains, substituting a real-Codex brain for any role named
+// in realRoles and a deterministic scripted brain otherwise. Returns the brains plus the real
+// brains (so the caller can Close their app-servers). With realRoles nil/empty it is all scripted.
+func codexLoopBrains(cfg loopDemoConfig, realRoles map[string]bool, workDir, codexCmd, sandbox string, turnTimeout time.Duration, log func(string)) ([]agentBrain, []*realCodexBrain) {
+	var brains []agentBrain
+	var reals []*realCodexBrain
+	for _, o := range loopRoleOrder(cfg) {
+		if realRoles[o.role] {
+			rb := newRealCodexBrain(o.principal, o.role, o.poc, o.teammates, workDir, codexCmd, sandbox, turnTimeout, log)
+			brains = append(brains, rb)
+			reals = append(reals, rb)
+			continue
 		}
-		return []contract.ObservationEnvelope{codexLoopObs("progress_digest.write_candidate.observed", "plan",
-			map[string]any{"summary": "planner: drafted a plan for the intent", "evidence": "broke the intent into build + review lanes"})}
-	}}
+		brains = append(brains, scriptedBrainForRole(cfg, o.role))
+	}
+	return brains, reals
+}
 
-	pocBuild := scriptedBrain{principal: cfg.PocBuild, act: func(pkt turnPacket) []contract.ObservationEnvelope {
-		return routeProgress(pkt, "planner:", "build: ", cfg.Builder, "route-build-")
-	}}
-
-	builder := scriptedBrain{principal: cfg.Builder, act: func(pkt turnPacket) []contract.ObservationEnvelope {
-		return actOnAssignment(pkt, cfg.Builder, "builder: built ", "build-")
-	}}
-
-	pocReview := scriptedBrain{principal: cfg.PocReview, act: func(pkt turnPacket) []contract.ObservationEnvelope {
-		return routeProgress(pkt, "builder:", "review: ", cfg.Reviewer, "route-review-")
-	}}
-
-	reviewer := scriptedBrain{principal: cfg.Reviewer, act: func(pkt turnPacket) []contract.ObservationEnvelope {
-		return actOnAssignment(pkt, cfg.Reviewer, "reviewer: reviewed ", "review-")
-	}}
-
-	return []agentBrain{planner, pocBuild, builder, pocReview, reviewer}
+// scriptedBrainForRole returns the deterministic brain for a role (the --simulate path).
+func scriptedBrainForRole(cfg loopDemoConfig, role string) scriptedBrain {
+	switch role {
+	case "planner":
+		return scriptedBrain{principal: cfg.Planner, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+			if !projectionHasKind(pkt.Projection, "project_intent") {
+				return nil
+			}
+			return []contract.ObservationEnvelope{codexLoopObs("progress_digest.write_candidate.observed", "plan",
+				map[string]any{"summary": "planner: drafted a plan for the intent", "evidence": "broke the intent into build + review lanes"})}
+		}}
+	case "poc-build":
+		return scriptedBrain{principal: cfg.PocBuild, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+			return routeProgress(pkt, "planner:", "build: ", cfg.Builder, "route-build-")
+		}}
+	case "builder":
+		return scriptedBrain{principal: cfg.Builder, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+			return actOnAssignment(pkt, cfg.Builder, "builder: built ", "build-")
+		}}
+	case "poc-review":
+		return scriptedBrain{principal: cfg.PocReview, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+			return routeProgress(pkt, "builder:", "review: ", cfg.Reviewer, "route-review-")
+		}}
+	case "reviewer":
+		return scriptedBrain{principal: cfg.Reviewer, act: func(pkt turnPacket) []contract.ObservationEnvelope {
+			return actOnAssignment(pkt, cfg.Reviewer, "reviewer: reviewed ", "review-")
+		}}
+	}
+	return scriptedBrain{principal: "unknown"}
 }
 
 // routeProgress is the POC routing primitive: for every progress item whose summary begins with
@@ -173,12 +233,43 @@ func actOnAssignment(pkt turnPacket, me contract.ActorID, summaryPrefix, idPrefi
 	return out
 }
 
-func runCodexTeamLoop(cmd *cobra.Command, args []string) error {
-	if !codexLoopSimulate {
-		return fmt.Errorf("only --simulate (scripted brains) is implemented; a real-Codex brain is the next slice (swap the brain, not the engine)")
+// brainKindLabel describes the brain mix for startup/headless output.
+func brainKindLabel(realRoles map[string]bool) string {
+	if len(realRoles) == 0 {
+		return "all scripted (deterministic)"
 	}
+	return "real Codex turns for: " + codexLoopRealRoles + " (rest scripted)"
+}
+
+// parseLoopRealRoles parses the comma-separated --real-roles flag into a validated set.
+func parseLoopRealRoles(s string) (map[string]bool, error) {
+	valid := map[string]bool{"planner": true, "poc-build": true, "builder": true, "poc-review": true, "reviewer": true}
+	out := map[string]bool{}
+	for _, raw := range strings.Split(s, ",") {
+		role := strings.TrimSpace(raw)
+		if role == "" {
+			continue
+		}
+		if !valid[role] {
+			return nil, fmt.Errorf("unknown role %q in --real-roles (valid: planner, poc-build, builder, poc-review, reviewer)", role)
+		}
+		out[role] = true
+	}
+	return out, nil
+}
+
+func runCodexTeamLoop(cmd *cobra.Command, args []string) error {
 	if codexLoopMaxSteps < 1 {
 		return fmt.Errorf("--max-steps must be at least 1")
+	}
+	realRoles, err := parseLoopRealRoles(codexLoopRealRoles)
+	if err != nil {
+		return err
+	}
+	if len(realRoles) > 0 {
+		if _, lerr := exec.LookPath(codexLoopCodexCmd); lerr != nil {
+			return fmt.Errorf("--real-roles requested but %q not found on PATH: %w", codexLoopCodexCmd, lerr)
+		}
 	}
 
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
@@ -210,13 +301,41 @@ func runCodexTeamLoop(cmd *cobra.Command, args []string) error {
 	}
 	defer handle.Close()
 
-	loop := newGovernedLoop(handle, bindings, codexLoopDemoBrains(cfg)...)
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	brainLog := func(msg string) { fmt.Fprintln(cmd.OutOrStdout(), "  "+msg) }
+	brains, realBrains := codexLoopBrains(cfg, realRoles, workDir, codexLoopCodexCmd, codexLoopSandbox, codexLoopTurnTimeout, brainLog)
+	defer func() {
+		for _, rb := range realBrains {
+			rb.Close()
+		}
+	}()
+
+	loop := newGovernedLoop(handle, bindings, brains...)
 	loop.Delay = codexLoopStepDelay
 
 	// Kickoff: the human hands the cluster ONE intent. Everything after is self-continuation.
 	if _, _, _, err := handle.Submit(cfg.Operator, codexLoopObs("project_intent.write_candidate.observed", "intent",
 		map[string]any{"statement": codexLoopIntent, "evidence": "intent handed to the cluster by the operator"})); err != nil {
 		return fmt.Errorf("seed intent: %w", err)
+	}
+
+	// Headless one-shot: run the loop to quiescence, print the chain, exit. Best for a real-Codex
+	// run you want to verify without a browser — the real turns happen during Run.
+	if codexLoopOnce {
+		loop.Delay = 0
+		accepted, runErr := loop.RunContext(ctx, codexLoopMaxSteps)
+		snap, serr := buildLoopSnapshot(handle, loop, cfg, codexLoopIntent)
+		if serr != nil {
+			return serr
+		}
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		enc.SetIndent("", "  ")
+		fmt.Fprintf(cmd.OutOrStdout(), "intent: %s\nbrains: %s\naccepted decisions: %d\n", codexLoopIntent, brainKindLabel(realRoles), accepted)
+		_ = enc.Encode(snap.Chain)
+		return runErr
 	}
 
 	go func() { _, _ = loop.RunContext(ctx, codexLoopMaxSteps) }()
@@ -235,9 +354,10 @@ func runCodexTeamLoop(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	brainKind := brainKindLabel(realRoles)
 	fmt.Fprintf(cmd.OutOrStdout(), "Governed self-continuation UI: %s\n", uiURL)
 	fmt.Fprintf(cmd.OutOrStdout(), "Intent: %s\n", codexLoopIntent)
-	fmt.Fprintf(cmd.OutOrStdout(), "Cluster: 3 workers + 2 POCs (scripted brains); engine makes 0 routing decisions\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "Cluster: 3 workers + 2 POCs; brains: %s; engine makes 0 routing decisions\n", brainKind)
 	fmt.Fprintf(cmd.OutOrStdout(), "Store: %s\n", storePath)
 
 	var runErr error
