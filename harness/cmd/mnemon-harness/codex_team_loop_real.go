@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mnemon-dev/mnemon/harness/internal/autopilot"
+	"github.com/mnemon-dev/mnemon/harness/internal/codexapp"
 	"github.com/mnemon-dev/mnemon/harness/internal/contract"
 	"github.com/mnemon-dev/mnemon/harness/internal/projection"
 )
@@ -34,7 +35,7 @@ type realCodexBrain struct {
 	turnTimeout time.Duration
 	log         func(string)
 
-	server   *codexRealAppServer
+	server   *codexapp.AppServer
 	threadID string
 	handled  map[string]bool // work-item ids already acted on (idempotency + turn-frugality)
 }
@@ -137,27 +138,27 @@ func (b *realCodexBrain) ensureStarted() error {
 	if b.server != nil {
 		return nil
 	}
-	server := newCodexRealAppServer(b.codexCmd, b.workDir)
-	if err := server.start(); err != nil {
+	server := codexapp.New(b.codexCmd, b.workDir)
+	if err := server.Start(); err != nil {
 		return err
 	}
-	if _, err := server.request("initialize", map[string]any{"clientInfo": map[string]any{"name": "mnemon-codex-team-loop", "version": "0.1.0"}}, 30*time.Second); err != nil {
-		server.close()
+	if _, err := server.Request("initialize", map[string]any{"clientInfo": map[string]any{"name": "mnemon-codex-team-loop", "version": "0.1.0"}}, 30*time.Second); err != nil {
+		server.Close()
 		return err
 	}
-	thread, err := server.request("thread/start", map[string]any{
+	thread, err := server.Request("thread/start", map[string]any{
 		"cwd":                   b.workDir,
 		"approvalPolicy":        "never",
 		"ephemeral":             true,
 		"developerInstructions": b.developerInstructions(),
 	}, 30*time.Second)
 	if err != nil {
-		server.close()
+		server.Close()
 		return err
 	}
-	threadID := codexTeamThreadID(thread)
+	threadID := codexapp.ThreadID(thread)
 	if threadID == "" {
-		server.close()
+		server.Close()
 		return fmt.Errorf("thread/start returned no thread id")
 	}
 	b.server = server
@@ -174,8 +175,8 @@ func (b *realCodexBrain) runTurn(field, task string) (string, error) {
 		"",
 		b.outputContract(),
 	}, "\n")
-	before := b.server.notificationCount()
-	if _, err := b.server.request("turn/start", map[string]any{
+	before := b.server.NotificationCount()
+	if _, err := b.server.Request("turn/start", map[string]any{
 		"threadId":       b.threadID,
 		"input":          []map[string]any{{"type": "text", "text": prompt}},
 		"cwd":            b.workDir,
@@ -184,20 +185,20 @@ func (b *realCodexBrain) runTurn(field, task string) (string, error) {
 	}, 30*time.Second); err != nil {
 		return "", err
 	}
-	if _, err := b.server.waitNotification("turn/completed", b.turnTimeout, before); err != nil {
+	if _, err := b.server.WaitNotification("turn/completed", b.turnTimeout, before); err != nil {
 		return "", err
 	}
-	notes := b.server.notificationsSince(before)
-	final := codexTeamFinalAnswer(notes)
+	notes := b.server.NotificationsSince(before)
+	final := codexapp.FinalAnswer(notes)
 	if final == "" {
-		final = codexTeamTrimOutput(codexTeamCombinedText(notes), 1500)
+		final = codexTeamTrimOutput(codexapp.CombinedText(notes), 1500)
 	}
 	return final, nil
 }
 
 func (b *realCodexBrain) Close() {
 	if b.server != nil {
-		b.server.close()
+		b.server.Close()
 		b.server = nil
 	}
 }

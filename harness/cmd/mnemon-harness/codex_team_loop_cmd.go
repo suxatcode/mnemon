@@ -23,15 +23,16 @@ import (
 // ============================================================================
 // `codex-team-loop`: a runnable demonstration of governed self-continuation.
 //
-// Unlike `codex-team` (orchestrator-driven rounds), this command hands the cluster ONE intent
-// and then steps back. The cluster drives ITSELF through governed events: workers report,
-// POC agents route via governed `assignment` writes, and the content-blind nudge engine wakes
-// whichever agent's scope changed. The "who acts next" decision is never in Go — it is a POC's
-// governed assignment, replayable from the ledger. The Web UI shows the chain growing live.
+// This command hands the cluster ONE intent and then steps back. The cluster drives ITSELF
+// through governed events: workers report, POC agents route via governed `assignment` writes,
+// and the optional autopilot (internal/autopilot) wakes whichever agent's scope changed. The
+// "who acts next" decision is never in Go — it is a POC's governed assignment, replayable from
+// the ledger. The Web UI shows the chain growing live.
 //
-// In --simulate mode (the default) the agent brains are deterministic Go closures: this proves
-// the PLUMBING without a real Codex turn. Swapping a brain for an LLM-backed one (reusing the
-// codexRealAppServer in codex_team.go) is a brain change, never an engine change.
+// Roles not in --real-roles use deterministic scripted Agents (autopilot.Scripted): this proves
+// the PLUMBING without a real Codex turn. A real-Codex Agent (realCodexBrain, driving a Codex
+// turn via internal/codexapp) is a drop-in with the same autopilot.Agent interface — swapping
+// one for the other is an Agent change, never an autopilot change.
 // ============================================================================
 
 var (
