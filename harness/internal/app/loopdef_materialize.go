@@ -12,6 +12,12 @@ import (
 	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
 )
 
+// loopdefActivator is the well-known principal under which a booting daemon records that a
+// materialized loop definition is now active (G4 activation ledger, P3e): the event is a durable
+// audit marker in the log, idempotent per (loopdef name, version, digest). It lives here, with the
+// loopdef machinery, not in the generic contract core — "loopdef" is application vocabulary.
+const loopdefActivator = contract.ActorID("loopdef@local")
+
 // materializeLoopdefs writes every admitted loop-definition draft in the loopdef resource to a
 // managed external package under .mnemon/loops/<name>/ (the D-loop Δ2/G5 step). It is the DRIVER
 // bridge's job — invoked from the app reproject callback when a loopdef accept invalidates — so the
@@ -122,7 +128,7 @@ func emitLoopdefActivations(rt *runtime.Runtime, projectRoot string) error {
 				Payload: map[string]any{"name": e.Name(), "version": version, "digest": digest},
 			},
 		}
-		if _, _, err := rt.IngestTrusted(contract.LoopdefActivator, env); err != nil {
+		if _, _, err := rt.IngestTrusted(loopdefActivator, env); err != nil {
 			return fmt.Errorf("record loopdef activation for %q: %w", e.Name(), err)
 		}
 	}

@@ -22,11 +22,6 @@ const (
 // drives the import runtime under it.
 const SyncImportActor = ActorID("sync@local")
 
-// LoopdefActivator is the well-known principal under which a booting daemon records that a
-// materialized loop definition is now active (G4 activation ledger, P3e): the event is a durable
-// audit marker in the log, idempotent per (loopdef name, version, digest).
-const LoopdefActivator = ActorID("loopdef@local")
-
 // The three Remote Workspace sync wire verbs (sync-abi-v1 §1). They live in contract because the ABI
 // names them: the channel binding layer and the standalone hub (syncserver/mnemon-hub) must agree on the
 // strings without either importing the other. Deliberately untyped so channel can alias them into its
