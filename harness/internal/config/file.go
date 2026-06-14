@@ -13,13 +13,13 @@ import (
 // bound (capabilities), and which background workers run (background). It enables/binds/limits
 // already-compiled capabilities; it can never define new behavior (the assembler is fail-closed).
 type File struct {
-	Local        LocalConfig                 `json:"local"`
+	Local        localConfig                 `json:"local"`
 	Channel      ChannelConfig               `json:"channel"`
 	Capabilities map[string]CapabilityConfig `json:"capabilities"`
 	Background   BackgroundConfig            `json:"background"`
 }
 
-type LocalConfig struct {
+type localConfig struct {
 	StorePath string `json:"store_path,omitempty"`
 	Endpoint  string `json:"endpoint,omitempty"`
 }
