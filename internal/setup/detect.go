@@ -9,8 +9,8 @@ import (
 
 // Environment describes a detected LLM CLI environment.
 type Environment struct {
-	Name      string // "claude-code", "codex", "openclaw", "nanobot", "pi", "hermes"
-	Display   string // "Claude Code", "Codex", "OpenClaw", "Nanobot", "Pi", "Hermes Agent"
+	Name      string // "claude-code", "codex", "cursor", "openclaw", "nanobot", "pi", "hermes"
+	Display   string // "Claude Code", "Codex", "Cursor", "OpenClaw", "Nanobot", "Pi", "Hermes Agent"
 	Detected  bool   // CLI binary or global config dir found
 	BinPath   string // exec.LookPath result
 	Installed bool   // mnemon integration present at ConfigDir
@@ -25,12 +25,13 @@ func HomeDir() string {
 }
 
 // DetectEnvironments probes for all supported LLM CLI environments.
-// When global is false, ConfigDir points to project-local config (.claude/);
-// when true, it points to the user-global config (~/.claude/).
+// When global is false, ConfigDir points to project-local config;
+// when true, it points to the user-global config for each environment.
 func DetectEnvironments(global bool) []Environment {
 	return []Environment{
 		detectClaude(global),
 		detectCodex(global),
+		detectCursor(global),
 		detectOpenClaw(global),
 		detectNanobot(global),
 		detectPi(global),
@@ -97,6 +98,44 @@ func detectCodex(global bool) Environment {
 
 	// CLI detection is always global.
 	if binPath, err := exec.LookPath("codex"); err == nil {
+		env.Detected = true
+		env.BinPath = binPath
+	}
+	if _, err := os.Stat(globalDir); err == nil {
+		env.Detected = true
+	}
+
+	skillPath := filepath.Join(configDir, "skills", "mnemon", "SKILL.md")
+	if _, err := os.Stat(skillPath); err == nil {
+		env.Installed = true
+	}
+
+	if env.BinPath != "" {
+		if out, err := exec.Command(env.BinPath, "--version").Output(); err == nil {
+			env.Version = cleanVersion(strings.TrimSpace(string(out)))
+		}
+	}
+
+	return env
+}
+
+func detectCursor(global bool) Environment {
+	home := HomeDir()
+	globalDir := filepath.Join(home, ".cursor")
+	localDir := ".cursor"
+
+	configDir := localDir
+	if global {
+		configDir = globalDir
+	}
+
+	env := Environment{
+		Name:      "cursor",
+		Display:   "Cursor",
+		ConfigDir: configDir,
+	}
+
+	if binPath, err := exec.LookPath("cursor"); err == nil {
 		env.Detected = true
 		env.BinPath = binPath
 	}

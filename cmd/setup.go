@@ -22,16 +22,17 @@ var setupCmd = &cobra.Command{
 	Short: "Deploy mnemon into LLM CLI environments",
 	Long: `Detect installed LLM CLIs and deploy mnemon integration.
 
-By default, installs to project-local config (.claude/, .codex/, .openclaw/, .nanobot/, .pi/).
-Use --global to install to user-wide config (~/.claude/, ~/.codex/, ~/.openclaw/, ~/.nanobot/workspace/, ~/.pi/agent/).
+By default, installs to project-local config (.claude/, .codex/, .cursor/, .openclaw/, .nanobot/, .pi/).
+Use --global to install to user-wide config (~/.claude/, ~/.codex/, ~/.cursor/, ~/.openclaw/, ~/.nanobot/workspace/, ~/.pi/agent/).
 Hermes Agent uses its native user config at ~/.hermes/.
 
-Supported environments: Claude Code, Codex, OpenClaw, Nanobot, Pi, Hermes Agent.
+Supported environments: Claude Code, Codex, Cursor, OpenClaw, Nanobot, Pi, Hermes Agent.
 
 Examples:
   mnemon setup                              # Interactive: project-local install
   mnemon setup --global                     # Interactive: user-wide install
   mnemon setup --target claude-code         # Non-interactive: Claude Code only
+  mnemon setup --target cursor              # Non-interactive: Cursor skill only
   mnemon setup --target hermes              # Non-interactive: Hermes Agent only
   mnemon setup --eject                      # Interactive: remove integrations
   mnemon setup --eject --target claude-code # Non-interactive: remove Claude Code only
@@ -40,7 +41,7 @@ Examples:
 }
 
 func init() {
-	setupCmd.Flags().StringVar(&setupTarget, "target", "", "target environment (claude-code, codex, openclaw, nanobot, pi, hermes)")
+	setupCmd.Flags().StringVar(&setupTarget, "target", "", "target environment (claude-code, codex, cursor, openclaw, nanobot, pi, hermes)")
 	setupCmd.Flags().BoolVar(&setupEject, "eject", false, "remove mnemon integrations")
 	setupCmd.Flags().BoolVar(&setupYes, "yes", false, "auto-confirm all prompts (CI-friendly)")
 	setupCmd.Flags().BoolVar(&setupGlobal, "global", false, "install to user-wide config instead of project-local config")
@@ -48,8 +49,8 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	if setupTarget != "" && setupTarget != "claude-code" && setupTarget != "codex" && setupTarget != "openclaw" && setupTarget != "nanobot" && setupTarget != "pi" && setupTarget != "hermes" {
-		return fmt.Errorf("invalid target %q (must be claude-code, codex, openclaw, nanobot, pi, or hermes)", setupTarget)
+	if setupTarget != "" && setupTarget != "claude-code" && setupTarget != "codex" && setupTarget != "cursor" && setupTarget != "openclaw" && setupTarget != "nanobot" && setupTarget != "pi" && setupTarget != "hermes" {
+		return fmt.Errorf("invalid target %q (must be claude-code, codex, cursor, openclaw, nanobot, pi, or hermes)", setupTarget)
 	}
 
 	envs := setup.DetectEnvironments(setupGlobal)
@@ -85,7 +86,7 @@ func runInstallFlow(envs []setup.Environment) error {
 
 	if len(detected) == 0 {
 		fmt.Println("\nNo supported LLM CLI environments detected.")
-		fmt.Println("Install Claude Code, Codex, OpenClaw, Nanobot, Pi, or Hermes Agent, then run 'mnemon setup' again.")
+		fmt.Println("Install Claude Code, Codex, Cursor, OpenClaw, Nanobot, Pi, or Hermes Agent, then run 'mnemon setup' again.")
 		return nil
 	}
 
@@ -129,6 +130,8 @@ func installEnv(env *setup.Environment) error {
 		err = installClaudeCode(env)
 	case "codex":
 		err = installCodex(env)
+	case "cursor":
+		err = installCursor(env)
 	case "openclaw":
 		err = installOpenClaw(env)
 	case "nanobot":
@@ -371,6 +374,119 @@ func installCodex(env *setup.Environment) error {
 	fmt.Println("Run 'mnemon setup --eject --target codex' to remove.")
 
 	return nil
+}
+
+// ─── Cursor ─────────────────────────────────────────────────────────
+
+func installCursor(env *setup.Environment) error {
+	configDir := env.ConfigDir
+
+	if !setupGlobal && !setupYes && setup.IsInteractive() {
+		home := setup.HomeDir()
+		localDir := ".cursor"
+		globalDir := home + "/.cursor"
+		idx := setup.SelectOne("Install scope",
+			[]string{
+				fmt.Sprintf("Local — this project only (%s/)", localDir),
+				fmt.Sprintf("Global — all projects (%s/)", globalDir),
+			}, 0)
+		if idx == 1 {
+			configDir = globalDir
+		} else {
+			configDir = localDir
+		}
+	}
+
+	fmt.Printf("\nSetting up Cursor (%s)...\n", configDir)
+
+	fmt.Println("\n[1/4] Skill")
+	if path, err := setup.CursorWriteSkill(configDir); err != nil {
+		setup.StatusError(0, 0, "Skill", err)
+		return err
+	} else {
+		setup.StatusOK(0, 0, "Skill", path)
+	}
+
+	fmt.Println("\n[2/4] Prompts")
+	var promptPath string
+	if path, err := setup.WritePromptFiles(); err != nil {
+		setup.StatusError(0, 0, "Prompts", err)
+		return err
+	} else {
+		setup.StatusOK(0, 0, "Prompts", path)
+		promptPath = path
+	}
+
+	fmt.Println("\n[3/4] Hooks")
+	sel := selectCursorOptionalHooks()
+	if path, err := setup.CursorWriteHook(configDir, "prime.sh", assets.CursorPrimeHook); err != nil {
+		setup.StatusError(0, 0, "Hook: prime", err)
+		return err
+	} else {
+		setup.StatusOK(0, 0, "Hook: prime", path)
+	}
+	if sel.Nudge {
+		if path, err := setup.CursorWriteHook(configDir, "stop.sh", assets.CursorStopHook); err != nil {
+			setup.StatusError(0, 0, "Hook: nudge", err)
+			return err
+		} else {
+			setup.StatusOK(0, 0, "Hook: nudge", path)
+		}
+	}
+	if sel.Compact {
+		if path, err := setup.CursorWriteHook(configDir, "compact.sh", assets.CursorCompactHook); err != nil {
+			setup.StatusError(0, 0, "Hook: compact", err)
+			return err
+		} else {
+			setup.StatusOK(0, 0, "Hook: compact", path)
+		}
+	}
+
+	fmt.Println("\n[4/4] Config")
+	if path, err := setup.CursorRegisterHooks(configDir, sel); err != nil {
+		setup.StatusError(0, 0, "Hooks config", err)
+		return err
+	} else {
+		setup.StatusUpdated(0, 0, "Hooks config", path)
+	}
+
+	hookNames := []string{"prime"}
+	if sel.Nudge {
+		hookNames = append(hookNames, "nudge")
+	}
+	if sel.Compact {
+		hookNames = append(hookNames, "compact")
+	}
+
+	fmt.Println()
+	fmt.Println("Setup complete!")
+	fmt.Printf("  Skill   %s/skills/mnemon/SKILL.md\n", configDir)
+	fmt.Printf("  Hooks   %s/hooks.json (%s)\n", configDir, strings.Join(hookNames, ", "))
+	fmt.Printf("  Prompts %s/ (guide.md, skill.md)\n", promptPath)
+	fmt.Println()
+	fmt.Println("Start a new Cursor agent session to activate the mnemon skill.")
+	fmt.Println("Run 'mnemon setup --eject --target cursor' to remove.")
+
+	return nil
+}
+
+func selectCursorOptionalHooks() setup.HookSelection {
+	sel := setup.HookSelection{Nudge: true, Compact: false}
+
+	if setupYes || !setup.IsInteractive() {
+		return sel
+	}
+
+	opts := []string{
+		"Nudge   — auto-submit a writeback reminder after responses (recommended)",
+		"Compact — show a reminder before context compaction",
+	}
+	defs := []bool{true, false}
+	choices := setup.SelectMulti("Select hooks to enable", opts, defs)
+
+	sel.Nudge = choices[0]
+	sel.Compact = choices[1]
+	return sel
 }
 
 // ─── OpenClaw ───────────────────────────────────────────────────────
@@ -797,6 +913,12 @@ func ejectEnv(env *setup.Environment) error {
 	case "codex":
 		errs := setup.CodexEject(env.ConfigDir)
 		ejectMarkdown("AGENTS.md", "Remove memory guidance from ./AGENTS.md?")
+		if len(errs) > 0 {
+			return errs[0]
+		}
+
+	case "cursor":
+		errs := setup.CursorEject(env.ConfigDir)
 		if len(errs) > 0 {
 			return errs[0]
 		}
