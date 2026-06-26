@@ -1,0 +1,24 @@
+replicaCount: 1
+
+image:
+  repository: mnemon-dev/mnemon-server
+  tag: dev
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 7443
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+
+server:
+  addr: ":7443"
+  existingSecret: mnemon-server-secret
+  usersKey: users.json
+  tlsCertKey: tls.crt
+  tlsKeyKey: tls.key
+
+resources: {}

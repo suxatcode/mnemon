@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,25 @@ var vizCmd = &cobra.Command{
 	Short: "Export knowledge graph for visualization",
 	Long:  "Export the knowledge graph as DOT (Graphviz) or HTML (vis.js interactive) format.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Viz(remoteapi.VizRequest{Format: vizFormat})
+			if err != nil {
+				return err
+			}
+			if vizOutput == "" || vizOutput == "-" {
+				fmt.Print(resp.Text)
+				return nil
+			}
+			if err := os.WriteFile(vizOutput, []byte(resp.Text), 0644); err != nil {
+				return fmt.Errorf("write file: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "written to %s\n", vizOutput)
+			return nil
+		}
+
 		db, err := openDB()
 		if err != nil {
 			return fmt.Errorf("open database: %w", err)

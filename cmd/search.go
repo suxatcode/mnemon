@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/mnemon-dev/mnemon/internal/search"
 	"github.com/spf13/cobra"
 )
@@ -21,6 +22,16 @@ var searchCmd = &cobra.Command{
 		query := strings.Join(args, " ")
 		if err := requirePositiveLimit("--limit", searchLimit); err != nil {
 			return err
+		}
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Search(remoteapi.SearchRequest{Query: query, Limit: searchLimit})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
 		}
 
 		db, err := openDB()

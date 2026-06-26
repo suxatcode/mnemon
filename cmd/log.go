@@ -5,6 +5,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,16 @@ var logCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := requirePositiveLimit("--limit", logLimit); err != nil {
 			return err
+		}
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Log(remoteapi.LogRequest{Limit: logLimit})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
 		}
 
 		db, err := openDB()

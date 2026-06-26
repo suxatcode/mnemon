@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +16,16 @@ var forgetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := args[0]
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Forget(remoteapi.ForgetRequest{ID: id})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
+		}
 
 		db, err := openDB()
 		if err != nil {

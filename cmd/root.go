@@ -17,6 +17,7 @@ var (
 	storeName  string
 	readOnly   bool
 	embedModel string
+	localOnly  bool
 )
 
 var rootCmd = &cobra.Command{
@@ -41,6 +42,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&dataDir, "data-dir", defaultDataDir, "base data directory (env: MNEMON_DATA_DIR)")
 	rootCmd.PersistentFlags().StringVar(&storeName, "store", "", "named memory store (overrides MNEMON_STORE and active file)")
 	rootCmd.PersistentFlags().BoolVar(&readOnly, "readonly", false, "open database in read-only mode (no WAL files, safe for read-only mounts)")
+	rootCmd.PersistentFlags().BoolVar(&localOnly, "local", false, "force local storage even when a remote default is configured")
 	rootCmd.PersistentFlags().StringVar(&embedModel, "embed-model", "",
 		fmt.Sprintf("Ollama embedding model (env: MNEMON_EMBED_MODEL; default: %s)", embed.DefaultModel))
 }

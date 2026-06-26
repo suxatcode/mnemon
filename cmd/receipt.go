@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -48,6 +49,16 @@ details so it can be shared for audits of what crossed the memory boundary.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := requirePositiveLimit("--limit", receiptLimit); err != nil {
 			return err
+		}
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Receipt(remoteapi.ReceiptRequest{Limit: receiptLimit})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
 		}
 
 		db, err := openDB()

@@ -8,10 +8,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var storeRemote bool
+
 var storeCmd = &cobra.Command{
 	Use:   "store",
 	Short: "Manage memory stores",
 	Long:  "Create, list, switch, and remove isolated memory stores.",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if !storeRemote {
+			return nil
+		}
+		// TODO(remote-gateway): define remote store semantics once the server grows
+		// beyond the initial single-tenant, single-store shared temporal-lobe model.
+		return fmt.Errorf("remote store management is not implemented yet; mnemon-server currently exposes one shared default store")
+	},
 }
 
 // ── list ─────────────────────────────────────────────────────────────
@@ -115,6 +125,7 @@ var storeRemoveCmd = &cobra.Command{
 }
 
 func init() {
+	storeCmd.PersistentFlags().BoolVar(&storeRemote, "remote", false, "manage remote stores (not implemented yet)")
 	storeCmd.AddCommand(storeListCmd, storeCreateCmd, storeSetCmd, storeRemoveCmd)
 	rootCmd.AddCommand(storeCmd)
 }

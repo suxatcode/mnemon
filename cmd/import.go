@@ -11,6 +11,7 @@ import (
 	"github.com/mnemon-dev/mnemon/internal/graph"
 	"github.com/mnemon-dev/mnemon/internal/importdraft"
 	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/mnemon-dev/mnemon/internal/search"
 	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
@@ -34,6 +35,21 @@ The draft format and a reference LLM prompt for generating it from chat
 exports are documented in docs/IMPORT.md.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			data, err := os.ReadFile(args[0])
+			if err != nil {
+				return err
+			}
+			resp, err := client.Import(remoteapi.ImportRequest{Draft: data, NoDiff: importNoDiff, DryRun: importDryRun, Agent: "mnemon-cli"})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
+		}
+
 		draft, err := importdraft.Load(args[0])
 		if err != nil {
 			return err

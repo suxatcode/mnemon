@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/mnemon-dev/mnemon/internal/embed"
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +25,21 @@ Modes:
   mnemon embed --all               Backfill embeddings for all un-embedded insights
   mnemon embed <id>                Generate embedding for a specific insight`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			id := ""
+			if len(args) > 0 {
+				id = args[0]
+			}
+			resp, err := client.Embed(remoteapi.EmbedRequest{ID: id, All: embedAll, Status: embedStatus})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
+		}
+
 		db, err := openDB()
 		if err != nil {
 			return fmt.Errorf("open database: %w", err)

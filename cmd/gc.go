@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -34,6 +35,16 @@ Keep mode:
 		}
 		if err := requireNonNegativeFloat("--threshold", gcThreshold); err != nil {
 			return err
+		}
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.GC(remoteapi.GCRequest{Threshold: gcThreshold, Limit: gcLimit, KeepID: gcKeepID})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
 		}
 
 		db, err := openDB()

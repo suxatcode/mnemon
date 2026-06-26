@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/spf13/cobra"
 )
 
@@ -34,6 +35,22 @@ var linkCmd = &cobra.Command{
 		// Validate weight
 		if linkWeight < 0.0 || linkWeight > 1.0 {
 			return fmt.Errorf("weight must be between 0.0 and 1.0, got %.2f", linkWeight)
+		}
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Link(remoteapi.LinkRequest{
+				SourceID: sourceID,
+				TargetID: targetID,
+				Type:     linkType,
+				Weight:   linkWeight,
+				MetaJSON: linkMeta,
+			})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
 		}
 
 		db, err := openDB()

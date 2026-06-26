@@ -9,6 +9,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/internal/embed"
 	"github.com/mnemon-dev/mnemon/internal/graph"
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/mnemon-dev/mnemon/internal/search"
 	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
@@ -105,6 +106,24 @@ var recallCmd = &cobra.Command{
 		keyword := strings.Join(args, " ")
 		if err := requirePositiveLimit("--limit", recLimit); err != nil {
 			return err
+		}
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Recall(remoteapi.RecallRequest{
+				Query:    keyword,
+				Category: recCategory,
+				Limit:    recLimit,
+				Source:   recSource,
+				Basic:    recBasic,
+				Intent:   recIntent,
+				Verbose:  recVerbose,
+			})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
 		}
 
 		db, err := openDB()

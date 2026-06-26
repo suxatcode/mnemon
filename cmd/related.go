@@ -7,6 +7,7 @@ import (
 
 	"github.com/mnemon-dev/mnemon/internal/graph"
 	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,16 @@ var relatedCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startID := args[0]
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Related(remoteapi.RelatedRequest{ID: startID, EdgeType: relEdgeType, Depth: relDepth})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
+		}
 
 		db, err := openDB()
 		if err != nil {

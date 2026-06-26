@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mnemon-server.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: mnemon-server
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - serve
+            - --addr={{ .Values.server.addr }}
+            - --data-dir=/data
+            - --users=/config/{{ .Values.server.usersKey }}
+            - --tls-cert=/config/{{ .Values.server.tlsCertKey }}
+            - --tls-key=/config/{{ .Values.server.tlsKeyKey }}
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ .Values.server.existingSecret }}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "mnemon-server.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

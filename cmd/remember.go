@@ -12,6 +12,7 @@ import (
 	"github.com/mnemon-dev/mnemon/internal/embed"
 	"github.com/mnemon-dev/mnemon/internal/graph"
 	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 	"github.com/mnemon-dev/mnemon/internal/search"
 	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
@@ -48,6 +49,26 @@ var rememberCmd = &cobra.Command{
 		entityMode := graph.EntityMode(remEntityMode)
 		if !graph.ValidEntityMode(entityMode) {
 			return fmt.Errorf("invalid entity mode %q; valid: merge, provided, auto", remEntityMode)
+		}
+		if client, ok, err := defaultRemoteClient(); err != nil {
+			return err
+		} else if ok {
+			defer client.Close()
+			resp, err := client.Remember(remoteapi.RememberRequest{
+				Content:    content,
+				Category:   remCategory,
+				Importance: remImportance,
+				Tags:       remTags,
+				Source:     remSource,
+				Entities:   remEntities,
+				EntityMode: remEntityMode,
+				NoDiff:     remNoDiff,
+				Agent:      "mnemon-cli",
+			})
+			if err != nil {
+				return err
+			}
+			return printRemoteResponse(resp)
 		}
 
 		var tags []string
