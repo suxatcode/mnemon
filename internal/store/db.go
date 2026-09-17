@@ -340,6 +340,18 @@ func (db *DB) Path() string {
 	return db.path
 }
 
+// DisplayPath is safe to show to clients. Postgres DSNs have the password redacted.
+func (db *DB) DisplayPath() string {
+	if db.dialect != DialectPostgres {
+		return db.path
+	}
+	u, err := url.Parse(db.path)
+	if err != nil {
+		return "postgres://"
+	}
+	return u.Redacted()
+}
+
 // Conn returns the underlying sql.DB for advanced queries.
 func (db *DB) Conn() *sql.DB {
 	return db.conn

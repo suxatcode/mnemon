@@ -13,6 +13,21 @@ import (
 	"github.com/mnemon-dev/mnemon/internal/model"
 )
 
+func TestDisplayPathRedactsPassword(t *testing.T) {
+	pg := &DB{dialect: DialectPostgres, path: "postgres://mnemon:s3cret@rds:5432/mnemon?sslmode=require"}
+	got := pg.DisplayPath()
+	if strings.Contains(got, "s3cret") {
+		t.Fatalf("password leaked: %s", got)
+	}
+	if !strings.Contains(got, "mnemon") || !strings.Contains(got, "rds:5432") {
+		t.Fatalf("redacted DSN dropped host: %s", got)
+	}
+	sqliteDB := &DB{dialect: DialectSQLite, path: "/tmp/mnemon.db"}
+	if sqliteDB.DisplayPath() != "/tmp/mnemon.db" {
+		t.Fatalf("sqlite path: %s", sqliteDB.DisplayPath())
+	}
+}
+
 func TestMaxInsightsFromEnv(t *testing.T) {
 	t.Setenv("MNEMON_MAX_INSIGHTS", "")
 	if got := MaxInsightsFromEnv(1000); got != 1000 {
@@ -82,6 +97,13 @@ func runSharedDialectChecks(t *testing.T, db *DB) {
 	}
 	if !known["WidgetCo"] {
 		t.Fatalf("entities: %v", known)
+	}
+	ids, err := db.FindInsightsWithEntity("WidgetCo", "other", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 1 || ids[0] != "d-alice" {
+		t.Fatalf("FindInsightsWithEntity: %v", ids)
 	}
 	personal, err := db.GetActiveInsightsForDiff("alice", model.LayerPersonal)
 	if err != nil {

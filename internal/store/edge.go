@@ -66,9 +66,10 @@ func (db *DB) GetEdgesBySourceAndType(sourceID string, edgeType model.EdgeType) 
 // FindInsightsWithEntity returns insight IDs that have the given entity in their entities JSON array.
 func (db *DB) FindInsightsWithEntity(entity string, excludeID string, limit int) ([]string, error) {
 	rows, err := db.execer().Query(
-		`SELECT DISTINCT i.id FROM insights i, `+db.dialect.jsonEach("i.entities", "je")+`
+		`SELECT i.id FROM insights i, `+db.dialect.jsonEach("i.entities", "je")+`
 		 WHERE i.deleted_at IS NULL AND i.id != ? AND je.value = ?
-		 ORDER BY i.created_at DESC LIMIT ?`,
+		 GROUP BY i.id
+		 ORDER BY MAX(i.created_at) DESC LIMIT ?`,
 		excludeID, entity, limit)
 	if err != nil {
 		return nil, err

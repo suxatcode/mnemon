@@ -10,7 +10,7 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: deps build build-server harness-build install uninstall test unit vet harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-build-server docker-run compose-up compose-down compose-dev release-snapshot clean help
+.PHONY: deps build build-server harness-build install uninstall test unit vet test-minikube harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-build-server docker-run compose-up compose-down compose-dev release-snapshot clean help
 
 .DEFAULT_GOAL := help
 
@@ -49,6 +49,9 @@ test: build ## Run E2E test suite
 
 unit: ## Run Go unit tests
 	go test ./...
+
+test-minikube: ## Run gateway Helm/client integration suite on a dedicated minikube profile
+	bash scripts/minikube_gateway_test.sh
 
 vet: ## Run go vet static analysis
 	go vet ./...
@@ -110,4 +113,4 @@ clean: ## Remove build artifacts and test data
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'

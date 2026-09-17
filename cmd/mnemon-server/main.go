@@ -27,13 +27,14 @@ var (
 	jwtKeyFile  string
 	maxInsights int
 
-	issuePrincipal string
-	issueServer    string
-	issueOut       string
-	issueCA        string
-	issueName      string
-	issueRole      string
-	issueTTLDays   int
+	issuePrincipal  string
+	issueServer     string
+	issueOut        string
+	issueCA         string
+	issueName       string
+	issueRole       string
+	issueServerName string
+	issueTTLDays    int
 )
 
 func main() {
@@ -49,6 +50,9 @@ func main() {
 }
 
 func defaultServerDataDir() string {
+	if env := os.Getenv("MNEMON_DATA_DIR"); env != "" {
+		return env
+	}
 	return filepath.Join(store.DefaultDataDir(), "server")
 }
 
@@ -145,6 +149,7 @@ func userCmd() *cobra.Command {
 				Principal:     ident.Principal,
 				Token:         token,
 				CAPEM:         caPEM,
+				ServerName:    issueServerName,
 				Workspace:     "default",
 				Role:          ident.Role,
 			}
@@ -171,6 +176,7 @@ func userCmd() *cobra.Command {
 	issue.Flags().StringVar(&issueRole, "role", model.RoleUser, "role: user or org")
 	issue.Flags().IntVar(&issueTTLDays, "ttl-days", 90, "token lifetime in days")
 	issue.Flags().StringVar(&issueServer, "server", "", "server host:port clients should dial")
+	issue.Flags().StringVar(&issueServerName, "server-name", "", "TLS ServerName (SNI), if different from --server")
 	issue.Flags().StringVar(&issueOut, "out", "-", "invite file output path")
 	issue.Flags().StringVar(&issueCA, "ca-file", "", "CA PEM to embed in the invite")
 	issue.Flags().StringVar(&issueName, "name", "team", "suggested remote name")

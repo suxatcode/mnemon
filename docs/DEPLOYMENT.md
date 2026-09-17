@@ -4,7 +4,7 @@
 
 Prerequisites:
 
-- Go 1.24.6 or newer in the 1.24 series
+- Go 1.24.6 or newer in the 1.24 series (the server image builds with Go 1.25.3 because `jackc/pgx/v5 v5.11.0` requires it)
 - `make`
 - `jq` for the E2E test script
 
@@ -111,14 +111,30 @@ Chart defaults (internal bring-up):
 Issue a user (takes effect immediately, no pod restart):
 
 ```bash
-mnemon-server user issue \
-  --principal alice@team --role user \
-  --server mnemon-server:7443 \
-  --jwt-key /config/jwt.key \
-  --out invite.json
+kubectl exec deploy/mnemon -- \
+  mnemon-server user issue \
+    --principal alice@team --role user \
+    --server mnemon.example.com:7443 \
+    --server-name mnemon.example.com \
+    --jwt-key /config/jwt.key \
+    --ca-file /config/ca.crt \
+    --data-dir /data \
+    --out -
 ```
 
+`--data-dir /data` matches the server container (and `MNEMON_DATA_DIR`); it is required for SQLite so issue/revoke hit the same database as `serve`. Postgres issue uses `MNEMON_DATABASE_URL` from the pod env.
+
 On the client: `mnemon auth login --default invite.json`. Use `mnemon --local ...` only to bypass the team store.
+
+### Minikube integration suite
+
+The suite uses a dedicated profile (`mnemon-gateway`) and does not switch your current kubectl context for other commands. It covers bundled Postgres, external DSN / `values-rds.yaml`, SQLite PVC restart, TLS off, and the main user/operator flows.
+
+```bash
+make test-minikube
+```
+
+Optional env: `MINIKUBE_PROFILE`, `SCENARIOS` (comma list: `bundled,external,rds,sqlite,tls-off`), `SKIP_BUILD=1`, `KEEP_CLUSTER=0` (delete the profile at the end).
 
 ### Amazon RDS (production)
 

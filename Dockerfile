@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION=1.24.6
+ARG GO_VERSION=1.25.3
 
 FROM golang:${GO_VERSION}-bookworm AS dev
 RUN apt-get update \
@@ -18,10 +18,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 ARG VERSION=dev
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod \
   -ldflags "-s -w -X github.com/mnemon-dev/mnemon/cmd.version=${VERSION}" \
   -o /out/mnemon . \
-  && CGO_ENABLED=0 GOOS=linux go build \
+  && CGO_ENABLED=0 GOOS=linux go build -mod=mod \
   -ldflags "-s -w" \
   -o /out/mnemon-server ./cmd/mnemon-server
 

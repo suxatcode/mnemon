@@ -102,6 +102,20 @@ func TestHelmTemplateBundledAndExternal(t *testing.T) {
 	if !strings.Contains(out, "jwt.key") {
 		t.Fatal("jwt key missing from bundled render")
 	}
+	if !strings.Contains(out, "app.kubernetes.io/component: server") {
+		t.Fatal("server pods/service must set component=server so Postgres is not selected")
+	}
+
+	secretSrc, err := os.ReadFile(filepath.Join(chart, "templates", "secret.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secretText := string(secretSrc)
+	for _, want := range []string{`"127.0.0.1"`, `"localhost"`} {
+		if !strings.Contains(secretText, want) {
+			t.Errorf("TLS cert template missing SAN %s", want)
+		}
+	}
 
 	external, err := exec.Command(helm, "template", "mnemon", chart,
 		"--set", "postgresql.enabled=false",

@@ -255,10 +255,7 @@ type ServeOptions struct {
 }
 
 func Serve(opts ServeOptions) error {
-	db, err := store.OpenWithOptions(store.Options{
-		DataDir:     storeDir(opts.DataDir, opts.StoreName),
-		DatabaseURL: opts.DatabaseURL,
-	})
+	db, err := openStore(opts)
 	if err != nil {
 		return fmt.Errorf("open store: %w", err)
 	}
@@ -289,6 +286,28 @@ func Serve(opts ServeOptions) error {
 	}
 	log.Printf("mnemon-server listening on %s", ln.Addr())
 	return srv.Serve(ln)
+}
+
+func openStore(opts ServeOptions) (*store.DB, error) {
+	cfg := store.Options{
+		DataDir:     storeDir(opts.DataDir, opts.StoreName),
+		DatabaseURL: opts.DatabaseURL,
+	}
+	db, err := store.OpenWithOptions(cfg)
+	if err == nil {
+		return db, nil
+	}
+	deadline := time.Now().Add(45 * time.Second)
+	last := err
+	for time.Now().Before(deadline) {
+		log.Printf("waiting for store: %v", last)
+		time.Sleep(time.Second)
+		db, last = store.OpenWithOptions(cfg)
+		if last == nil {
+			return db, nil
+		}
+	}
+	return nil, last
 }
 
 func listen(opts ServeOptions) (net.Listener, error) {

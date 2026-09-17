@@ -13,7 +13,10 @@ Issue a user (no restart required):
     mnemon-server user issue \
       --principal alice@team --role user \
       --server {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }} \
+      --server-name {{ include "mnemon-server.fullname" . }} \
       --jwt-key /config/jwt.key \
+      --ca-file /config/ca.crt \
+      --data-dir /data \
       --out -
 
 Then on the client: mnemon auth login --default invite.json

@@ -19,8 +19,10 @@ func (s *Service) Status(actor Actor) (Result, error) {
 		return Result{}, err
 	}
 	var fileSize int64
-	if fi, err := os.Stat(s.db.Path()); err == nil {
-		fileSize = fi.Size()
+	if s.db.Dialect() != store.DialectPostgres {
+		if fi, err := os.Stat(s.db.Path()); err == nil {
+			fileSize = fi.Size()
+		}
 	}
 	return s.encode(map[string]any{
 		"total_insights":   stats.Total,
@@ -29,7 +31,7 @@ func (s *Service) Status(actor Actor) (Result, error) {
 		"edge_count":       stats.EdgeCount,
 		"top_entities":     stats.TopEntities,
 		"oplog_count":      stats.OplogCount,
-		"db_path":          s.db.Path(),
+		"db_path":          s.db.DisplayPath(),
 		"db_size_bytes":    fileSize,
 		"remote":           s.enforceACL,
 		"dialect":          s.db.Dialect().String(),
