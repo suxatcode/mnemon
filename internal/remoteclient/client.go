@@ -1,19 +1,25 @@
 package remoteclient
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
-	"net/rpc"
+	"io"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mnemon-dev/mnemon/internal/remoteapi"
 )
 
 type Client struct {
-	rpc  *rpc.Client
-	auth remoteapi.Auth
+	http  *http.Client
+	base  string
+	token string
+	agent string
 }
 
 func Dial(remote remoteapi.RemoteConfig) (*Client, error) {
@@ -36,96 +42,107 @@ func Dial(remote remoteapi.RemoteConfig) (*Client, error) {
 		}
 		cfg.RootCAs = pool
 	}
-
-	conn, err := tls.Dial("tcp", remote.Server, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("dial remote %s: %w", remote.Server, err)
+	host := remote.Server
+	if !strings.Contains(host, "://") {
+		host = "https://" + host
 	}
 	return &Client{
-		rpc: rpc.NewClient(conn),
-		auth: remoteapi.Auth{
-			Principal: remote.Principal,
-			Token:     strings.TrimSpace(string(tokenBytes)),
+		http: &http.Client{
+			Timeout: 60 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: cfg,
+			},
 		},
+		base:  strings.TrimRight(host, "/"),
+		token: strings.TrimSpace(string(tokenBytes)),
+		agent: "mnemon-cli",
 	}, nil
 }
 
-func (c *Client) Close() error {
-	return c.rpc.Close()
-}
+func (c *Client) Close() error { return nil }
 
-func (c *Client) Auth() remoteapi.Auth {
-	return c.auth
-}
-
-func (c *Client) call(method string, req any) (*remoteapi.Response, error) {
-	var resp remoteapi.Response
-	if err := c.rpc.Call(remoteapi.RPCServiceName+"."+method, req, &resp); err != nil {
+func (c *Client) call(path string, req any) (*remoteapi.Response, error) {
+	var body []byte
+	var err error
+	if req != nil {
+		body, err = json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	httpReq, err := http.NewRequest(http.MethodPost, c.base+path, bytes.NewReader(body))
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	httpReq.Header.Set("Authorization", "Bearer "+c.token)
+	httpReq.Header.Set("Content-Type", "application/json")
+	if c.agent != "" {
+		httpReq.Header.Set("X-Mnemon-Agent", c.agent)
+	}
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var env remoteapi.Envelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return nil, fmt.Errorf("decode response: %w (%s)", err, strings.TrimSpace(string(raw)))
+	}
+	if env.Error != "" || resp.StatusCode >= 400 {
+		if env.Error == "" {
+			env.Error = fmt.Sprintf("http %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("%s", env.Error)
+	}
+	out := &remoteapi.Response{Text: env.Text, Warnings: env.Warnings}
+	if env.Result != nil {
+		b, err := json.MarshalIndent(env.Result, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		out.JSON = append(b, '\n')
+	}
+	return out, nil
 }
 
-func (c *Client) Status() (*remoteapi.Response, error) {
-	return c.call("Status", remoteapi.StatusRequest{Auth: c.auth})
-}
-
+func (c *Client) Status() (*remoteapi.Response, error) { return c.call("/v1/status", struct{}{}) }
 func (c *Client) Remember(req remoteapi.RememberRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Remember", req)
+	return c.call("/v1/remember", req)
 }
-
 func (c *Client) Recall(req remoteapi.RecallRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Recall", req)
+	return c.call("/v1/recall", req)
 }
-
 func (c *Client) Search(req remoteapi.SearchRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Search", req)
+	return c.call("/v1/search", req)
 }
-
 func (c *Client) Link(req remoteapi.LinkRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Link", req)
+	return c.call("/v1/link", req)
 }
-
 func (c *Client) Forget(req remoteapi.ForgetRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Forget", req)
+	return c.call("/v1/forget", req)
 }
-
 func (c *Client) Log(req remoteapi.LogRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Log", req)
+	return c.call("/v1/log", req)
 }
-
 func (c *Client) Related(req remoteapi.RelatedRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Related", req)
+	return c.call("/v1/related", req)
 }
-
 func (c *Client) GC(req remoteapi.GCRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("GC", req)
+	return c.call("/v1/gc", req)
 }
-
 func (c *Client) Receipt(req remoteapi.ReceiptRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Receipt", req)
+	return c.call("/v1/receipt", req)
 }
-
 func (c *Client) Embed(req remoteapi.EmbedRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Embed", req)
+	return c.call("/v1/embed", req)
 }
-
 func (c *Client) Import(req remoteapi.ImportRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Import", req)
+	return c.call("/v1/import", req)
 }
-
 func (c *Client) Viz(req remoteapi.VizRequest) (*remoteapi.Response, error) {
-	req.Auth = c.auth
-	return c.call("Viz", req)
+	return c.call("/v1/viz", req)
 }

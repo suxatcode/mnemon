@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ include "mnemon-server.replicas" . }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
@@ -24,26 +24,58 @@ spec:
           args:
             - serve
             - --addr={{ .Values.server.addr }}
+            - --max-insights={{ .Values.maxInsights }}
+            - --jwt-key=/config/{{ .Values.server.jwtKeyKey }}
+            {{- if not (include "mnemon-server.usePostgres" .) }}
             - --data-dir=/data
-            - --users=/config/{{ .Values.server.usersKey }}
+            {{- end }}
+            {{- if .Values.server.tls.enabled }}
             - --tls-cert=/config/{{ .Values.server.tlsCertKey }}
             - --tls-key=/config/{{ .Values.server.tlsKeyKey }}
+            {{- end }}
+          env:
+            - name: MNEMON_MAX_INSIGHTS
+              value: {{ .Values.maxInsights | quote }}
+            {{- if include "mnemon-server.usePostgres" . }}
+            - name: MNEMON_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mnemon-server.databaseSecretName" . }}
+                  key: {{ include "mnemon-server.databaseSecretKey" . }}
+            {{- end }}
           ports:
-            - name: rpc
+            - name: https
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: https
+              scheme: {{ if .Values.server.tls.enabled }}HTTPS{{ else }}HTTP{{ end }}
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: https
+              scheme: {{ if .Values.server.tls.enabled }}HTTPS{{ else }}HTTP{{ end }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
           volumeMounts:
-            - name: data
-              mountPath: /data
             - name: config
               mountPath: /config
               readOnly: true
+            {{- if not (include "mnemon-server.usePostgres" .) }}
+            - name: data
+              mountPath: /data
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config
           secret:
-            secretName: {{ .Values.server.existingSecret }}
+            secretName: {{ include "mnemon-server.appSecretName" . }}
+        {{- if not (include "mnemon-server.usePostgres" .) }}
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
@@ -51,3 +83,4 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- end }}

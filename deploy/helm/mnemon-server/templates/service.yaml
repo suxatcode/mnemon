@@ -9,9 +9,9 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: rpc
+      targetPort: https
       protocol: TCP
-      name: rpc
+      name: https
   selector:
     app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}

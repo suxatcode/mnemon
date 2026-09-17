@@ -4,12 +4,15 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/mnemon-dev/mnemon/internal/embed"
 	_ "modernc.org/sqlite"
 )
@@ -28,12 +31,48 @@ type dbExecer interface {
 	QueryRow(string, ...any) *sql.Row
 }
 
-// DB wraps the SQLite database connection.
+type reboundExecer struct {
+	inner   dbExecer
+	dialect Dialect
+}
+
+func (r reboundExecer) Exec(query string, args ...any) (sql.Result, error) {
+	return r.inner.Exec(rebind(r.dialect, query), args...)
+}
+
+func (r reboundExecer) Query(query string, args ...any) (*sql.Rows, error) {
+	return r.inner.Query(rebind(r.dialect, query), args...)
+}
+
+func (r reboundExecer) QueryRow(query string, args ...any) *sql.Row {
+	return r.inner.QueryRow(rebind(r.dialect, query), args...)
+}
+
+// Options controls how a store is opened.
+type Options struct {
+	DataDir     string
+	DatabaseURL string
+	ReadOnly    bool
+}
+
+// DB wraps a SQLite or Postgres database connection.
 type DB struct {
 	conn     *sql.DB
 	tx       *sql.Tx // current active transaction (nil = no transaction)
 	path     string
 	readOnly bool
+	dialect  Dialect
+}
+
+// Dialect returns the SQL dialect of this connection.
+func (db *DB) Dialect() Dialect { return db.dialect }
+
+// Ping verifies the database is reachable.
+func (db *DB) Ping() error {
+	if db.conn == nil {
+		return fmt.Errorf("database is not open")
+	}
+	return db.conn.Ping()
 }
 
 // IsReadOnly returns true if the database was opened in read-only mode.
@@ -41,10 +80,11 @@ func (db *DB) IsReadOnly() bool { return db.readOnly }
 
 // execer returns the active transaction if set, otherwise the raw connection.
 func (db *DB) execer() dbExecer {
+	var inner dbExecer = db.conn
 	if db.tx != nil {
-		return db.tx
+		inner = db.tx
 	}
-	return db.conn
+	return reboundExecer{inner: inner, dialect: db.dialect}
 }
 
 // InTransaction runs fn inside a single SQL transaction.
@@ -203,34 +243,86 @@ func renameIfExists(oldPath, newPath string) error {
 // Safe for read-only filesystem mounts: uses journal_mode=OFF to avoid
 // writing WAL/SHM sidecar files.
 func OpenReadOnly(dataDir string) (*DB, error) {
+	return OpenWithOptions(Options{DataDir: dataDir, ReadOnly: true})
+}
+
+// Open opens (or creates) the SQLite database at the given directory.
+func Open(dataDir string) (*DB, error) {
+	return OpenWithOptions(Options{DataDir: dataDir})
+}
+
+// OpenWithOptions opens SQLite (default) or Postgres from a connection URL.
+func OpenWithOptions(opts Options) (*DB, error) {
+	dsn := strings.TrimSpace(opts.DatabaseURL)
+	if dsn == "" {
+		dsn = strings.TrimSpace(os.Getenv("MNEMON_DATABASE_URL"))
+	}
+	if isPostgresURL(dsn) {
+		if opts.ReadOnly {
+			return nil, fmt.Errorf("read-only postgres is not supported")
+		}
+		return openPostgres(dsn)
+	}
+	if strings.HasPrefix(dsn, "sqlite:") {
+		opts.DataDir = strings.TrimPrefix(dsn, "sqlite:")
+	}
+	if opts.ReadOnly {
+		return openSQLiteReadOnly(opts.DataDir)
+	}
+	return openSQLite(opts.DataDir)
+}
+
+func isPostgresURL(dsn string) bool {
+	return strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://")
+}
+
+func openSQLiteReadOnly(dataDir string) (*DB, error) {
 	dbPath := filepath.Join(dataDir, "mnemon.db")
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil, fmt.Errorf("database not found: %s", dbPath)
 	}
-
 	conn, err := sql.Open("sqlite", dbPath+"?mode=ro&_pragma=journal_mode(OFF)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open readonly database: %w", err)
 	}
 	conn.SetMaxOpenConns(1)
-	return &DB{conn: conn, path: dbPath, readOnly: true}, nil
+	return &DB{conn: conn, path: dbPath, readOnly: true, dialect: DialectSQLite}, nil
 }
 
-// Open opens (or creates) the SQLite database at the given directory.
-func Open(dataDir string) (*DB, error) {
+func openSQLite(dataDir string) (*DB, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
-
 	dbPath := filepath.Join(dataDir, "mnemon.db")
-	conn, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	conn, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
+	conn.SetMaxOpenConns(1)
+	db := &DB{conn: conn, path: dbPath, dialect: DialectSQLite}
+	if err := db.migrate(); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	return db, nil
+}
 
-	conn.SetMaxOpenConns(1) // SQLite single-writer
-
-	db := &DB{conn: conn, path: dbPath}
+func openPostgres(dsn string) (*DB, error) {
+	if _, err := url.Parse(dsn); err != nil {
+		return nil, fmt.Errorf("parse postgres url: %w", err)
+	}
+	conn, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open postgres: %w", err)
+	}
+	conn.SetMaxOpenConns(20)
+	conn.SetMaxIdleConns(5)
+	conn.SetConnMaxLifetime(30 * time.Minute)
+	if err := conn.Ping(); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("ping postgres: %w", err)
+	}
+	db := &DB{conn: conn, path: dsn, dialect: DialectPostgres}
 	if err := db.migrate(); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
@@ -254,7 +346,73 @@ func (db *DB) Conn() *sql.DB {
 }
 
 func (db *DB) migrate() error {
-	schema := `
+	schema := db.baseSchema()
+	if _, err := db.conn.Exec(schema); err != nil {
+		return err
+	}
+
+	if err := db.addColumn("insights", "last_accessed_at", "TEXT"); err != nil {
+		return fmt.Errorf("add last_accessed_at: %w", err)
+	}
+	if err := db.addColumn("insights", "embedding", db.dialect.blobType()); err != nil {
+		return fmt.Errorf("add embedding: %w", err)
+	}
+	if db.dialect == DialectSQLite {
+		if err := db.migrateEmbeddingsToFloat32(); err != nil {
+			return fmt.Errorf("migrate embeddings to float32: %w", err)
+		}
+	}
+	if err := db.addColumn("insights", "effective_importance", "REAL DEFAULT 0.5"); err != nil {
+		return fmt.Errorf("add effective_importance: %w", err)
+	}
+	if err := db.addColumn("insights", "owner_principal", "TEXT NOT NULL DEFAULT 'local'"); err != nil {
+		return fmt.Errorf("add owner_principal: %w", err)
+	}
+	if err := db.addColumn("insights", "layer", "TEXT NOT NULL DEFAULT 'personal'"); err != nil {
+		return fmt.Errorf("add layer: %w", err)
+	}
+	if err := db.addColumn("insights", "external_ref", "TEXT"); err != nil {
+		return fmt.Errorf("add external_ref: %w", err)
+	}
+	if err := db.addColumn("insights", "source_uri", "TEXT"); err != nil {
+		return fmt.Errorf("add source_uri: %w", err)
+	}
+	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_insights_effective_imp ON insights(effective_importance)`); err != nil {
+		return fmt.Errorf("create effective_imp index: %w", err)
+	}
+	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_prune_candidates ON insights(deleted_at, importance, access_count, effective_importance)`); err != nil {
+		return fmt.Errorf("create prune_candidates index: %w", err)
+	}
+	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_insights_owner_layer ON insights(owner_principal, layer)`); err != nil {
+		return fmt.Errorf("create owner_layer index: %w", err)
+	}
+	if _, err := db.conn.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_insights_external_ref ON insights(external_ref) WHERE external_ref IS NOT NULL AND external_ref != ''`); err != nil {
+		return fmt.Errorf("create external_ref index: %w", err)
+	}
+
+	if db.dialect == DialectSQLite {
+		if err := db.migrateRemoveNarrativeEdges(); err != nil {
+			return fmt.Errorf("remove narrative edges: %w", err)
+		}
+	}
+
+	var narrativeCount int
+	_ = db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE category = 'narrative' AND deleted_at IS NULL`).Scan(&narrativeCount)
+	if narrativeCount > 0 {
+		now := time.Now().UTC().Format(time.RFC3339)
+		if _, err := db.execer().Exec(`UPDATE insights SET deleted_at = ? WHERE category = 'narrative' AND deleted_at IS NULL`, now); err != nil {
+			return fmt.Errorf("clean narrative insights: %w", err)
+		}
+	}
+	return nil
+}
+
+func (db *DB) baseSchema() string {
+	oplogID := "INTEGER PRIMARY KEY AUTOINCREMENT"
+	if db.dialect == DialectPostgres {
+		oplogID = "BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY"
+	}
+	return fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS insights (
     id          TEXT PRIMARY KEY,
     content     TEXT NOT NULL,
@@ -293,65 +451,39 @@ CREATE INDEX IF NOT EXISTS idx_edges_source_type ON edges(source_id, edge_type);
 CREATE INDEX IF NOT EXISTS idx_edges_target_type ON edges(target_id, edge_type);
 
 CREATE TABLE IF NOT EXISTS oplog (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          %s,
     operation   TEXT NOT NULL,
     insight_id  TEXT,
     detail      TEXT DEFAULT '',
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_oplog_created ON oplog(created_at);
-`
-	_, err := db.conn.Exec(schema)
-	if err != nil {
-		return err
-	}
 
-	// Phase 2 migration: add last_accessed_at column
-	if err := addColumnIfNotExists(db.conn, `ALTER TABLE insights ADD COLUMN last_accessed_at TEXT`); err != nil {
-		return fmt.Errorf("add last_accessed_at: %w", err)
-	}
+CREATE TABLE IF NOT EXISTS principals (
+    principal  TEXT PRIMARY KEY,
+    role       TEXT NOT NULL CHECK(role IN ('user','org')),
+    disabled   INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
 
-	// Phase 3 migration: add embedding column
-	if err := addColumnIfNotExists(db.conn, `ALTER TABLE insights ADD COLUMN embedding BLOB`); err != nil {
-		return fmt.Errorf("add embedding: %w", err)
-	}
-	if err := db.migrateEmbeddingsToFloat32(); err != nil {
-		return fmt.Errorf("migrate embeddings to float32: %w", err)
-	}
-
-	// Lifecycle migration: add effective_importance column
-	if err := addColumnIfNotExists(db.conn, `ALTER TABLE insights ADD COLUMN effective_importance REAL DEFAULT 0.5`); err != nil {
-		return fmt.Errorf("add effective_importance: %w", err)
-	}
-	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_insights_effective_imp ON insights(effective_importance)`); err != nil {
-		return fmt.Errorf("create effective_imp index: %w", err)
-	}
-	if _, err := db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_prune_candidates ON insights(deleted_at, importance, access_count, effective_importance)`); err != nil {
-		return fmt.Errorf("create prune_candidates index: %w", err)
-	}
-
-	// Migration: remove narrative edge type from existing databases
-	if err := db.migrateRemoveNarrativeEdges(); err != nil {
-		return fmt.Errorf("remove narrative edges: %w", err)
-	}
-
-	// One-time cleanup: soft-delete narrative category insights from legacy databases.
-	// Only runs the UPDATE when narrative insights actually exist (avoids needless writes).
-	var narrativeCount int
-	_ = db.conn.QueryRow(`SELECT COUNT(*) FROM insights WHERE category = 'narrative' AND deleted_at IS NULL`).Scan(&narrativeCount)
-	if narrativeCount > 0 {
-		if _, err := db.conn.Exec(`UPDATE insights SET deleted_at = datetime('now') WHERE category = 'narrative' AND deleted_at IS NULL`); err != nil {
-			return fmt.Errorf("clean narrative insights: %w", err)
-		}
-	}
-
-	return nil
+CREATE TABLE IF NOT EXISTS issued_tokens (
+    jti        TEXT PRIMARY KEY,
+    principal  TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked    INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (principal) REFERENCES principals(principal)
+);
+CREATE INDEX IF NOT EXISTS idx_issued_tokens_principal ON issued_tokens(principal);
+`, oplogID)
 }
 
-// addColumnIfNotExists runs an ALTER TABLE ADD COLUMN statement,
-// ignoring "duplicate column" errors (column already exists).
-func addColumnIfNotExists(conn *sql.DB, stmt string) error {
-	_, err := conn.Exec(stmt)
+func (db *DB) addColumn(table, column, decl string) error {
+	if db.dialect == DialectPostgres {
+		_, err := db.conn.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s`, table, column, decl))
+		return err
+	}
+	_, err := db.conn.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s %s`, table, column, decl))
 	if err != nil && strings.Contains(err.Error(), "duplicate column") {
 		return nil
 	}

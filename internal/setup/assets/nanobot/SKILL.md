@@ -57,6 +57,16 @@ then run `mnemon import <file>` only after validation passes. After import,
 verify with `mnemon status` and a focused `mnemon search` or `mnemon recall`.
 Check the output `errors` field because imports can partially succeed.
 
+## Team memory
+
+When a remote is configured (`mnemon auth login`), this is a **team-shared brain**, not a private notebook.
+
+- Recall/search/related/status may return memories written by other people or agents. Attribute them by `owner_principal` and `layer` in the JSON (`remember` also returns these fields).
+- `layer: org` is organizational ground truth. Do not treat a coworker's personal notes as org policy.
+- You may add, edit, `forget`, or GC **only your own** personal memories. Do not "update" or delete someone else's insight; the server rejects it.
+- Org memories are written only by an organization principal (`role=org`). Regular skills never write org.
+- Use `mnemon --local ...` only when you deliberately want the machine-local SQLite store instead of the team gateway.
+
 ## Guardrails
 
 - Prefer delegating `remember` and `link` to a sub-agent via `spawn` rather than running them in the main conversation.

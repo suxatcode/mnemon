@@ -1,17 +1,10 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"math"
-	"os"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
-	"github.com/mnemon-dev/mnemon/internal/graph"
+	"github.com/mnemon-dev/mnemon/internal/memorysvc"
 	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/search"
-	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -25,78 +18,6 @@ var (
 	recVerbose  bool
 )
 
-// compactResult is the LLM-friendly projection of a recall result.
-// It drops signals, timestamps, traversal metadata, and other debug fields
-// that add noise for agent consumption.
-type compactResult struct {
-	ID         string  `json:"id"`
-	Content    string  `json:"content"`
-	Category   string  `json:"category,omitempty"`
-	Importance int     `json:"importance,omitempty"`
-	Intent     string  `json:"intent"`
-	MatchedVia string  `json:"matched_via,omitempty"`
-	Confidence string  `json:"confidence"`
-	Score      float64 `json:"score"`
-}
-
-// compactResponse wraps compact results with an optional hint.
-type compactResponse struct {
-	Results []compactResult `json:"results"`
-	Hint    string          `json:"hint,omitempty"`
-}
-
-// confidenceLowMax / confidenceMediumMax bucket the recall score into
-// low / medium / high labels for agent consumption. The score is the
-// weighted sum of normalized signals (keyword + entity + similarity +
-// graph), so it is not a calibrated probability. The current cutoffs
-// are chosen empirically and may need tuning once we have a larger
-// sample of real recall traces; until then the raw score is also
-// exposed for callers that need finer control.
-const (
-	confidenceLowMax    = 0.25
-	confidenceMediumMax = 0.6
-)
-
-// confidenceLabel maps a numeric score to a discrete confidence bucket.
-func confidenceLabel(score float64) string {
-	switch {
-	case score < confidenceLowMax:
-		return "low"
-	case score < confidenceMediumMax:
-		return "medium"
-	default:
-		return "high"
-	}
-}
-
-// roundScore rounds a float to 3 decimal places (half-away-from-zero).
-func roundScore(s float64) float64 {
-	return math.Round(s*1000) / 1000
-}
-
-// toCompact projects a full RecallResponse into the compact LLM-friendly shape.
-func toCompact(resp search.RecallResponse) compactResponse {
-	results := make([]compactResult, 0, len(resp.Results))
-	for _, r := range resp.Results {
-		rounded := roundScore(r.Score)
-		cr := compactResult{
-			ID:         r.Insight.ID,
-			Content:    r.Insight.Content,
-			Category:   string(r.Insight.Category),
-			Importance: r.Insight.Importance,
-			Intent:     string(r.Intent),
-			MatchedVia: r.Via,
-			Confidence: confidenceLabel(rounded),
-			Score:      rounded,
-		}
-		results = append(results, cr)
-	}
-	return compactResponse{
-		Results: results,
-		Hint:    resp.Meta.Hint,
-	}
-}
-
 var recallCmd = &cobra.Command{
 	Use:   "recall [keyword]",
 	Short: "Retrieve insights by keyword",
@@ -107,91 +28,26 @@ var recallCmd = &cobra.Command{
 		if err := requirePositiveLimit("--limit", recLimit); err != nil {
 			return err
 		}
+		input := memorysvc.RecallInput{
+			Query: keyword, Category: recCategory, Limit: recLimit, Source: recSource,
+			Basic: recBasic, Intent: recIntent, Verbose: recVerbose,
+		}
 		if client, ok, err := defaultRemoteClient(); err != nil {
 			return err
 		} else if ok {
 			defer client.Close()
 			resp, err := client.Recall(remoteapi.RecallRequest{
-				Query:    keyword,
-				Category: recCategory,
-				Limit:    recLimit,
-				Source:   recSource,
-				Basic:    recBasic,
-				Intent:   recIntent,
-				Verbose:  recVerbose,
+				Query: input.Query, Category: input.Category, Limit: input.Limit, Source: input.Source,
+				Basic: input.Basic, Intent: input.Intent, Verbose: input.Verbose,
 			})
 			if err != nil {
 				return err
 			}
 			return printRemoteResponse(resp)
 		}
-
-		db, err := openDB()
-		if err != nil {
-			return fmt.Errorf("open database: %w", err)
-		}
-		defer db.Close()
-
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-
-		if recBasic {
-			// Legacy SQL LIKE recall (not affected by format flags)
-			results, err := db.QueryInsights(store.QueryFilter{
-				Keyword:  keyword,
-				Category: recCategory,
-				Source:   recSource,
-				Limit:    recLimit,
-			})
-			if err != nil {
-				return fmt.Errorf("query insights: %w", err)
-			}
-
-			for _, r := range results {
-				_ = db.IncrementAccessCount(r.ID)
-			}
-			db.LogOp("recall:basic", "", fmt.Sprintf("q=%s hits=%d", keyword, len(results)))
-			return enc.Encode(results)
-		}
-
-		// Default: intent-aware graph-enhanced recall
-		var intentOverride *search.Intent
-		if recIntent != "" {
-			parsed, err := search.IntentFromString(recIntent)
-			if err != nil {
-				return err
-			}
-			intentOverride = &parsed
-		}
-
-		// Try to get query embedding for hybrid search
-		var queryVec []float64
-		ec := embed.NewClientWithModel(resolveEmbedModel())
-		if ec.Available() {
-			queryVec, _ = ec.Embed(keyword)
-		}
-
-		// Extract query entities at cmd layer (avoid graph->search circular dep).
-		// Load the known-entity set so the indexed extractor's fourth path can
-		// admit user vocabulary (single-segment CamelCase, lowercase project
-		// names) that techDictionary does not cover. The lookup is read-only;
-		// on error we fall through to the default regex+dictionary extractor.
-		knownEntities, _ := db.LoadKnownEntities()
-		queryEntities := graph.ExtractEntitiesIndexed(keyword, knownEntities)
-
-		resp, err := search.IntentAwareRecall(db, keyword, queryVec, queryEntities, recLimit, intentOverride)
-		if err != nil {
-			return fmt.Errorf("recall: %w", err)
-		}
-		for _, r := range resp.Results {
-			_ = db.IncrementAccessCount(r.Insight.ID)
-		}
-		db.LogOp("recall", "", fmt.Sprintf("q=%s hits=%d", keyword, len(resp.Results)))
-
-		if recVerbose {
-			return enc.Encode(resp)
-		}
-		return enc.Encode(toCompact(resp))
+		return withLocalService(func(svc *memorysvc.Service, actor memorysvc.Actor) error {
+			return writeResult(svc.Recall(actor, input))
+		})
 	},
 }
 

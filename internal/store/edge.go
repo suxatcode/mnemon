@@ -10,8 +10,7 @@ import (
 // InsertEdge inserts or replaces an edge.
 func (db *DB) InsertEdge(e *model.Edge) error {
 	_, err := db.execer().Exec(
-		`INSERT OR REPLACE INTO edges (source_id, target_id, edge_type, weight, metadata, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
+		db.dialect.insertEdgeSQL(),
 		e.SourceID, e.TargetID, string(e.EdgeType), e.Weight,
 		e.MetadataJSON(), e.CreatedAt.Format(time.RFC3339),
 	)
@@ -67,7 +66,7 @@ func (db *DB) GetEdgesBySourceAndType(sourceID string, edgeType model.EdgeType) 
 // FindInsightsWithEntity returns insight IDs that have the given entity in their entities JSON array.
 func (db *DB) FindInsightsWithEntity(entity string, excludeID string, limit int) ([]string, error) {
 	rows, err := db.execer().Query(
-		`SELECT DISTINCT i.id FROM insights i, json_each(i.entities) je
+		`SELECT DISTINCT i.id FROM insights i, `+db.dialect.jsonEach("i.entities", "je")+`
 		 WHERE i.deleted_at IS NULL AND i.id != ? AND je.value = ?
 		 ORDER BY i.created_at DESC LIMIT ?`,
 		excludeID, entity, limit)

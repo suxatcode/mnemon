@@ -3,17 +3,19 @@ package remoteapi
 const (
 	DefaultAuthFileName = "auth.json"
 	DefaultStoreName    = "default"
-	RPCServiceName      = "Mnemon"
 )
 
-type Auth struct {
-	Principal string
-	Token     string
+type Envelope struct {
+	Result   any      `json:"result,omitempty"`
+	Text     string   `json:"text,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
+	Error    string   `json:"error,omitempty"`
 }
 
 type Response struct {
-	JSON []byte
-	Text string
+	JSON     []byte
+	Text     string
+	Warnings []string
 }
 
 type Invite struct {
@@ -25,6 +27,7 @@ type Invite struct {
 	CAPEM         string `json:"ca_pem,omitempty"`
 	ServerName    string `json:"server_name,omitempty"`
 	Workspace     string `json:"workspace,omitempty"`
+	Role          string `json:"role,omitempty"`
 }
 
 type AuthConfig struct {
@@ -43,98 +46,76 @@ type RemoteConfig struct {
 	Workspace  string `json:"workspace,omitempty"`
 }
 
-type CommonRequest struct {
-	Auth Auth
-}
-
-type StatusRequest struct {
-	Auth Auth
-}
-
 type RememberRequest struct {
-	Auth       Auth
-	Content    string
-	Category   string
-	Importance int
-	Tags       string
-	Source     string
-	Entities   string
-	EntityMode string
-	NoDiff     bool
-	Agent      string
+	Content    string `json:"content"`
+	Category   string `json:"category"`
+	Importance int    `json:"importance"`
+	Tags       string `json:"tags"`
+	Source     string `json:"source"`
+	Entities   string `json:"entities"`
+	EntityMode string `json:"entity_mode"`
+	NoDiff     bool   `json:"no_diff"`
 }
 
 type RecallRequest struct {
-	Auth     Auth
-	Query    string
-	Category string
-	Limit    int
-	Source   string
-	Basic    bool
-	Intent   string
-	Verbose  bool
+	Query    string `json:"query"`
+	Category string `json:"category"`
+	Limit    int    `json:"limit"`
+	Source   string `json:"source"`
+	Basic    bool   `json:"basic"`
+	Intent   string `json:"intent"`
+	Verbose  bool   `json:"verbose"`
 }
 
 type SearchRequest struct {
-	Auth  Auth
-	Query string
-	Limit int
+	Query string `json:"query"`
+	Limit int    `json:"limit"`
 }
 
 type LinkRequest struct {
-	Auth     Auth
-	SourceID string
-	TargetID string
-	Type     string
-	Weight   float64
-	MetaJSON string
+	SourceID string  `json:"source_id"`
+	TargetID string  `json:"target_id"`
+	Type     string  `json:"type"`
+	Weight   float64 `json:"weight"`
+	MetaJSON string  `json:"meta_json"`
 }
 
 type ForgetRequest struct {
-	Auth Auth
-	ID   string
+	ID string `json:"id"`
 }
 
 type LogRequest struct {
-	Auth  Auth
-	Limit int
+	Limit int `json:"limit"`
 }
 
 type RelatedRequest struct {
-	Auth     Auth
-	ID       string
-	EdgeType string
-	Depth    int
+	ID       string `json:"id"`
+	EdgeType string `json:"edge_type"`
+	Depth    int    `json:"depth"`
 }
 
 type GCRequest struct {
-	Auth      Auth
-	Threshold float64
-	Limit     int
-	KeepID    string
+	Threshold float64 `json:"threshold"`
+	Limit     int     `json:"limit"`
+	KeepID    string  `json:"keep_id"`
 }
 
 type ReceiptRequest struct {
-	Auth  Auth
-	Limit int
+	Limit int `json:"limit"`
 }
 
 type EmbedRequest struct {
-	Auth   Auth
-	ID     string
-	All    bool
-	Status bool
+	ID     string `json:"id"`
+	All    bool   `json:"all"`
+	Status bool   `json:"status"`
 }
 
 type ImportRequest struct {
-	Auth   Auth
-	Draft  []byte
-	NoDiff bool
-	DryRun bool
-	Agent  string
+	Draft  []byte `json:"draft"`
+	NoDiff bool   `json:"no_diff"`
+	DryRun bool   `json:"dry_run"`
 }
 
 type VizRequest struct {
-	Auth   Auth
-	Format string
+	Format string `json:"format"`
 }

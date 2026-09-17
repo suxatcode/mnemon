@@ -1,3 +1,7 @@
+### Team memory
+
+When a remote is configured (`mnemon auth login`), Mnemon is a **team-shared brain**. Recall may return other people's notes plus org ground truth — attribute by `owner_principal` and `layer`. `layer: org` is policy; do not treat personal notes as org policy. Do not `forget` or "update" someone else's insight. Use `--local` only when deliberately off the team store.
+
 ### Recall — before responding
 
 **Default: recall on every new user message**, unless ALL of these apply:

@@ -90,6 +90,48 @@ The relevant environment variables are:
 
 For host-based Ollama, set `MNEMON_EMBED_ENDPOINT=http://host.docker.internal:11434` on Docker Desktop, or use the host gateway address for Linux deployments.
 
+## Team memory gateway
+
+Local `mnemon` without a remote stays SQLite (`~/.mnemon`, cap 1000). Helm/AWS runs `mnemon-server` against Postgres with HTTPS JSON and self-issued JWTs.
+
+Build the server image:
+
+```bash
+make docker-build-server
+```
+
+Chart defaults (internal bring-up):
+
+- Bundled Postgres StatefulSet
+- `replicaCount: 2`
+- JWT signing key and TLS generated in the app secret
+- Probes on `GET /health` and `GET /ready`
+- `maxInsights: 25000` per principal (personal layer only)
+
+Issue a user (takes effect immediately, no pod restart):
+
+```bash
+mnemon-server user issue \
+  --principal alice@team --role user \
+  --server mnemon-server:7443 \
+  --jwt-key /config/jwt.key \
+  --out invite.json
+```
+
+On the client: `mnemon auth login --default invite.json`. Use `mnemon --local ...` only to bypass the team store.
+
+### Amazon RDS (production)
+
+Use the RDS overlay and a DSN secret (Secrets Manager / ExternalSecret):
+
+```bash
+helm upgrade --install mnemon deploy/helm/mnemon-server \
+  -f deploy/helm/mnemon-server/values-rds.yaml \
+  --set image.tag=dev
+```
+
+`values-rds.yaml` sets `postgresql.enabled: false` and reads `database.existingSecret`. Principals and token `jti` rows live in that Postgres; there is no `users.json`.
+
 ## Release Deployment
 
 Tagged releases are handled by GoReleaser through `.github/workflows/release.yml`.

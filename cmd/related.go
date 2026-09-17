@@ -1,14 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/mnemon-dev/mnemon/internal/graph"
+	"github.com/mnemon-dev/mnemon/internal/memorysvc"
 	"github.com/mnemon-dev/mnemon/internal/model"
 	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +21,12 @@ var relatedCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startID := args[0]
+		if relEdgeType != "" {
+			et := model.EdgeType(relEdgeType)
+			if !model.ValidEdgeTypes[et] {
+				return fmt.Errorf("invalid edge type %q; valid: temporal, semantic, causal, entity", relEdgeType)
+			}
+		}
 		if client, ok, err := defaultRemoteClient(); err != nil {
 			return err
 		} else if ok {
@@ -34,63 +37,10 @@ var relatedCmd = &cobra.Command{
 			}
 			return printRemoteResponse(resp)
 		}
-
-		db, err := openDB()
-		if err != nil {
-			return fmt.Errorf("open database: %w", err)
-		}
-		defer db.Close()
-
-		// Verify start node exists
-		start, err := db.GetInsightByID(startID)
-		if err != nil {
-			return fmt.Errorf("insight not found: %w", err)
-		}
-
-		var edgeFilter model.EdgeType
-		if relEdgeType != "" {
-			et := model.EdgeType(relEdgeType)
-			if !model.ValidEdgeTypes[et] {
-				return fmt.Errorf("invalid edge type %q; valid: temporal, semantic, causal, entity", relEdgeType)
-			}
-			edgeFilter = et
-		}
-
-		// BFS traversal
-		related := bfsTraverse(db, start.ID, edgeFilter, relDepth)
-
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(related)
-	},
-}
-
-type relatedResult struct {
-	ID         string `json:"id"`
-	Content    string `json:"content"`
-	Category   string `json:"category"`
-	Importance int    `json:"importance"`
-	Depth      int    `json:"depth"`
-	EdgeType   string `json:"via_edge_type,omitempty"`
-}
-
-func bfsTraverse(db *store.DB, startID string, edgeFilter model.EdgeType, maxDepth int) []relatedResult {
-	nodes := graph.BFS(db, startID, graph.BFSOptions{
-		MaxDepth:   maxDepth,
-		EdgeFilter: edgeFilter,
-	})
-	results := make([]relatedResult, 0, len(nodes))
-	for _, n := range nodes {
-		results = append(results, relatedResult{
-			ID:         n.Insight.ID,
-			Content:    n.Insight.Content,
-			Category:   string(n.Insight.Category),
-			Importance: n.Insight.Importance,
-			Depth:      n.Hop,
-			EdgeType:   string(n.ViaEdge.EdgeType),
+		return withLocalService(func(svc *memorysvc.Service, actor memorysvc.Actor) error {
+			return writeResult(svc.Related(actor, memorysvc.RelatedInput{ID: startID, EdgeType: relEdgeType, Depth: relDepth}))
 		})
-	}
-	return results
+	},
 }
 
 func init() {

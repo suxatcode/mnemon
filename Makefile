@@ -10,7 +10,7 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: deps build harness-build install uninstall test unit vet harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-run compose-up compose-down compose-dev release-snapshot clean help
+.PHONY: deps build build-server harness-build install uninstall test unit vet harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-build-server docker-run compose-up compose-down compose-dev release-snapshot clean help
 
 .DEFAULT_GOAL := help
 
@@ -21,6 +21,9 @@ deps: ## Download Go dependencies
 
 build: ## Build the mnemon binary
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
+
+build-server: ## Build the mnemon-server binary
+	go build -ldflags "$(LDFLAGS)" -o mnemon-server ./cmd/mnemon-server
 
 harness-build: ## Build the harness binaries (mnemon-harness local plane + mnemon-hub remote hub + mnemond local governance daemon)
 	go build -ldflags "$(LDFLAGS)" -o mnemon-harness ./harness/cmd/mnemon-harness
@@ -79,6 +82,9 @@ codex-eval-smoke: ## Run real Codex app-server eval projection smoke check
 docker-build: ## Build runtime Docker image
 	docker build --target runtime --build-arg VERSION=$(VERSION) -t mnemon-dev/mnemon:$(VERSION) .
 
+docker-build-server: ## Build mnemon-server Docker image
+	docker build --target server --build-arg VERSION=$(VERSION) -t mnemon-dev/mnemon-server:$(VERSION) .
+
 docker-run: ## Run mnemon status in Docker with local .env
 	docker run --rm --env-file .env -v mnemon-data:/data mnemon-dev/mnemon:$(VERSION) status
 
@@ -97,7 +103,7 @@ release-snapshot: ## Build local GoReleaser snapshot artifacts
 # ── Clean ────────────────────────────────────────────────────────────
 
 clean: ## Remove build artifacts and test data
-	rm -f $(BINARY)
+	rm -f $(BINARY) mnemon-server
 	rm -rf .testdata
 
 # ── Help ─────────────────────────────────────────────────────────────

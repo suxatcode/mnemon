@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,21 +19,56 @@ const (
 	// After this many days without access, importance halves.
 	HalfLifeDays = 30.0
 
-	// MaxInsights is the default cap before auto-pruning kicks in.
+	// MaxInsights is the default cap before auto-pruning kicks in for local SQLite.
 	MaxInsights = 1000
+	// ServerDefaultMaxInsights is the Helm/server default personal cap per principal.
+	ServerDefaultMaxInsights = 25000
 
 	// PruneBatchSize is how many excess insights to prune at once.
 	PruneBatchSize = 10
 )
 
+// MaxInsightsFromEnv returns MNEMON_MAX_INSIGHTS or fallback when unset/invalid.
+func MaxInsightsFromEnv(fallback int) int {
+	raw := strings.TrimSpace(os.Getenv("MNEMON_MAX_INSIGHTS"))
+	if raw == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		return fallback
+	}
+	return n
+}
+
+const insightSelect = `id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at, owner_principal, layer, COALESCE(external_ref, ''), COALESCE(source_uri, '')`
+
+func normalizeOwnership(i *model.Insight) {
+	if i.OwnerPrincipal == "" {
+		i.OwnerPrincipal = model.LocalOwner
+	}
+	if i.Layer == "" {
+		i.Layer = model.LayerPersonal
+	}
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // InsertInsight inserts a new insight into the database.
 func (db *DB) InsertInsight(i *model.Insight) error {
+	normalizeOwnership(i)
 	_, err := db.execer().Exec(
-		`INSERT INTO insights (id, content, category, importance, tags, entities, source, access_count, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO insights (id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, owner_principal, layer, external_ref, source_uri)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		i.ID, i.Content, string(i.Category), i.Importance,
 		i.TagsJSON(), i.EntitiesJSON(), i.Source, i.AccessCount,
 		i.CreatedAt.Format(time.RFC3339), i.UpdatedAt.Format(time.RFC3339),
+		i.OwnerPrincipal, i.Layer, nullIfEmpty(i.ExternalRef), nullIfEmpty(i.SourceURI),
 	)
 	return err
 }
@@ -40,16 +76,14 @@ func (db *DB) InsertInsight(i *model.Insight) error {
 // GetInsightByID returns a single insight by ID (excludes soft-deleted).
 func (db *DB) GetInsightByID(id string) (*model.Insight, error) {
 	row := db.execer().QueryRow(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
-		 FROM insights WHERE id = ? AND deleted_at IS NULL`, id)
+		`SELECT `+insightSelect+` FROM insights WHERE id = ? AND deleted_at IS NULL`, id)
 	return scanInsight(row)
 }
 
 // GetInsightByIDIncludeDeleted returns a single insight by ID, including soft-deleted.
 func (db *DB) GetInsightByIDIncludeDeleted(id string) (*model.Insight, error) {
 	row := db.execer().QueryRow(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
-		 FROM insights WHERE id = ?`, id)
+		`SELECT `+insightSelect+` FROM insights WHERE id = ?`, id)
 	return scanInsight(row)
 }
 
@@ -70,7 +104,7 @@ func (db *DB) QueryInsights(f QueryFilter) ([]*model.Insight, error) {
 	conditions = append(conditions, "deleted_at IS NULL")
 
 	if f.Keyword != "" {
-		conditions = append(conditions, "content LIKE ?")
+		conditions = append(conditions, "content "+db.dialect.likeOp()+" ?")
 		args = append(args, "%"+f.Keyword+"%")
 	}
 	if f.Category != "" {
@@ -92,7 +126,7 @@ func (db *DB) QueryInsights(f QueryFilter) ([]*model.Insight, error) {
 	}
 
 	query := fmt.Sprintf(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		`SELECT `+insightSelect+`
 		 FROM insights WHERE %s ORDER BY importance DESC, created_at DESC LIMIT ?`,
 		strings.Join(conditions, " AND "))
 	args = append(args, limit)
@@ -143,7 +177,7 @@ func (db *DB) UpdateEntities(id string, entities []string) error {
 func (db *DB) LoadKnownEntities() (map[string]bool, error) {
 	known := make(map[string]bool)
 	rows, err := db.execer().Query(
-		`SELECT DISTINCT je.value FROM insights i, json_each(i.entities) je
+		`SELECT DISTINCT je.value FROM insights i, ` + db.dialect.jsonEach("i.entities", "je") + `
 		 WHERE i.deleted_at IS NULL`)
 	if err != nil {
 		return nil, fmt.Errorf("load known entities: %w", err)
@@ -267,15 +301,25 @@ type RetentionCandidate struct {
 // GetRetentionCandidates returns non-immune insights sorted by effective_importance ascending.
 // Uses bulk queries for last_accessed_at and edge counts instead of per-insight queries.
 func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionCandidate, int, error) {
-	// Single query: all active insights including last_accessed_at
+	return db.GetRetentionCandidatesOwned(threshold, limit, "")
+}
+
+// GetRetentionCandidatesOwned lists GC candidates. When owner is set, only that
+// principal's personal-layer memories are considered.
+func (db *DB) GetRetentionCandidatesOwned(threshold float64, limit int, owner string) ([]RetentionCandidate, int, error) {
 	type insightRow struct {
 		insight    *model.Insight
 		lastAccess time.Time
 	}
-	rows, err := db.execer().Query(
-		`SELECT id, content, category, importance, tags, entities, source, access_count,
+	query := `SELECT id, content, category, importance, tags, entities, source, access_count,
 		        created_at, updated_at, deleted_at, last_accessed_at
-		 FROM insights WHERE deleted_at IS NULL`)
+		 FROM insights WHERE deleted_at IS NULL`
+	args := []any{}
+	if owner != "" {
+		query += ` AND owner_principal = ? AND layer = ?`
+		args = append(args, owner, model.LayerPersonal)
+	}
+	rows, err := db.execer().Query(query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -372,17 +416,17 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 	if len(updates) > 0 {
 		tx, err := db.conn.Begin()
 		if err == nil {
+			ex := reboundExecer{inner: tx, dialect: db.dialect}
 			var txErr error
 			for _, u := range updates {
-				if _, txErr = tx.Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, u.ei, u.id); txErr != nil {
+				if _, txErr = ex.Exec(`UPDATE insights SET effective_importance = ? WHERE id = ?`, u.ei, u.id); txErr != nil {
 					break
 				}
 			}
 			if txErr != nil {
-				tx.Rollback()
-				fmt.Fprintf(os.Stderr, "warning: batch EI update failed, rolled back: %v\n", txErr)
+				_ = tx.Rollback()
 			} else {
-				tx.Commit()
+				_ = tx.Commit()
 			}
 		}
 	}
@@ -404,23 +448,37 @@ func (db *DB) GetRetentionCandidates(threshold float64, limit int) ([]RetentionC
 // (typically the just-created insights). Returns number pruned.
 // If already inside a transaction (db.tx != nil), executes inline; otherwise wraps in its own transaction.
 func (db *DB) AutoPrune(maxInsights int, excludeIDs []string) (int, error) {
+	return db.AutoPruneOwned("", maxInsights, excludeIDs)
+}
+
+// AutoPruneOwned soft-deletes personal-layer insights for owner when owner is set.
+func (db *DB) AutoPruneOwned(owner string, maxInsights int, excludeIDs []string) (int, error) {
 	if db.tx != nil {
-		return db.autoPrune(maxInsights, excludeIDs)
+		return db.autoPrune(owner, maxInsights, excludeIDs)
 	}
 	var pruned int
 	err := db.InTransaction(func() error {
 		var innerErr error
-		pruned, innerErr = db.autoPrune(maxInsights, excludeIDs)
+		pruned, innerErr = db.autoPrune(owner, maxInsights, excludeIDs)
 		return innerErr
 	})
 	return pruned, err
 }
 
-func (db *DB) autoPrune(maxInsights int, excludeIDs []string) (int, error) {
+func (db *DB) autoPrune(owner string, maxInsights int, excludeIDs []string) (int, error) {
 	ex := db.execer()
 
+	countSQL := `SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`
+	countArgs := []any{}
+	filter := ""
+	if owner != "" {
+		countSQL += ` AND owner_principal = ? AND layer = ?`
+		countArgs = append(countArgs, owner, model.LayerPersonal)
+		filter = ` AND owner_principal = ? AND layer = ?`
+	}
+
 	var total int
-	if err := ex.QueryRow(`SELECT COUNT(*) FROM insights WHERE deleted_at IS NULL`).Scan(&total); err != nil {
+	if err := ex.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
 		return 0, fmt.Errorf("count insights: %w", err)
 	}
 	if total <= maxInsights {
@@ -432,9 +490,11 @@ func (db *DB) autoPrune(maxInsights int, excludeIDs []string) (int, error) {
 		excess = PruneBatchSize
 	}
 
-	// Build NOT IN clause for excluded IDs
 	var excludeClause string
 	var args []interface{}
+	if owner != "" {
+		args = append(args, owner, model.LayerPersonal)
+	}
 	if len(excludeIDs) > 0 {
 		placeholders := make([]string, len(excludeIDs))
 		for i, id := range excludeIDs {
@@ -445,11 +505,10 @@ func (db *DB) autoPrune(maxInsights int, excludeIDs []string) (int, error) {
 	}
 	args = append(args, excess)
 
-	// Collect candidate IDs first (close cursor before writing to avoid single-conn deadlock)
 	rows, err := ex.Query(
 		fmt.Sprintf(`SELECT id FROM insights
-		 WHERE deleted_at IS NULL AND importance < 4 AND access_count < 3 %s
-		 ORDER BY effective_importance ASC LIMIT ?`, excludeClause), args...)
+		 WHERE deleted_at IS NULL AND importance < 4 AND access_count < 3 %s %s
+		 ORDER BY effective_importance ASC LIMIT ?`, filter, excludeClause), args...)
 	if err != nil {
 		return 0, fmt.Errorf("query prune candidates: %w", err)
 	}
@@ -505,7 +564,7 @@ func (db *DB) BoostRetention(id string) error {
 func (db *DB) GetRecentInsightsInWindow(excludeID string, windowHours float64, limit int) ([]*model.Insight, error) {
 	cutoff := time.Now().UTC().Add(-time.Duration(windowHours * float64(time.Hour)))
 	rows, err := db.execer().Query(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		`SELECT `+insightSelect+`
 		 FROM insights WHERE id != ? AND deleted_at IS NULL AND created_at >= ?
 		 ORDER BY created_at DESC LIMIT ?`,
 		excludeID, cutoff.Format(time.RFC3339), limit)
@@ -519,16 +578,16 @@ func (db *DB) GetRecentInsightsInWindow(excludeID string, windowHours float64, l
 // GetLatestInsightBySource returns the most recent non-deleted insight for a given source, excluding the given ID.
 func (db *DB) GetLatestInsightBySource(source string, excludeID string) (*model.Insight, error) {
 	row := db.execer().QueryRow(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		`SELECT `+insightSelect+`
 		 FROM insights WHERE source = ? AND id != ? AND deleted_at IS NULL
-		 ORDER BY created_at DESC, rowid DESC LIMIT 1`, source, excludeID)
+		 ORDER BY created_at DESC, `+db.dialect.insertOrderDesc()+` LIMIT 1`, source, excludeID)
 	return scanInsight(row)
 }
 
 // GetRecentInsightsBySource returns the N most recent non-deleted insights for a source, excluding the given ID.
 func (db *DB) GetRecentInsightsBySource(source string, excludeID string, limit int) ([]*model.Insight, error) {
 	rows, err := db.execer().Query(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		`SELECT `+insightSelect+`
 		 FROM insights WHERE source = ? AND id != ? AND deleted_at IS NULL
 		 ORDER BY created_at DESC LIMIT ?`, source, excludeID, limit)
 	if err != nil {
@@ -541,9 +600,9 @@ func (db *DB) GetRecentInsightsBySource(source string, excludeID string, limit i
 // GetActiveInsightsBySourceOrdered returns active insights for a source in chronological order.
 func (db *DB) GetActiveInsightsBySourceOrdered(source string) ([]*model.Insight, error) {
 	rows, err := db.execer().Query(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		`SELECT `+insightSelect+`
 		 FROM insights WHERE source = ? AND deleted_at IS NULL
-		 ORDER BY created_at ASC, rowid ASC`, source)
+		 ORDER BY created_at ASC, id ASC`, source)
 	if err != nil {
 		return nil, err
 	}
@@ -554,8 +613,28 @@ func (db *DB) GetActiveInsightsBySourceOrdered(source string) ([]*model.Insight,
 // GetAllActiveInsights returns all non-deleted insights.
 func (db *DB) GetAllActiveInsights() ([]*model.Insight, error) {
 	rows, err := db.execer().Query(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		`SELECT ` + insightSelect + `
 		 FROM insights WHERE deleted_at IS NULL ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanInsights(rows)
+}
+
+// GetActiveInsightsForDiff returns insights considered for duplicate/conflict detection.
+// When owner is set, only that principal's personal-layer memories are returned.
+func (db *DB) GetActiveInsightsForDiff(owner, layer string) ([]*model.Insight, error) {
+	if owner == "" {
+		return db.GetAllActiveInsights()
+	}
+	if layer == "" {
+		layer = model.LayerPersonal
+	}
+	rows, err := db.execer().Query(
+		`SELECT `+insightSelect+`
+		 FROM insights WHERE deleted_at IS NULL AND owner_principal = ? AND layer = ?
+		 ORDER BY created_at DESC`, owner, layer)
 	if err != nil {
 		return nil, err
 	}
@@ -621,7 +700,7 @@ func (db *DB) GetStats() (*InsightStats, error) {
 	// Top entities by link count (across active insights)
 	eRows, err := db.execer().Query(`
 		SELECT je.value, COUNT(DISTINCT i.id) as cnt
-		FROM insights i, json_each(i.entities) je
+		FROM insights i, ` + db.dialect.jsonEach("i.entities", "je") + `
 		WHERE i.deleted_at IS NULL
 		GROUP BY je.value
 		ORDER BY cnt DESC
@@ -731,7 +810,7 @@ func (db *DB) GetInsightsWithoutEmbedding(limit int) ([]*model.Insight, error) {
 		limit = 100
 	}
 	rows, err := db.execer().Query(
-		`SELECT id, content, category, importance, tags, entities, source, access_count, created_at, updated_at, deleted_at
+		`SELECT `+insightSelect+`
 		 FROM insights WHERE deleted_at IS NULL AND embedding IS NULL
 		 ORDER BY importance DESC, created_at DESC LIMIT ?`, limit)
 	if err != nil {
@@ -753,13 +832,15 @@ func scanOneInsight(s insightScanner) (*model.Insight, error) {
 	var deletedAt sql.NullString
 
 	err := s.Scan(&i.ID, &i.Content, &cat, &i.Importance, &tags, &entities,
-		&source, &i.AccessCount, &createdAt, &updatedAt, &deletedAt)
+		&source, &i.AccessCount, &createdAt, &updatedAt, &deletedAt,
+		&i.OwnerPrincipal, &i.Layer, &i.ExternalRef, &i.SourceURI)
 	if err != nil {
 		return nil, err
 	}
 
 	i.Category = model.Category(cat)
 	i.Source = source
+	normalizeOwnership(&i)
 	i.ParseTags(tags)
 	i.ParseEntities(entities)
 	if i.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {

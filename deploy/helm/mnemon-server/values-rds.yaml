@@ -1,0 +1,18 @@
+# Production overlay: Amazon RDS (or other external Postgres).
+# Point database.existingSecret at a Secret whose `url` key is a postgres:// DSN
+# (for example from External Secrets / AWS Secrets Manager).
+replicaCount: 2
+maxInsights: 25000
+postgresql:
+  enabled: false
+persistence:
+  enabled: false
+database:
+  existingSecret: mnemon-db
+  existingSecretKey: url
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi

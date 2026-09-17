@@ -1,0 +1,22 @@
+mnemon-server {{ .Chart.AppVersion }}
+
+HTTPS JSON API: {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}
+Probes: GET /health  GET /ready
+
+Database: {{ if include "mnemon-server.useBundledPostgres" . }}bundled Postgres{{ else if include "mnemon-server.useExternalDatabase" . }}external Postgres DSN{{ else }}SQLite (single replica){{ end }}
+Replicas: {{ include "mnemon-server.replicas" . }}
+Max insights (per principal, personal layer): {{ .Values.maxInsights }}
+
+Issue a user (no restart required):
+
+  kubectl exec -it deploy/{{ include "mnemon-server.fullname" . }} -- \
+    mnemon-server user issue \
+      --principal alice@team --role user \
+      --server {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }} \
+      --jwt-key /config/jwt.key \
+      --out -
+
+Then on the client: mnemon auth login --default invite.json
+
+Production AWS: use values-rds.yaml with postgresql.enabled=false and an RDS DSN secret.
+Users live in Postgres (`principals` and `issued_tokens` tables). Adding a user is an INSERT plus JWT issue; no pod restart.

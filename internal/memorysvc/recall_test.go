@@ -1,4 +1,4 @@
-package cmd
+package memorysvc
 
 import (
 	"encoding/json"
@@ -15,16 +15,18 @@ func makeTestRecallResponse() search.RecallResponse {
 		Results: []search.RecallResult{
 			{
 				Insight: &model.Insight{
-					ID:          "550e8400-e29b-41d4-a716-446655440000",
-					Content:     "User prefers Qdrant for vector DB",
-					Category:    model.CategoryPreference,
-					Importance:  4,
-					Tags:        []string{"tool", "db"},
-					Entities:    []string{"Qdrant"},
-					Source:      "agent",
-					AccessCount: 2,
-					CreatedAt:   time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
-					UpdatedAt:   time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+					ID:             "550e8400-e29b-41d4-a716-446655440000",
+					Content:        "User prefers Qdrant for vector DB",
+					Category:       model.CategoryPreference,
+					Importance:     4,
+					Tags:           []string{"tool", "db"},
+					Entities:       []string{"Qdrant"},
+					Source:         "agent",
+					AccessCount:    2,
+					CreatedAt:      time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+					UpdatedAt:      time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+					OwnerPrincipal: "alice@team",
+					Layer:          model.LayerPersonal,
 				},
 				Score:  0.84217,
 				Intent: search.IntentGeneral,
@@ -38,16 +40,18 @@ func makeTestRecallResponse() search.RecallResponse {
 			},
 			{
 				Insight: &model.Insight{
-					ID:          "660e8400-e29b-41d4-a716-446655440001",
-					Content:     "Chose Qdrant because of Rust performance",
-					Category:    model.CategoryDecision,
-					Importance:  5,
-					Tags:        []string{"architecture"},
-					Entities:    []string{"Qdrant", "Rust"},
-					Source:      "user",
-					AccessCount: 0,
-					CreatedAt:   time.Date(2026, 1, 14, 8, 0, 0, 0, time.UTC),
-					UpdatedAt:   time.Date(2026, 1, 14, 8, 0, 0, 0, time.UTC),
+					ID:             "660e8400-e29b-41d4-a716-446655440001",
+					Content:        "Chose Qdrant because of Rust performance",
+					Category:       model.CategoryDecision,
+					Importance:     5,
+					Tags:           []string{"architecture"},
+					Entities:       []string{"Qdrant", "Rust"},
+					Source:         "user",
+					AccessCount:    0,
+					CreatedAt:      time.Date(2026, 1, 14, 8, 0, 0, 0, time.UTC),
+					UpdatedAt:      time.Date(2026, 1, 14, 8, 0, 0, 0, time.UTC),
+					OwnerPrincipal: "organization",
+					Layer:          model.LayerOrg,
 				},
 				Score:  0.55432,
 				Intent: search.IntentGeneral,
@@ -72,7 +76,7 @@ func makeTestRecallResponse() search.RecallResponse {
 
 func TestRecall_CompactProjection_PreservesContentAndIntent(t *testing.T) {
 	resp := makeTestRecallResponse()
-	compact := toCompact(resp)
+	compact := ToCompact(resp)
 
 	if len(compact.Results) != 2 {
 		t.Fatalf("want 2 results, got %d", len(compact.Results))
@@ -91,13 +95,18 @@ func TestRecall_CompactProjection_PreservesContentAndIntent(t *testing.T) {
 	if r.Importance != 4 {
 		t.Errorf("importance: got %d", r.Importance)
 	}
+	if r.OwnerPrincipal != "alice@team" || r.Layer != model.LayerPersonal {
+		t.Errorf("owner/layer: got %q %q", r.OwnerPrincipal, r.Layer)
+	}
+	if compact.Results[1].OwnerPrincipal != "organization" || compact.Results[1].Layer != model.LayerOrg {
+		t.Errorf("org owner/layer: got %q %q", compact.Results[1].OwnerPrincipal, compact.Results[1].Layer)
+	}
 }
 
 func TestRecall_CompactProjection_DropsSignalsAndTimestamps(t *testing.T) {
 	resp := makeTestRecallResponse()
-	compact := toCompact(resp)
+	compact := ToCompact(resp)
 
-	// Marshal to JSON and verify that dropped fields are absent.
 	data, err := json.Marshal(compact)
 	if err != nil {
 		t.Fatalf("json.Marshal: %v", err)
@@ -121,19 +130,21 @@ func TestRecall_CompactProjection_DropsSignalsAndTimestamps(t *testing.T) {
 			t.Errorf("compact JSON should not contain %s, got: %s", sub, raw)
 		}
 	}
+	if !strings.Contains(raw, `"owner_principal"`) || !strings.Contains(raw, `"layer"`) {
+		t.Fatalf("compact JSON should surface owner_principal and layer: %s", raw)
+	}
 }
 
 func TestRecall_CompactProjection_PreservesHint(t *testing.T) {
 	resp := makeTestRecallResponse()
-	compact := toCompact(resp)
+	compact := ToCompact(resp)
 
 	if compact.Hint != "sparse_results" {
 		t.Errorf("hint: want sparse_results, got %q", compact.Hint)
 	}
 
-	// Empty hint case
 	resp.Meta.Hint = ""
-	compact = toCompact(resp)
+	compact = ToCompact(resp)
 	if compact.Hint != "" {
 		t.Errorf("empty hint: want empty, got %q", compact.Hint)
 	}
@@ -141,7 +152,7 @@ func TestRecall_CompactProjection_PreservesHint(t *testing.T) {
 
 func TestRecall_CompactProjection_PreservesFullID(t *testing.T) {
 	resp := makeTestRecallResponse()
-	compact := toCompact(resp)
+	compact := ToCompact(resp)
 
 	expectedID := "550e8400-e29b-41d4-a716-446655440000"
 	if compact.Results[0].ID != expectedID {
@@ -151,7 +162,7 @@ func TestRecall_CompactProjection_PreservesFullID(t *testing.T) {
 
 func TestRecall_CompactProjection_MatchedVia(t *testing.T) {
 	resp := makeTestRecallResponse()
-	compact := toCompact(resp)
+	compact := ToCompact(resp)
 
 	if compact.Results[0].MatchedVia != "keyword" {
 		t.Errorf("matched_via[0]: want keyword, got %q", compact.Results[0].MatchedVia)
@@ -208,17 +219,14 @@ func TestRecall_ScoreRoundedToThreeDecimals(t *testing.T) {
 }
 
 func TestRecall_CompactProjection_ConfidenceMatchesRoundedScore(t *testing.T) {
-	// Verify that the confidence label is derived from the rounded score,
-	// not the raw score. This matters at bucket boundaries where rounding
-	// can cross a cutoff.
 	cases := []struct {
 		rawScore  float64
 		wantScore float64
 		wantLabel string
 	}{
-		{0.5996, 0.6, "high"},     // boundary: rounding crosses 0.6 cutoff
-		{0.2496, 0.25, "medium"},  // boundary: rounding crosses 0.25 cutoff
-		{0.5994, 0.599, "medium"}, // just below boundary, no crossing
+		{0.5996, 0.6, "high"},
+		{0.2496, 0.25, "medium"},
+		{0.5994, 0.599, "medium"},
 	}
 
 	for _, tc := range cases {
@@ -234,7 +242,7 @@ func TestRecall_CompactProjection_ConfidenceMatchesRoundedScore(t *testing.T) {
 				},
 			},
 		}
-		compact := toCompact(resp)
+		compact := ToCompact(resp)
 		r := compact.Results[0]
 		if r.Score != tc.wantScore {
 			t.Errorf("rawScore=%f: want Score=%f, got %f", tc.rawScore, tc.wantScore, r.Score)
@@ -256,7 +264,7 @@ func TestRecall_CompactProjection_EmptyResults(t *testing.T) {
 			Hint:         "sparse_results",
 		},
 	}
-	compact := toCompact(resp)
+	compact := ToCompact(resp)
 	if len(compact.Results) != 0 {
 		t.Errorf("want 0 results, got %d", len(compact.Results))
 	}

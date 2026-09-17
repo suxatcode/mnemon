@@ -26,19 +26,31 @@ var ValidCategories = map[Category]bool{
 	CategoryGeneral:    true,
 }
 
+const (
+	LayerPersonal = "personal"
+	LayerOrg      = "org"
+	RoleUser      = "user"
+	RoleOrg       = "org"
+	LocalOwner    = "local"
+)
+
 // Insight represents a memory node in the knowledge graph.
 type Insight struct {
-	ID          string     `json:"id"`
-	Content     string     `json:"content"`
-	Category    Category   `json:"category"`
-	Importance  int        `json:"importance"`
-	Tags        []string   `json:"tags"`
-	Entities    []string   `json:"entities"`
-	Source      string     `json:"source"`
-	AccessCount int        `json:"access_count"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
+	ID             string     `json:"id"`
+	Content        string     `json:"content"`
+	Category       Category   `json:"category"`
+	Importance     int        `json:"importance"`
+	Tags           []string   `json:"tags"`
+	Entities       []string   `json:"entities"`
+	Source         string     `json:"source"`
+	AccessCount    int        `json:"access_count"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	DeletedAt      *time.Time `json:"deleted_at,omitempty"`
+	OwnerPrincipal string     `json:"owner_principal"`
+	Layer          string     `json:"layer"`
+	ExternalRef    string     `json:"external_ref,omitempty"`
+	SourceURI      string     `json:"source_uri,omitempty"`
 }
 
 // TagsJSON returns tags as a JSON string for storage.
