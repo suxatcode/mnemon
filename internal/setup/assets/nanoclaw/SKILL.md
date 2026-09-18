@@ -71,7 +71,7 @@ Create this file with the mnemon container skill content. This skill teaches the
 - **Remember guide**: Decision tree — Step 1: Does this exchange contain a user directive, reasoning conclusion, or durable observed state? Step 2: Does a memory already exist (create/update/skip)? Step 3: Is it worth storing?
 - **Workflow**: remember → link (evaluate semantic/causal candidates with judgment) → recall.
 - **Commands**: Full mnemon command reference (remember, link, recall, search, forget, related, gc, status, log).
-- **Guardrails**: Never store secrets. Never write to the global store. Team memory: attribute by `owner_principal`/`layer`; do not forget others' memories; org layer is ground truth; use `--local` only to leave the team store. Categories: preference, decision, insight, fact, context. Max 8,000 chars per insight.
+- **Guardrails**: Never store secrets. Never write to the global store. Team memory: recall is team-visible (personal is write-isolated, not private); `link` is not owner-scoped; do not forget others' memories; org layer is ground truth; use `--local` only to leave the team store. Categories: preference, decision, insight, fact, context. Max 8,000 chars per insight.
 
 ### 2c. Add volume mounts for mnemon data
 

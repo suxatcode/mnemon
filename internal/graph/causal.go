@@ -29,15 +29,18 @@ func HasCausalSignal(text string) bool {
 // CreateCausalEdges creates causal edges when either the new insight or a recent
 // insight has causal signals and they share sufficient token overlap.
 // Direction is inferred from which side has the causal keyword (MAGMA §3.3).
-func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
+func CreateCausalEdges(db *store.DB, insight *model.Insight) (int, error) {
 	recent, err := db.GetRecentInsightsBySource(insight.Source, insight.ID, causalLookback)
-	if err != nil || len(recent) == 0 {
-		return 0
+	if err != nil {
+		return 0, err
+	}
+	if len(recent) == 0 {
+		return 0, nil
 	}
 
 	newTokens := search.Tokenize(insight.Content)
 	if len(newTokens) == 0 {
-		return 0
+		return 0, nil
 	}
 
 	newHasSignal := HasCausalSignal(insight.Content)
@@ -76,7 +79,7 @@ func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
 
 		subType := suggestSubType(insight.Content + " " + prev.Content)
 
-		err = db.InsertEdge(&model.Edge{
+		if err := db.InsertEdge(&model.Edge{
 			SourceID: sourceID,
 			TargetID: targetID,
 			EdgeType: model.EdgeCausal,
@@ -86,12 +89,12 @@ func CreateCausalEdges(db *store.DB, insight *model.Insight) int {
 				"sub_type": subType,
 			},
 			CreatedAt: now,
-		})
-		if err == nil {
-			count++
+		}); err != nil {
+			return count, err
 		}
+		count++
 	}
-	return count
+	return count, nil
 }
 
 // tokenOverlap computes |intersection| / max(|a|, |b|).

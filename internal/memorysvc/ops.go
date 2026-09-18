@@ -49,6 +49,9 @@ type LinkInput struct {
 }
 
 func (s *Service) Link(actor Actor, req LinkInput) (Result, error) {
+	if err := s.assertWritable(); err != nil {
+		return Result{}, err
+	}
 	edgeType := model.EdgeType(req.Type)
 	if edgeType == "" {
 		edgeType = model.EdgeSemantic
@@ -101,6 +104,9 @@ type ForgetInput struct {
 }
 
 func (s *Service) Forget(actor Actor, req ForgetInput) (Result, error) {
+	if err := s.assertWritable(); err != nil {
+		return Result{}, err
+	}
 	ins, err := s.db.GetInsightByID(req.ID)
 	if err != nil || ins == nil {
 		return Result{}, fmt.Errorf("insight %s not found or already deleted", req.ID)
@@ -141,6 +147,11 @@ type GCInput struct {
 }
 
 func (s *Service) GC(actor Actor, req GCInput) (Result, error) {
+	if req.KeepID != "" {
+		if err := s.assertWritable(); err != nil {
+			return Result{}, err
+		}
+	}
 	if req.Limit <= 0 {
 		req.Limit = 20
 	}
@@ -255,6 +266,11 @@ type EmbedInput struct {
 }
 
 func (s *Service) Embed(actor Actor, req EmbedInput) (Result, error) {
+	if !req.Status {
+		if err := s.assertWritable(); err != nil {
+			return Result{}, err
+		}
+	}
 	ec := embed.NewClientWithModel(s.embedModel)
 	if req.Status {
 		total, embedded, err := s.db.EmbeddingStats()

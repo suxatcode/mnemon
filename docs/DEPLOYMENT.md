@@ -4,7 +4,7 @@
 
 Prerequisites:
 
-- Go 1.24.6 or newer in the 1.24 series (the server image builds with Go 1.25.3 because `jackc/pgx/v5 v5.11.0` requires it)
+- Go 1.25.3 (required by `jackc/pgx/v5 v5.11.0`; `go.mod` pins `go 1.25.0` / `toolchain go1.25.3`)
 - `make`
 - `jq` for the E2E test script
 
@@ -92,21 +92,19 @@ For host-based Ollama, set `MNEMON_EMBED_ENDPOINT=http://host.docker.internal:11
 
 ## Team memory gateway
 
-Local `mnemon` without a remote stays SQLite (`~/.mnemon`, cap 1000). Helm/AWS runs `mnemon-server` against Postgres with HTTPS JSON and self-issued JWTs.
+Local `mnemon` without a remote stays SQLite (`~/.mnemon`, cap 1000). Helm/AWS runs `mnemon-server` against Postgres. TLS is on by default (HTTPS JSON). Set `server.tls.enabled=false` for HTTP. JWTs are self-issued HS256; the signing key can be chart-generated or an existing Secret (`server.existingSecret`) from External Secrets / AWS Secrets Manager — TLS is independent (`server.tls.existingSecret` or a generated `*-tls` secret).
 
-Build the server image:
-
-```bash
-make docker-build-server
-```
+Recall on a team remote is fully shared (personal notes are write-isolated, not read-isolated). `mnemon link` is not owner-scoped; forget / GC / `--keep` are.
 
 Chart defaults (internal bring-up):
 
 - Bundled Postgres StatefulSet
 - `replicaCount: 2`
-- JWT signing key and TLS generated in the app secret
+- JWT signing key generated in `{release}-app` (or `server.existingSecret`)
+- TLS generated in the same secret, or `{release}-tls` when JWT comes from an existing Secret
 - Probes on `GET /health` and `GET /ready`
 - `maxInsights: 25000` per principal (personal layer only)
+- `MNEMON_DATA_DIR=/data` in the pod, so `mnemon-server user issue` uses the same SQLite path as `serve` without passing `--data-dir`. Postgres issue uses `MNEMON_DATABASE_URL`.
 
 Issue a user (takes effect immediately, no pod restart):
 
@@ -118,27 +116,24 @@ kubectl exec deploy/mnemon -- \
     --server-name mnemon.example.com \
     --jwt-key /config/jwt.key \
     --ca-file /config/ca.crt \
-    --data-dir /data \
     --out -
 ```
 
-`--data-dir /data` matches the server container (and `MNEMON_DATA_DIR`); it is required for SQLite so issue/revoke hit the same database as `serve`. Postgres issue uses `MNEMON_DATABASE_URL` from the pod env.
-
-On the client: `mnemon auth login --default invite.json`. Use `mnemon --local ...` only to bypass the team store.
+Issue prints the store path on stderr. On the client: `mnemon auth login --default invite.json`. Use `mnemon --local ...` only to bypass the team store.
 
 ### Minikube integration suite
 
-The suite uses a dedicated profile (`mnemon-gateway`) and does not switch your current kubectl context for other commands. It covers bundled Postgres, external DSN / `values-rds.yaml`, SQLite PVC restart, TLS off, and the main user/operator flows.
+The suite uses a dedicated profile (`mnemon-gateway`) and does not switch your current kubectl context for other commands. It covers bundled Postgres, external DSN / `database.url` / `values-rds.yaml`, JWT `existingSecret`, Ingress objects, SQLite PVC restart, TLS off, and operator flows (concurrent writes, replica kill, token TTL, GC prune, forged import owner).
 
 ```bash
 make test-minikube
 ```
 
-Optional env: `MINIKUBE_PROFILE`, `SCENARIOS` (comma list: `bundled,external,rds,sqlite,tls-off`), `SKIP_BUILD=1`, `KEEP_CLUSTER=0` (delete the profile at the end).
+Optional env: `MINIKUBE_PROFILE`, `SCENARIOS` (comma list: `bundled,external,rds,postgres,jwt-secret,ingress,sqlite,tls-off`), `IMAGE_TAG` (default unique `dev-<timestamp>`), `SKIP_BUILD=1`, `KEEP_CLUSTER=0` (delete the profile at the end).
 
-### Amazon RDS (production)
+### Amazon RDS and AWS secrets (production)
 
-Use the RDS overlay and a DSN secret (Secrets Manager / ExternalSecret):
+DSN-only overlay:
 
 ```bash
 helm upgrade --install mnemon deploy/helm/mnemon-server \
@@ -146,7 +141,17 @@ helm upgrade --install mnemon deploy/helm/mnemon-server \
   --set image.tag=dev
 ```
 
-`values-rds.yaml` sets `postgresql.enabled: false` and reads `database.existingSecret`. Principals and token `jti` rows live in that Postgres; there is no `users.json`.
+Full AWS overlay (RDS DSN secret, JWT existingSecret, Ingress + cert-manager Certificate):
+
+```bash
+helm upgrade --install mnemon deploy/helm/mnemon-server \
+  -f deploy/helm/mnemon-server/values-aws.yaml \
+  --set image.tag=dev
+```
+
+Create `mnemon-db` (`url`) and `mnemon-jwt` (`jwt.key`, ≥32 bytes) first — typically via External Secrets from AWS Secrets Manager. `values-aws.yaml` expects cert-manager to write `mnemon-tls`. Postgres backup/restore stays with RDS; this chart does not ship a backup job.
+
+`values-rds.yaml` / `values-aws.yaml` set `postgresql.enabled: false`. Principals and token `jti` rows live in that Postgres; there is no `users.json`.
 
 ## Release Deployment
 

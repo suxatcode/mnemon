@@ -18,8 +18,10 @@ var (
 var linkCmd = &cobra.Command{
 	Use:   "link <source_id> <target_id>",
 	Short: "Create or update an edge between two insights",
-	Long:  "Create or update a typed edge between two insights. Used by Claude to create semantic edges after evaluating candidates.",
-	Args:  cobra.ExactArgs(2),
+	Long: `Create or update a typed edge between two insights. Used by Claude to create semantic edges after evaluating candidates.
+
+Link is not owner-scoped: any two insights the caller can recall may be linked, including another person's. Forget, GC, and --keep remain owner-scoped.`,
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceID := args[0]
 		targetID := args[1]

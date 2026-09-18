@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,45 +19,50 @@ const maxProximityEdges = 10
 // CreateTemporalEdge creates a backbone temporal edge between the new insight
 // and the most recent insight from the same source (MAGMA backbone chain),
 // plus proximity edges to recent insights within a 24h window.
-func CreateTemporalEdge(db *store.DB, insight *model.Insight) int {
+func CreateTemporalEdge(db *store.DB, insight *model.Insight) (int, error) {
 	now := time.Now().UTC()
 	count := 0
 
 	// 1. Backbone chain: link to most recent from same source
 	prev, err := db.GetLatestInsightBySource(insight.Source, insight.ID)
-	if err == nil && prev != nil {
-		// prev → new (PRECEDES)
-		err = db.InsertEdge(&model.Edge{
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+
+	if prev != nil {
+		if err := db.InsertEdge(&model.Edge{
 			SourceID:  prev.ID,
 			TargetID:  insight.ID,
 			EdgeType:  model.EdgeTemporal,
 			Weight:    1.0,
 			Metadata:  map[string]string{"sub_type": "backbone", "direction": "precedes"},
 			CreatedAt: now,
-		})
-		if err == nil {
-			count++
+		}); err != nil {
+			return count, err
 		}
+		count++
 
-		// new → prev (SUCCEEDS)
-		err = db.InsertEdge(&model.Edge{
+		if err := db.InsertEdge(&model.Edge{
 			SourceID:  insight.ID,
 			TargetID:  prev.ID,
 			EdgeType:  model.EdgeTemporal,
 			Weight:    1.0,
 			Metadata:  map[string]string{"sub_type": "backbone", "direction": "succeeds"},
 			CreatedAt: now,
-		})
-		if err == nil {
-			count++
+		}); err != nil {
+			return count, err
 		}
+		count++
 	}
 
 	// 2. Temporal proximity: link to recent insights within 24h window
 	// Weight decays with time distance: w = 1/(1 + hours_diff) (MAGMA formula)
 	recent, err := db.GetRecentInsightsInWindow(insight.ID, temporalWindowHours, maxProximityEdges)
-	if err != nil || len(recent) == 0 {
-		return count
+	if err != nil {
+		return count, err
+	}
+	if len(recent) == 0 {
+		return count, nil
 	}
 
 	backboneID := ""
@@ -75,31 +82,30 @@ func CreateTemporalEdge(db *store.DB, insight *model.Insight) int {
 		}
 		weight := 1.0 / (1.0 + hoursDiff)
 
-		// Bidirectional proximity edges
-		err = db.InsertEdge(&model.Edge{
+		if err := db.InsertEdge(&model.Edge{
 			SourceID:  insight.ID,
 			TargetID:  near.ID,
 			EdgeType:  model.EdgeTemporal,
 			Weight:    weight,
 			Metadata:  map[string]string{"sub_type": "proximity", "hours_diff": fmt.Sprintf("%.2f", hoursDiff)},
 			CreatedAt: now,
-		})
-		if err == nil {
-			count++
+		}); err != nil {
+			return count, err
 		}
+		count++
 
-		err = db.InsertEdge(&model.Edge{
+		if err := db.InsertEdge(&model.Edge{
 			SourceID:  near.ID,
 			TargetID:  insight.ID,
 			EdgeType:  model.EdgeTemporal,
 			Weight:    weight,
 			Metadata:  map[string]string{"sub_type": "proximity", "hours_diff": fmt.Sprintf("%.2f", hoursDiff)},
 			CreatedAt: now,
-		})
-		if err == nil {
-			count++
+		}); err != nil {
+			return count, err
 		}
+		count++
 	}
 
-	return count
+	return count, nil
 }

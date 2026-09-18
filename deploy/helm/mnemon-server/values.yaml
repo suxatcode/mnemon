@@ -20,7 +20,8 @@ persistence:
 
 server:
   addr: ":7443"
-  # If set, must contain jwt.key and, when TLS is enabled, tls.crt and tls.key.
+  # HS256 signing key only (key jwt.key by default). Independent of TLS so
+  # External Secrets / AWS Secrets Manager can own the JWT secret.
   existingSecret: ""
   jwtKeyKey: jwt.key
   tlsCertKey: tls.crt
@@ -28,6 +29,30 @@ server:
   tls:
     enabled: true
     existingSecret: ""
+    # Mount this key from the TLS secret as /config/ca.crt. Empty means
+    # mount ca.crt only when this chart generated the TLS secret.
+    caKey: ""
+
+# Ingress is off by default. Pair with cert-manager or an existing TLS secret.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: mnemon.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Optional cert-manager Certificate. When enabled, set server.tls.existingSecret
+# to the same secretName (cert-manager writes tls.crt/tls.key).
+certManager:
+  enabled: false
+  issuerKind: ClusterIssuer
+  issuerName: letsencrypt-prod
+  secretName: ""
+  dnsNames: []
 
 # Bundled Postgres for first bring-up. Disable and set database.url or
 # database.existingSecret for Amazon RDS.

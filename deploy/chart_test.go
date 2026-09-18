@@ -65,7 +65,7 @@ func TestHelmChartSourceHasNoUsersJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(dep)
-	for _, want := range []string{"/health", "/ready", "--jwt-key", "MNEMON_DATABASE_URL", "--max-insights"} {
+	for _, want := range []string{"/health", "/ready", "--jwt-key", "MNEMON_DATABASE_URL", "--max-insights", "projected:", "MNEMON_DATA_DIR"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("deployment.yaml missing %q", want)
 		}
@@ -151,5 +151,82 @@ func TestHelmTemplateBundledAndExternal(t *testing.T) {
 	}
 	if strings.Contains(sqlOut, "MNEMON_DATABASE_URL") {
 		t.Fatal("sqlite mode should not set MNEMON_DATABASE_URL")
+	}
+
+	jwtOnly, err := exec.Command(helm, "template", "mnemon", chart,
+		"--set", "fullnameOverride=mnemon",
+		"--set", "server.existingSecret=mnemon-jwt",
+		"--set", "postgresql.enabled=false",
+	).CombinedOutput()
+	if err != nil {
+		t.Fatalf("helm template jwt existingSecret: %v\n%s", err, jwtOnly)
+	}
+	jwtOut := string(jwtOnly)
+	if !strings.Contains(jwtOut, "name: mnemon-jwt") {
+		t.Fatal("JWT existingSecret should be mounted")
+	}
+	if !strings.Contains(jwtOut, "name: mnemon-tls") {
+		t.Fatal("JWT existingSecret should still generate a TLS secret")
+	}
+	if strings.Contains(jwtOut, "name: mnemon-app") {
+		t.Fatal("JWT existingSecret should not generate the default app secret")
+	}
+
+	urlPlusJWT, err := exec.Command(helm, "template", "mnemon", chart,
+		"--set", "fullnameOverride=mnemon",
+		"--set", "server.existingSecret=mnemon-jwt",
+		"--set", "postgresql.enabled=false",
+		"--set", "database.url=postgres://mnemon:secret@pg:5432/mnemon?sslmode=disable",
+	).CombinedOutput()
+	if err != nil {
+		t.Fatalf("helm template jwt+url: %v\n%s", err, urlPlusJWT)
+	}
+	if !strings.Contains(string(urlPlusJWT), "name: mnemon-database") {
+		t.Fatal("database.url with JWT existingSecret should render a DSN secret")
+	}
+
+	ing, err := exec.Command(helm, "template", "mnemon", chart,
+		"-f", filepath.Join(chart, "values-aws.yaml"),
+	).CombinedOutput()
+	if err != nil {
+		t.Fatalf("helm template values-aws: %v\n%s", err, ing)
+	}
+	aws := string(ing)
+	for _, want := range []string{
+		"kind: Ingress",
+		"kind: Certificate",
+		"name: mnemon-jwt",
+		"secretName: mnemon-tls",
+		"name: mnemon-db",
+		"mnemon.example.com",
+		"cert-manager.io/cluster-issuer",
+	} {
+		if !strings.Contains(aws, want) {
+			t.Errorf("values-aws render missing %q", want)
+		}
+	}
+	if strings.Contains(aws, "kind: StatefulSet") {
+		t.Fatal("values-aws must not deploy bundled Postgres")
+	}
+
+	notesTpl, err := os.ReadFile(filepath.Join(chart, "templates", "NOTES.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	notesSrc := string(notesTpl)
+	if !strings.Contains(notesSrc, "HTTPS{{ else }}HTTP") {
+		t.Fatal("NOTES.txt should switch HTTPS/HTTP from server.tls.enabled")
+	}
+
+	tlsOff, err := exec.Command(helm, "template", "mnemon", chart,
+		"--set", "server.tls.enabled=false",
+		"--set", "postgresql.enabled=false",
+	).CombinedOutput()
+	if err != nil {
+		t.Fatalf("helm template tls-off: %v\n%s", err, tlsOff)
+	}
+	off := string(tlsOff)
+	if strings.Contains(off, "--tls-cert") {
+		t.Fatal("tls-off render must not pass --tls-cert")
 	}
 }

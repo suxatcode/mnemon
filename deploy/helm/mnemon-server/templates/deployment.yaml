@@ -38,6 +38,8 @@ spec:
           env:
             - name: MNEMON_MAX_INSIGHTS
               value: {{ .Values.maxInsights | quote }}
+            - name: MNEMON_DATA_DIR
+              value: /data
             {{- if include "mnemon-server.usePostgres" . }}
             - name: MNEMON_DATABASE_URL
               valueFrom:
@@ -75,8 +77,26 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config
-          secret:
-            secretName: {{ include "mnemon-server.appSecretName" . }}
+          projected:
+            sources:
+              - secret:
+                  name: {{ include "mnemon-server.jwtSecretName" . }}
+                  items:
+                    - key: {{ .Values.server.jwtKeyKey }}
+                      path: {{ .Values.server.jwtKeyKey }}
+              {{- if .Values.server.tls.enabled }}
+              - secret:
+                  name: {{ include "mnemon-server.tlsSecretName" . }}
+                  items:
+                    - key: {{ .Values.server.tlsCertKey }}
+                      path: {{ .Values.server.tlsCertKey }}
+                    - key: {{ .Values.server.tlsKeyKey }}
+                      path: {{ .Values.server.tlsKeyKey }}
+                    {{- if include "mnemon-server.mountCA" . }}
+                    - key: {{ .Values.server.tls.caKey | default "ca.crt" }}
+                      path: ca.crt
+                    {{- end }}
+              {{- end }}
         {{- if not (include "mnemon-server.usePostgres" .) }}
         - name: data
           {{- if .Values.persistence.enabled }}

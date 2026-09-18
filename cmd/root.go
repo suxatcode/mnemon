@@ -24,7 +24,11 @@ var rootCmd = &cobra.Command{
 	Use:     "mnemon",
 	Version: version,
 	Short:   "Memory daemon for LLM agents",
-	Long:    "Mnemon is a standalone memory daemon based on MAGMA's four-graph architecture.",
+	Long: `Mnemon is a standalone memory daemon based on MAGMA's four-graph architecture.
+
+When a remote is configured (mnemon auth login), commands talk to the team gateway.
+Recall, search, related, and status are team-visible: personal notes are write-isolated,
+not read-isolated. Use --local for this machine's SQLite store.`,
 }
 
 func Execute() {

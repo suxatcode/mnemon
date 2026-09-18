@@ -88,8 +88,10 @@ func (db *DB) execer() dbExecer {
 }
 
 // InTransaction runs fn inside a single SQL transaction.
-// All store methods called within fn will use the transaction automatically.
-func (db *DB) InTransaction(fn func() error) error {
+// fn receives a scoped *DB whose tx pointer is private to this call, so
+// concurrent InTransaction calls on the same *DB do not share db.tx.
+// Store methods used inside fn must go through the scoped *DB, not the receiver.
+func (db *DB) InTransaction(fn func(*DB) error) error {
 	if db.tx != nil {
 		return fmt.Errorf("nested transactions not supported")
 	}
@@ -97,9 +99,9 @@ func (db *DB) InTransaction(fn func() error) error {
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	db.tx = tx
-	defer func() { db.tx = nil }()
-	if err := fn(); err != nil {
+	scoped := *db
+	scoped.tx = tx
+	if err := fn(&scoped); err != nil {
 		tx.Rollback()
 		return err
 	}

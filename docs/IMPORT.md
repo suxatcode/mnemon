@@ -80,6 +80,8 @@ Chat export / Markdown -> LLM extraction prompt -> memory_draft.json -> mnemon i
 | `entities` | array | no | Max 50 items; each max 200 characters | Named subjects such as people, projects, tools, libraries, or organizations. Mnemon merges these with automatic extraction |
 | `source` | string | no | - | Overrides the top-level `source` for this insight |
 | `created_at` | string | no | RFC 3339 | Original creation timestamp; import time is used when omitted |
+| `owner_principal` | string | no | ignored | Accepted for compatibility and discarded. Owner is always the authenticated principal |
+| `layer` | string | no | ignored | Accepted for compatibility and discarded. Layer comes from the caller's role |
 
 #### Categories
 

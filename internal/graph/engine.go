@@ -62,32 +62,46 @@ func NewEngineWithOptions(db *store.DB, embedCache EmbedCache, options EngineOpt
 
 // OnInsightCreated runs all edge generators for a newly created insight.
 // It merges any pre-provided entities (e.g. from LLM) with regex-extracted ones.
-func (e *Engine) OnInsightCreated(insight *model.Insight) EdgeStats {
+// Query and insert errors are returned so a surrounding SQL transaction can roll back.
+func (e *Engine) OnInsightCreated(insight *model.Insight) (EdgeStats, error) {
 	var stats EdgeStats
 
 	// 1. Resolve entities from pre-provided values and/or regex+dictionary
 	//    extraction. The indexed variant adds a fourth path that admits
 	//    wide-cast capitalized tokens and known-word matches filtered against
 	//    the existing entity index, so user vocabulary already represented in
-	//    the graph propagates into new insights without dictionary edits. On
-	//    error the index lookup falls through to nil and behavior matches the
-	//    non-indexed extractor.
-	knownEntities, _ := e.db.LoadKnownEntities()
+	//    the graph propagates into new insights without dictionary edits.
+	knownEntities, err := e.db.LoadKnownEntities()
+	if err != nil {
+		return stats, err
+	}
 	insight.Entities = ResolveEntitiesIndexed(insight.Content, insight.Entities, e.entityMode, knownEntities)
 
 	// 2. Temporal backbone + proximity edges
 	if e.options.TemporalMode != TemporalDisabled {
-		stats.Temporal = CreateTemporalEdge(e.db, insight)
+		stats.Temporal, err = CreateTemporalEdge(e.db, insight)
+		if err != nil {
+			return stats, err
+		}
 	}
 
 	// 3. Entity co-occurrence edges
-	stats.Entity = CreateEntityEdges(e.db, insight)
+	stats.Entity, err = CreateEntityEdges(e.db, insight)
+	if err != nil {
+		return stats, err
+	}
 
 	// 4. Causal keyword edges
-	stats.Causal = CreateCausalEdges(e.db, insight)
+	stats.Causal, err = CreateCausalEdges(e.db, insight)
+	if err != nil {
+		return stats, err
+	}
 
 	// 5. Auto semantic edges (when embeddings available)
-	stats.Semantic = CreateSemanticEdges(e.db, insight, e.embedCache)
+	stats.Semantic, err = CreateSemanticEdges(e.db, insight, e.embedCache)
+	if err != nil {
+		return stats, err
+	}
 
-	return stats
+	return stats, nil
 }

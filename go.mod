@@ -1,8 +1,8 @@
 module github.com/mnemon-dev/mnemon
 
-go 1.24.2
+go 1.25.0
 
-toolchain go1.24.6
+toolchain go1.25.3
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1

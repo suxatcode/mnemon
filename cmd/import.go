@@ -23,7 +23,10 @@ graph edge construction, embeddings, and lifecycle scoring are all applied
 automatically.
 
 The draft format and a reference LLM prompt for generating it from chat
-exports are documented in docs/IMPORT.md.`,
+exports are documented in docs/IMPORT.md.
+
+On a team remote, imported insights are owned by the authenticated principal.
+Draft fields owner_principal and layer are ignored if present.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		data, err := os.ReadFile(args[0])

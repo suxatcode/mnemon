@@ -259,9 +259,9 @@ func mergeEntities(provided, extracted []string) []string {
 
 // CreateEntityEdges creates entity co-occurrence edges between the new insight
 // and existing insights that share the same entities.
-func CreateEntityEdges(db *store.DB, insight *model.Insight) int {
+func CreateEntityEdges(db *store.DB, insight *model.Insight) (int, error) {
 	if len(insight.Entities) == 0 {
-		return 0
+		return 0, nil
 	}
 
 	now := time.Now().UTC()
@@ -272,7 +272,10 @@ func CreateEntityEdges(db *store.DB, insight *model.Insight) int {
 			break
 		}
 		ids, err := db.FindInsightsWithEntity(entity, insight.ID, maxEntityLinks)
-		if err != nil || len(ids) == 0 {
+		if err != nil {
+			return count, err
+		}
+		if len(ids) == 0 {
 			continue
 		}
 
@@ -280,31 +283,29 @@ func CreateEntityEdges(db *store.DB, insight *model.Insight) int {
 			if count >= maxTotalEntityEdges {
 				break
 			}
-			// new → old
-			err = db.InsertEdge(&model.Edge{
+			if err := db.InsertEdge(&model.Edge{
 				SourceID:  insight.ID,
 				TargetID:  targetID,
 				EdgeType:  model.EdgeEntity,
 				Weight:    1.0,
 				Metadata:  map[string]string{"entity": entity},
 				CreatedAt: now,
-			})
-			if err == nil {
-				count++
+			}); err != nil {
+				return count, err
 			}
-			// old → new (reverse)
-			err = db.InsertEdge(&model.Edge{
+			count++
+			if err := db.InsertEdge(&model.Edge{
 				SourceID:  targetID,
 				TargetID:  insight.ID,
 				EdgeType:  model.EdgeEntity,
 				Weight:    1.0,
 				Metadata:  map[string]string{"entity": entity},
 				CreatedAt: now,
-			})
-			if err == nil {
-				count++
+			}); err != nil {
+				return count, err
 			}
+			count++
 		}
 	}
-	return count
+	return count, nil
 }

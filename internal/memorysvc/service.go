@@ -67,6 +67,13 @@ func New(db *store.DB, opts Options) *Service {
 
 func (s *Service) DB() *store.DB { return s.db }
 
+func (s *Service) assertWritable() error {
+	if s.db.IsReadOnly() {
+		return fmt.Errorf("database is read-only")
+	}
+	return nil
+}
+
 // Result is JSON (or text) plus warnings that belong on the client stderr.
 type Result struct {
 	JSON     []byte

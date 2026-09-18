@@ -16,7 +16,7 @@ var searchLimit int
 var searchCmd = &cobra.Command{
 	Use:   "search [query]",
 	Short: "Search insights with token-based scoring",
-	Long:  "Search insights using tokenized keyword matching. Returns results ranked by relevance score.",
+	Long:  "Search insights using tokenized keyword matching. Returns results ranked by relevance score. On a team remote this is fully shared, same as recall.",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := strings.Join(args, " ")

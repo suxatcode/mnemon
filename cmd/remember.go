@@ -27,8 +27,10 @@ var (
 var rememberCmd = &cobra.Command{
 	Use:   "remember [content]",
 	Short: "Store a new insight",
-	Long:  "Store a new insight into the memory graph with optional category, importance, and tags.",
-	Args:  cobra.MinimumNArgs(1),
+	Long: `Store a new insight into the memory graph with optional category, importance, and tags.
+
+On a team remote, owner_principal and layer come from the authenticated JWT, not from flags or tags.`,
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		content := strings.Join(args, " ")
 		if len(content) > 8000 {

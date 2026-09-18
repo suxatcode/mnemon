@@ -43,9 +43,10 @@ mnemon store remove <name>
 
 When a remote is configured (`mnemon auth login`), this is a **team-shared brain**, not a private notebook.
 
-- Recall/search/related/status may return memories written by other people or agents. Attribute them by `owner_principal` and `layer` in the JSON (`remember` also returns these fields).
+- Recall/search/related/status are **fully team-visible**. Personal layer is write-isolated, not read-isolated: you will see other people's personal notes. They are not private. Attribute every hit by `owner_principal` and `layer` in the JSON (`remember` also returns these fields).
 - `layer: org` is organizational ground truth. Do not treat a coworker's personal notes as org policy.
 - You may add, edit, `forget`, or GC **only your own** personal memories. Do not "update" or delete someone else's insight; the server rejects it.
+- `mnemon link` is **not owner-scoped**. You may link any two insights the team can recall, including someone else's. Forget / GC / `--keep` stay owner-scoped.
 - Org memories are written only by an organization principal (`role=org`). Regular skills never write org.
 - Use `mnemon --local ...` only when you deliberately want the machine-local SQLite store instead of the team gateway.
 

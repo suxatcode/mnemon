@@ -60,6 +60,13 @@ type DraftInsight struct {
 	// CreatedAt sets the original creation timestamp (RFC 3339).
 	// Defaults to import time when omitted.
 	CreatedAt string `json:"created_at,omitempty"`
+
+	// OwnerPrincipal is ignored. Ownership is always the authenticated
+	// principal (or "local" for --local imports).
+	OwnerPrincipal string `json:"owner_principal,omitempty"`
+
+	// Layer is ignored. Layer is personal for users and org for role=org.
+	Layer string `json:"layer,omitempty"`
 }
 
 // DraftEdge declares an explicit relationship between two insights.

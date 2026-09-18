@@ -21,8 +21,10 @@ var (
 var recallCmd = &cobra.Command{
 	Use:   "recall [keyword]",
 	Short: "Retrieve insights by keyword",
-	Long:  "Search for insights using intent-aware graph-enhanced retrieval. Use --basic for simple SQL LIKE matching.",
-	Args:  cobra.MinimumNArgs(1),
+	Long: `Search for insights using intent-aware graph-enhanced retrieval. Use --basic for simple SQL LIKE matching.
+
+On a team remote, recall is fully shared: you will see other principals' personal notes plus org layer. Attribute hits by owner_principal and layer. Use --local to search only this machine.`,
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		keyword := strings.Join(args, " ")
 		if err := requirePositiveLimit("--limit", recLimit); err != nil {

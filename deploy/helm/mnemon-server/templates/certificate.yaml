@@ -1,0 +1,19 @@
+{{- if .Values.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "mnemon-server.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: tls
+spec:
+  secretName: {{ default (include "mnemon-server.tlsSecretName" .) .Values.certManager.secretName }}
+  issuerRef:
+    kind: {{ .Values.certManager.issuerKind }}
+    name: {{ .Values.certManager.issuerName }}
+  dnsNames:
+    {{- range .Values.certManager.dnsNames }}
+    - {{ . | quote }}
+    {{- end }}
+{{- end }}

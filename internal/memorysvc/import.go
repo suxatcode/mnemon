@@ -30,6 +30,11 @@ type ImportResult struct {
 }
 
 func (s *Service) Import(actor Actor, req ImportInput) (Result, error) {
+	if !req.DryRun {
+		if err := s.assertWritable(); err != nil {
+			return Result{}, err
+		}
+	}
 	var warnings []string
 	var draft importdraft.MemoryDraft
 	if err := json.Unmarshal(req.Draft, &draft); err != nil {
@@ -169,38 +174,41 @@ func (s *Service) Import(actor Actor, req ImportInput) (Result, error) {
 			}
 		}
 
-		err := db.InTransaction(func() error {
+		err := db.InTransaction(func(tx *store.DB) error {
 			if action == "updated" && replacedID != "" {
-				if err := db.SoftDeleteInsight(replacedID); err != nil {
-					warnf(&warnings, "soft-delete %s: %v", replacedID, err)
-				} else {
-					db.LogOp("import-replace", replacedID, fmt.Sprintf("replaced by %s", insight.ID))
-					delete(embedCache, replacedID)
+				if err := tx.SoftDeleteInsight(replacedID); err != nil {
+					return fmt.Errorf("soft-delete %s: %w", replacedID, err)
 				}
+				tx.LogOp("import-replace", replacedID, fmt.Sprintf("replaced by %s", insight.ID))
+				delete(embedCache, replacedID)
 			}
-			if err := db.InsertInsight(insight); err != nil {
+			if err := tx.InsertInsight(insight); err != nil {
 				return fmt.Errorf("insert insight: %w", err)
 			}
 			if embeddingBlob != nil {
-				if err := db.UpdateEmbedding(insight.ID, embeddingBlob); err != nil {
+				if err := tx.UpdateEmbedding(insight.ID, embeddingBlob); err != nil {
 					return fmt.Errorf("update embedding: %w", err)
 				}
 				if embedCache != nil {
 					embedCache[insight.ID] = embeddingVec
 				}
 			}
-			engine := graph.NewEngineWithOptions(db, embedCache, graph.EngineOptions{
+			engine := graph.NewEngineWithOptions(tx, embedCache, graph.EngineOptions{
 				EntityMode:   graph.EntityModeMerge,
 				TemporalMode: graph.TemporalDisabled,
 			})
-			engine.OnInsightCreated(insight)
+			if _, err := engine.OnInsightCreated(insight); err != nil {
+				return err
+			}
 			if len(insight.Entities) > 0 {
-				_ = db.UpdateEntities(insight.ID, insight.Entities)
+				if err := tx.UpdateEntities(insight.ID, insight.Entities); err != nil {
+					return fmt.Errorf("update entities: %w", err)
+				}
 			}
-			if _, err := db.RefreshEffectiveImportance(insight.ID); err != nil {
-				warnf(&warnings, "refresh EI for %s: %v", insight.ID, err)
+			if _, err := tx.RefreshEffectiveImportance(insight.ID); err != nil {
+				return fmt.Errorf("refresh EI for %s: %w", insight.ID, err)
 			}
-			db.LogOp("import", insight.ID, insight.Content)
+			tx.LogOp("import", insight.ID, insight.Content)
 			return nil
 		})
 		if err != nil {
@@ -217,7 +225,7 @@ func (s *Service) Import(actor Actor, req ImportInput) (Result, error) {
 
 	edgesInserted := 0
 	pruned := 0
-	if err := db.InTransaction(func() error {
+	if err := db.InTransaction(func(tx *store.DB) error {
 		for _, de := range draft.Edges {
 			srcID, srcOK := imported[de.SourceIndex]
 			tgtID, tgtOK := imported[de.TargetIndex]
@@ -232,7 +240,7 @@ func (s *Service) Import(actor Actor, req ImportInput) (Result, error) {
 			if de.Reason != "" {
 				meta["reason"] = de.Reason
 			}
-			if err := db.InsertEdge(&model.Edge{
+			if err := tx.InsertEdge(&model.Edge{
 				SourceID:  srcID,
 				TargetID:  tgtID,
 				EdgeType:  model.EdgeType(de.EdgeType),
@@ -240,14 +248,13 @@ func (s *Service) Import(actor Actor, req ImportInput) (Result, error) {
 				Metadata:  meta,
 				CreatedAt: time.Now().UTC(),
 			}); err != nil {
-				warnf(&warnings, "insert explicit edge %d→%d: %v", de.SourceIndex, de.TargetIndex, err)
-				continue
+				return fmt.Errorf("insert explicit edge %d→%d: %w", de.SourceIndex, de.TargetIndex, err)
 			}
 			edgesInserted++
 			refreshIDs[srcID] = true
 			refreshIDs[tgtID] = true
 		}
-		repaired, touched, err := repairImportedTemporalEdges(db, importedSources, importedIDs)
+		repaired, touched, err := repairImportedTemporalEdges(tx, importedSources, importedIDs)
 		if err != nil {
 			return err
 		}
@@ -256,13 +263,13 @@ func (s *Service) Import(actor Actor, req ImportInput) (Result, error) {
 			refreshIDs[id] = true
 		}
 		for id := range refreshIDs {
-			if _, err := db.RefreshEffectiveImportance(id); err != nil {
-				warnf(&warnings, "refresh EI for %s: %v", id, err)
+			if _, err := tx.RefreshEffectiveImportance(id); err != nil {
+				return fmt.Errorf("refresh EI for %s: %w", id, err)
 			}
 		}
 		if actor.Role != RoleOrg {
 			var pruneErr error
-			pruned, pruneErr = db.AutoPruneOwned(s.pruneOwner(actor), s.maxInsights, nil)
+			pruned, pruneErr = tx.AutoPruneOwned(s.pruneOwner(actor), s.maxInsights, nil)
 			return pruneErr
 		}
 		return nil

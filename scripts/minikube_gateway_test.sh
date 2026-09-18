@@ -33,9 +33,9 @@ PROFILE="${MINIKUBE_PROFILE:-mnemon-gateway}"
 NS="${MINIKUBE_NAMESPACE:-mnemon-gateway-test}"
 RELEASE="${HELM_RELEASE:-mnemon}"
 IMAGE_REPO="${IMAGE_REPO:-mnemon-dev/mnemon-server}"
-IMAGE_TAG="${IMAGE_TAG:-dev}"
+IMAGE_TAG="${IMAGE_TAG:-}"
 LOCAL_PORT="${LOCAL_PORT:-17443}"
-SCENARIOS="${SCENARIOS:-bundled,external,rds,sqlite,tls-off}"
+SCENARIOS="${SCENARIOS:-bundled,external,rds,postgres,jwt-secret,sqlite,tls-off}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 KEEP_CLUSTER="${KEEP_CLUSTER:-1}"
 HELM_TIMEOUT="${HELM_TIMEOUT:-8m}"
@@ -45,6 +45,7 @@ ALICE_DIR="$WORKDIR/alice"
 BOB_DIR="$WORKDIR/bob"
 ORG_DIR="$WORKDIR/org"
 CAROL_DIR="$WORKDIR/carol"
+DAVE_DIR="$WORKDIR/dave"
 LOCAL_DIR="$WORKDIR/local-bypass"
 INVITES="$WORKDIR/invites"
 CA_FILE="$WORKDIR/ca.crt"
@@ -147,7 +148,7 @@ assert_exit_fails() {
 dump_cluster() {
   echo ""
   echo -e "${YELLOW}── cluster dump ──${RESET}"
-  k get pods,svc,pvc,secret,deploy,sts -o wide || true
+  k get pods,svc,pvc,secret,deploy,sts,ingress -o wide || true
   k get events --sort-by=.lastTimestamp | tail -n 40 || true
   k logs -l app.kubernetes.io/name=mnemon-server --tail=80 --all-containers=true || true
   k logs -l app.kubernetes.io/component=postgresql --tail=40 || true
@@ -196,21 +197,21 @@ start_minikube() {
 build_and_load() {
   step "build CLI and server image"
   mkdir -p "$WORKDIR" "$INVITES"
+  if [[ -z "$IMAGE_TAG" ]]; then
+    if [[ "$SKIP_BUILD" == "1" ]]; then
+      IMAGE_TAG="dev"
+    else
+      IMAGE_TAG="dev-$(date +%Y%m%d%H%M%S)"
+    fi
+  fi
   if [[ "$SKIP_BUILD" != "1" ]]; then
-    local gomod_bak="$WORKDIR/go.mod.bak" gosum_bak="$WORKDIR/go.sum.bak"
-    cp "$ROOT/go.mod" "$gomod_bak"
-    cp "$ROOT/go.sum" "$gosum_bak"
-    # pgx v5.11 needs Go 1.25; keep go.mod pinned by restoring after the host build.
-    GOTOOLCHAIN=local go build -mod=mod -o "$MNEMON" "$ROOT"
-    cp "$gomod_bak" "$ROOT/go.mod"
-    cp "$gosum_bak" "$ROOT/go.sum"
+    go build -o "$MNEMON" "$ROOT"
     env -u GOTOOLCHAIN docker build --target server \
       --build-arg VERSION="$IMAGE_TAG" \
       --build-arg GO_VERSION="${SERVER_GO_VERSION:-1.25.3}" \
       -t "${IMAGE_REPO}:${IMAGE_TAG}" "$ROOT"
   elif [[ ! -x "$MNEMON" ]]; then
-    GOTOOLCHAIN=local go build -mod=mod -o "$MNEMON" "$ROOT"
-    git -C "$ROOT" checkout -- go.mod go.sum >/dev/null 2>&1 || true
+    go build -o "$MNEMON" "$ROOT"
   fi
   minikube -p "$PROFILE" image load --overwrite=true "${IMAGE_REPO}:${IMAGE_TAG}"
   pass "image loaded" "${IMAGE_REPO}:${IMAGE_TAG}"
@@ -222,8 +223,8 @@ reset_namespace() {
   helm --kube-context "$PROFILE" uninstall "$RELEASE" -n "$NS" >/dev/null 2>&1 || true
   kubectl --context "$PROFILE" delete ns "$NS" --wait=true --timeout=120s >/dev/null 2>&1 || true
   kubectl --context "$PROFILE" create ns "$NS" >/dev/null
-  rm -rf "$ALICE_DIR" "$BOB_DIR" "$ORG_DIR" "$CAROL_DIR" "$LOCAL_DIR" "$INVITES"
-  mkdir -p "$ALICE_DIR" "$BOB_DIR" "$ORG_DIR" "$CAROL_DIR" "$LOCAL_DIR" "$INVITES"
+  rm -rf "$ALICE_DIR" "$BOB_DIR" "$ORG_DIR" "$CAROL_DIR" "$DAVE_DIR" "$LOCAL_DIR" "$INVITES"
+  mkdir -p "$ALICE_DIR" "$BOB_DIR" "$ORG_DIR" "$CAROL_DIR" "$DAVE_DIR" "$LOCAL_DIR" "$INVITES"
 }
 
 install_chart() {
@@ -287,31 +288,34 @@ curl_code() {
 }
 
 save_ca() {
-  if k get secret mnemon-app >/dev/null 2>&1 && k get secret mnemon-app -o json | jq -e '.data["ca.crt"]' >/dev/null 2>&1; then
-    k get secret mnemon-app -o jsonpath='{.data.ca\.crt}' | base64 -d >"$CA_FILE"
-  else
-    rm -f "$CA_FILE"
-  fi
+  rm -f "$CA_FILE"
+  local secret
+  for secret in mnemon-tls mnemon-app; do
+    if k get secret "$secret" >/dev/null 2>&1 && k get secret "$secret" -o json | jq -e '.data["ca.crt"]' >/dev/null 2>&1; then
+      k get secret "$secret" -o jsonpath='{.data.ca\.crt}' | base64 -d >"$CA_FILE"
+      return 0
+    fi
+  done
 }
 
 issue_user() {
   local principal="$1" role="$2" outfile="$3"
+  shift 3
   local server="127.0.0.1:${LOCAL_PORT}"
   local cmd=(mnemon-server user issue
     --principal "$principal" --role "$role"
-    --server "$server"
     --jwt-key /config/jwt.key
-    --data-dir /data
     --name team --out -)
   if [[ "$SCHEME" == "http" ]]; then
-    cmd=(mnemon-server user issue
-      --principal "$principal" --role "$role"
-      --server "http://127.0.0.1:${LOCAL_PORT}"
-      --jwt-key /config/jwt.key
-      --data-dir /data
-      --name team --out -)
+    cmd+=(--server "http://${server}")
   else
-    cmd+=(--ca-file /config/ca.crt --server-name mnemon)
+    cmd+=(--server "$server")
+    if k exec deploy/mnemon -- test -f /config/ca.crt >/dev/null 2>&1; then
+      cmd+=(--ca-file /config/ca.crt --server-name mnemon)
+    fi
+  fi
+  if [[ $# -gt 0 ]]; then
+    cmd+=("$@")
   fi
   k exec deploy/mnemon -- "${cmd[@]}" >"$outfile"
   jq -e '.token and .principal' "$outfile" >/dev/null
@@ -596,7 +600,7 @@ EOF
   fi
 
   step "revoke bob"
-  k exec deploy/mnemon -- mnemon-server user revoke --principal bob@team --data-dir /data >/dev/null
+  k exec deploy/mnemon -- mnemon-server user revoke --principal bob@team >/dev/null
   assert_exit_fails "revoked bob cannot status" "$BOB_DIR" status
   local still
   still=$(cli_capture "$ALICE_DIR" status)
@@ -613,6 +617,133 @@ EOF
   local remote_rec
   remote_rec=$(cli_capture "$ALICE_DIR" recall "this stays on the laptop" --limit 10)
   assert_not_contains "local note not on gateway" "$remote_rec" "this stays on the laptop"
+}
+
+run_resilience_flows() {
+  banner "Resilience / previously untested flows"
+
+  step "concurrent remembers on one principal"
+  MNEMON_DATA_DIR="$ALICE_DIR" "$MNEMON" remember --no-diff "concurrent-write-alpha" --cat fact --imp 3 >"$WORKDIR/conc-a.json" 2>"$WORKDIR/conc-a.err" &
+  local p1=$!
+  MNEMON_DATA_DIR="$ALICE_DIR" "$MNEMON" remember --no-diff "concurrent-write-beta" --cat fact --imp 3 >"$WORKDIR/conc-b.json" 2>"$WORKDIR/conc-b.err" &
+  local p2=$!
+  local rc1=0 rc2=0
+  wait "$p1" || rc1=$?
+  wait "$p2" || rc2=$?
+  if [[ "$rc1" -eq 0 && "$rc2" -eq 0 ]]; then
+    pass "concurrent remember exits" "0/0"
+  else
+    fail "concurrent remember exits" "rc=$rc1/$rc2 a=$(tr '\n' ' ' <"$WORKDIR/conc-a.err") b=$(tr '\n' ' ' <"$WORKDIR/conc-b.err")"
+  fi
+  local rec_conc
+  rec_conc=$(cli_capture "$ALICE_DIR" recall "concurrent-write" --limit 10)
+  assert_contains "concurrent alpha stored" "$rec_conc" "concurrent-write-alpha"
+  assert_contains "concurrent beta stored" "$rec_conc" "concurrent-write-beta"
+
+  step "forged import owner_principal/layer ignored"
+  cat >"$WORKDIR/forged-import.json" <<'EOF'
+{
+  "schema_version": "1",
+  "insights": [
+    {
+      "content": "forged-import-owner should stay alice personal",
+      "category": "fact",
+      "importance": 3,
+      "owner_principal": "bob@team",
+      "layer": "org"
+    }
+  ]
+}
+EOF
+  local imp_forge
+  imp_forge=$(cli_capture "$ALICE_DIR" import --no-diff "$WORKDIR/forged-import.json")
+  local forged_id
+  forged_id=$(echo "$imp_forge" | jq -r '.results[0].id // empty')
+  if [[ -n "$forged_id" && "$forged_id" != "null" ]]; then
+    pass "forged import returned id" "$forged_id"
+  else
+    fail "forged import returned id" "$(echo "$imp_forge" | tr '\n' ' ' | head -c 200)"
+  fi
+  local rec_forge
+  rec_forge=$(cli_capture "$ALICE_DIR" recall "forged-import-owner" --limit 5)
+  assert_contains "forged import content" "$rec_forge" "forged-import-owner should stay alice personal"
+  assert_contains "forged import owner is alice" "$rec_forge" '"owner_principal": "alice@team"'
+  assert_contains "forged import layer personal" "$rec_forge" '"layer": "personal"'
+  assert_not_contains "forged import not org" "$rec_forge" '"layer": "org"'
+
+  step "embed --all without Ollama"
+  assert_exit_fails "embed --all errors without model" "$ALICE_DIR" embed --all
+
+  step "--readonly and extra local store"
+  assert_exit_fails "readonly remember rejected" "$ALICE_DIR" --local --readonly remember --no-diff "should not write" --cat fact --imp 3
+  local st_ro
+  st_ro=$(cli_capture "$ALICE_DIR" --local --readonly status)
+  assert_jq "readonly local status" "$st_ro" '.dialect' 'sqlite'
+  local stores
+  stores=$(cli_capture "$ALICE_DIR" --local store create extra-store)
+  assert_contains "store create extra" "$stores" "extra-store"
+
+  step "short-lived JWT"
+  issue_user "dave@team" user "$INVITES/dave.json" --ttl 1s
+  login_user "$DAVE_DIR" "$INVITES/dave.json"
+  sleep 2
+  assert_exit_fails "expired token rejected" "$DAVE_DIR" status
+
+  local ready
+  ready=$(k get deploy mnemon -o jsonpath='{.status.readyReplicas}')
+  if [[ "${ready:-0}" -ge 2 ]]; then
+    step "delete one server replica"
+    local pod
+    pod=$(k get pod -l app.kubernetes.io/component=server -o jsonpath='{.items[0].metadata.name}')
+    k delete pod "$pod" --wait=true --timeout=120s >/dev/null
+    k rollout status deploy/mnemon --timeout=180s >/dev/null
+    start_pf
+    local rec_after
+    rec_after=$(cli_capture "$ALICE_DIR" recall "widgets" --limit 10)
+    assert_contains "recall after replica kill" "$rec_after" "alice-only memory about widgets"
+  fi
+
+  if k get sts mnemon-postgresql >/dev/null 2>&1; then
+    step "restart bundled Postgres"
+    k delete pod -l app.kubernetes.io/component=postgresql --wait=true --timeout=180s >/dev/null || true
+    k rollout status sts/mnemon-postgresql --timeout=180s >/dev/null
+    k rollout status deploy/mnemon --timeout=180s >/dev/null
+    start_pf
+    local rec_pg
+    rec_pg=$(cli_capture "$ALICE_DIR" recall "widgets" --limit 10)
+    assert_contains "recall after postgres restart" "$rec_pg" "alice-only memory about widgets"
+  fi
+
+  step "helm upgrade persists JWT and exercises GC cap"
+  local jwt_secret="mnemon-app"
+  if k get secret mnemon-jwt >/dev/null 2>&1 && ! k get secret mnemon-app >/dev/null 2>&1; then
+    jwt_secret="mnemon-jwt"
+  fi
+  local jwt_before jwt_after
+  jwt_before=$(k get secret "$jwt_secret" -o jsonpath='{.data.jwt\.key}')
+  install_chart --set replicaCount=2 --set maxInsights=3
+  save_ca
+  start_pf
+  jwt_after=$(k get secret "$jwt_secret" -o jsonpath='{.data.jwt\.key}')
+  if [[ "$jwt_before" == "$jwt_after" && -n "$jwt_before" ]]; then
+    pass "JWT persisted across helm upgrade" "$jwt_secret"
+  else
+    fail "JWT persisted across helm upgrade" "secret=$jwt_secret changed"
+  fi
+  local prune_json pruned
+  prune_json=$(remember "$ALICE_DIR" "prune-filler-one")
+  pruned=$(echo "$prune_json" | jq -r '.auto_pruned // 0')
+  prune_json=$(remember "$ALICE_DIR" "prune-filler-two")
+  local pruned2
+  pruned2=$(echo "$prune_json" | jq -r '.auto_pruned // 0')
+  prune_json=$(remember "$ALICE_DIR" "prune-filler-three")
+  local pruned3
+  pruned3=$(echo "$prune_json" | jq -r '.auto_pruned // 0')
+  if [[ "${pruned:-0}" -gt 0 || "${pruned2:-0}" -gt 0 || "${pruned3:-0}" -gt 0 ]]; then
+    pass "auto-prune at cap" "pruned=$pruned/$pruned2/$pruned3"
+  else
+    fail "auto-prune at cap" "auto_pruned stayed 0"
+  fi
 }
 
 deploy_external_postgres() {
@@ -703,6 +834,7 @@ scenario_bundled() {
   probe_k8s 2 postgres
   assert_tls_sans
   run_user_operator_flows postgres
+  run_resilience_flows
   stop_pf
 }
 
@@ -777,6 +909,90 @@ scenario_sqlite() {
   stop_pf
 }
 
+scenario_postgres_url() {
+  banner "F. Postgres image + database.url (not existingSecret)"
+  SCHEME=https
+  reset_namespace
+  deploy_external_postgres
+  install_chart \
+    --set postgresql.enabled=false \
+    --set replicaCount=2 \
+    --set database.url='postgres://mnemon:testdbpass@ext-pg:5432/mnemon?sslmode=disable'
+  save_ca
+  start_pf
+  probe_k8s 2 postgres
+  if k get sts mnemon-postgresql >/dev/null 2>&1; then
+    fail "database.url must not deploy bundled postgres" ""
+  else
+    pass "database.url has no bundled postgres" ""
+  fi
+  smoke_client postgres "database-url"
+  local st
+  st=$(cli_capture "$ALICE_DIR" status)
+  assert_not_contains "database.url password redacted" "$st" "testdbpass"
+  stop_pf
+}
+
+scenario_jwt_secret() {
+  banner "G. JWT existingSecret + generated TLS + Ingress"
+  SCHEME=https
+  reset_namespace
+  k create secret generic mnemon-jwt \
+    --from-literal=jwt.key='minikube-hs256-jwt-key-for-existing-secret-test' >/dev/null
+  install_chart \
+    --set postgresql.enabled=false \
+    --set persistence.enabled=false \
+    --set server.existingSecret=mnemon-jwt \
+    --set ingress.enabled=true \
+    --set ingress.hosts[0].host=mnemon.local \
+    --set ingress.hosts[0].paths[0].path=/ \
+    --set ingress.hosts[0].paths[0].pathType=Prefix \
+    --set 'ingress.tls[0].secretName=mnemon-tls' \
+    --set 'ingress.tls[0].hosts[0]=mnemon.local'
+  if k get secret mnemon-app >/dev/null 2>&1; then
+    fail "JWT existingSecret must not create mnemon-app" ""
+  else
+    pass "no generated JWT app secret" "using mnemon-jwt"
+  fi
+  if k get secret mnemon-tls >/dev/null 2>&1; then
+    pass "TLS generated beside JWT secret" "mnemon-tls"
+  else
+    fail "TLS generated beside JWT secret" "mnemon-tls missing"
+  fi
+  if k get ingress mnemon >/dev/null 2>&1; then
+    pass "Ingress object" "mnemon.local"
+  else
+    fail "Ingress object" "missing"
+  fi
+  save_ca
+  start_pf
+  probe_k8s 1 sqlite
+  smoke_client sqlite "jwt-existingSecret"
+  local jwt_before jwt_after
+  jwt_before=$(k get secret mnemon-jwt -o jsonpath='{.data.jwt\.key}')
+  install_chart \
+    --set postgresql.enabled=false \
+    --set persistence.enabled=false \
+    --set server.existingSecret=mnemon-jwt \
+    --set ingress.enabled=true \
+    --set ingress.hosts[0].host=mnemon.local \
+    --set ingress.hosts[0].paths[0].path=/ \
+    --set ingress.hosts[0].paths[0].pathType=Prefix \
+    --set replicaCount=1
+  jwt_after=$(k get secret mnemon-jwt -o jsonpath='{.data.jwt\.key}')
+  if [[ "$jwt_before" == "$jwt_after" ]]; then
+    pass "existing JWT secret unchanged on upgrade" ""
+  else
+    fail "existing JWT secret unchanged on upgrade" ""
+  fi
+  save_ca
+  start_pf
+  local reca
+  reca=$(cli_capture "$ALICE_DIR" recall "smoke jwt-existingSecret" --limit 5)
+  assert_contains "token still valid after upgrade" "$reca" "smoke jwt-existingSecret"
+  stop_pf
+}
+
 scenario_tls_off() {
   banner "E. TLS disabled (HTTP)"
   SCHEME=http
@@ -827,6 +1043,8 @@ main() {
   want_scenario bundled && scenario_bundled
   want_scenario external && scenario_external
   want_scenario rds && scenario_rds
+  want_scenario postgres && scenario_postgres_url
+  want_scenario jwt-secret && scenario_jwt_secret
   want_scenario sqlite && scenario_sqlite
   want_scenario tls-off && scenario_tls_off
   summary

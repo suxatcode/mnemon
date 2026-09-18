@@ -457,9 +457,9 @@ func (db *DB) AutoPruneOwned(owner string, maxInsights int, excludeIDs []string)
 		return db.autoPrune(owner, maxInsights, excludeIDs)
 	}
 	var pruned int
-	err := db.InTransaction(func() error {
+	err := db.InTransaction(func(tx *DB) error {
 		var innerErr error
-		pruned, innerErr = db.autoPrune(owner, maxInsights, excludeIDs)
+		pruned, innerErr = tx.autoPrune(owner, maxInsights, excludeIDs)
 		return innerErr
 	})
 	return pruned, err

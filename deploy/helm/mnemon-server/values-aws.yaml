@@ -1,0 +1,52 @@
+# Production overlay: AWS (RDS + optional External Secrets / cert-manager).
+#
+# Create cluster secrets before helm install (External Secrets, CSI Secrets
+# Store, or kubectl). This chart does not talk to AWS APIs directly.
+#
+#   mnemon-db   key `url`     postgres://user:pass@rds:5432/mnemon?sslmode=require
+#   mnemon-jwt  key `jwt.key` HS256 HMAC material, at least 32 bytes
+#   mnemon-tls                kubernetes.io/tls from cert-manager (optional)
+#
+# Postgres backup/restore stays with RDS (snapshots, PITR). Mnemon does not
+# ship a backup job.
+replicaCount: 2
+maxInsights: 25000
+postgresql:
+  enabled: false
+persistence:
+  enabled: false
+database:
+  existingSecret: mnemon-db
+  existingSecretKey: url
+server:
+  existingSecret: mnemon-jwt
+  tls:
+    enabled: true
+    existingSecret: mnemon-tls
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: mnemon.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: mnemon-tls
+      hosts:
+        - mnemon.example.com
+certManager:
+  enabled: true
+  issuerKind: ClusterIssuer
+  issuerName: letsencrypt-prod
+  secretName: mnemon-tls
+  dnsNames:
+    - mnemon.example.com
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi

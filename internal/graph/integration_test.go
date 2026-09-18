@@ -49,7 +49,10 @@ func TestCreateTemporalEdge_BackboneChain(t *testing.T) {
 	insertInsight(t, db, "t-1", "first insight", "user", 3, nil, now.Add(-1*time.Hour))
 	ins2 := insertInsight(t, db, "t-2", "second insight", "user", 3, nil, now)
 
-	count := CreateTemporalEdge(db, ins2)
+	count, err := CreateTemporalEdge(db, ins2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count < 2 {
 		t.Errorf("backbone chain: want at least 2 edges (bidirectional), got %d", count)
 	}
@@ -90,7 +93,9 @@ func TestCreateTemporalEdge_ProximityDecay(t *testing.T) {
 	insertInsight(t, db, "p-far", "far in time", "other", 3, nil, now.Add(-20*time.Hour))
 	ins := insertInsight(t, db, "p-new", "new insight", "other", 3, nil, now)
 
-	CreateTemporalEdge(db, ins)
+	if _, err := CreateTemporalEdge(db, ins); err != nil {
+		t.Fatal(err)
+	}
 
 	edges, _ := db.GetEdgesByNodeAndType("p-new", model.EdgeTemporal)
 	// Find weights to the close and far neighbors
@@ -120,7 +125,10 @@ func TestCreateTemporalEdge_NoSource(t *testing.T) {
 	db := testDB(t)
 	// Only insight — no previous from same source
 	ins := insertInsight(t, db, "alone", "only insight", "user", 3, nil, time.Now().UTC())
-	count := CreateTemporalEdge(db, ins)
+	count, err := CreateTemporalEdge(db, ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// No backbone, possibly no proximity either (no other insights within 24h)
 	if count != 0 {
 		t.Errorf("single insight: want 0 edges, got %d", count)
@@ -137,7 +145,10 @@ func TestCreateEntityEdges_CoOccurrence(t *testing.T) {
 	insertInsight(t, db, "ent-1", "Go is fast", "user", 3, []string{"Go", "performance"}, now.Add(-1*time.Hour))
 	ins2 := insertInsight(t, db, "ent-2", "Go concurrency patterns", "user", 3, []string{"Go", "concurrency"}, now)
 
-	count := CreateEntityEdges(db, ins2)
+	count, err := CreateEntityEdges(db, ins2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count < 2 {
 		t.Errorf("co-occurrence: want at least 2 edges (bidirectional for 'Go'), got %d", count)
 	}
@@ -162,7 +173,10 @@ func TestCreateEntityEdges_NoSharedEntities(t *testing.T) {
 	insertInsight(t, db, "ne-1", "Go is fast", "user", 3, []string{"Go"}, now.Add(-1*time.Hour))
 	ins2 := insertInsight(t, db, "ne-2", "Python is flexible", "user", 3, []string{"Python"}, now)
 
-	count := CreateEntityEdges(db, ins2)
+	count, err := CreateEntityEdges(db, ins2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Errorf("no shared entities: want 0 edges, got %d", count)
 	}
@@ -171,7 +185,10 @@ func TestCreateEntityEdges_NoSharedEntities(t *testing.T) {
 func TestCreateEntityEdges_EmptyEntities(t *testing.T) {
 	db := testDB(t)
 	ins := insertInsight(t, db, "empty", "no entities", "user", 3, nil, time.Now().UTC())
-	count := CreateEntityEdges(db, ins)
+	count, err := CreateEntityEdges(db, ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Errorf("empty entities: want 0, got %d", count)
 	}
@@ -188,7 +205,10 @@ func TestCreateEntityEdges_MaxLinks(t *testing.T) {
 	}
 	ins := insertInsight(t, db, "many-new", "another Go insight", "user", 3, []string{"Go"}, now)
 
-	count := CreateEntityEdges(db, ins)
+	count, err := CreateEntityEdges(db, ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// maxEntityLinks=5, bidirectional = up to 10
 	if count > maxEntityLinks*2 {
 		t.Errorf("should cap at %d links (bidirectional), got %d", maxEntityLinks*2, count)
@@ -206,7 +226,10 @@ func TestCreateCausalEdges_DirectionInference(t *testing.T) {
 	insertInsight(t, db, "cause", "SQLite has low latency and small footprint", "user", 3, nil, now.Add(-1*time.Hour))
 	effect := insertInsight(t, db, "effect", "chose SQLite because of low latency and small footprint", "user", 3, nil, now)
 
-	count := CreateCausalEdges(db, effect)
+	count, err := CreateCausalEdges(db, effect)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count == 0 {
 		t.Fatal("want at least 1 causal edge")
 	}
@@ -233,7 +256,10 @@ func TestCreateCausalEdges_NoCausalSignal(t *testing.T) {
 	insertInsight(t, db, "nc-1", "Go is a programming language", "user", 3, nil, now.Add(-1*time.Hour))
 	ins := insertInsight(t, db, "nc-2", "SQLite is a database engine", "user", 3, nil, now)
 
-	count := CreateCausalEdges(db, ins)
+	count, err := CreateCausalEdges(db, ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Errorf("no causal signal: want 0 edges, got %d", count)
 	}
@@ -247,7 +273,10 @@ func TestCreateCausalEdges_InsufficientOverlap(t *testing.T) {
 	insertInsight(t, db, "lo-1", "apple banana cherry mango peach grape because fruit", "user", 3, nil, now.Add(-1*time.Hour))
 	ins := insertInsight(t, db, "lo-2", "therefore dog elephant fox giraffe zebra lion tiger", "user", 3, nil, now)
 
-	count := CreateCausalEdges(db, ins)
+	count, err := CreateCausalEdges(db, ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Errorf("insufficient overlap: want 0, got %d", count)
 	}
@@ -411,7 +440,10 @@ func TestCreateSemanticEdges_HighCosineSimilarity(t *testing.T) {
 	db.UpdateEmbedding("se-1", embed.SerializeVector(vec1))
 	db.UpdateEmbedding("se-2", embed.SerializeVector(vec2))
 
-	count := CreateSemanticEdges(db, ins2, nil)
+	count, err := CreateSemanticEdges(db, ins2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count == 0 {
 		t.Error("want semantic edges for high cosine similarity")
 	}
@@ -440,7 +472,10 @@ func TestCreateSemanticEdges_LowSimilarityNoEdge(t *testing.T) {
 	db.UpdateEmbedding("sl-1", embed.SerializeVector(vec1))
 	db.UpdateEmbedding("sl-2", embed.SerializeVector(vec2))
 
-	count := CreateSemanticEdges(db, ins2, nil)
+	count, err := CreateSemanticEdges(db, ins2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Errorf("low similarity: want 0 semantic edges, got %d", count)
 	}
@@ -450,7 +485,10 @@ func TestCreateSemanticEdges_NoEmbedding(t *testing.T) {
 	db := testDB(t)
 	ins := insertInsight(t, db, "no-emb", "no embedding stored", "user", 3, nil, time.Now().UTC())
 
-	count := CreateSemanticEdges(db, ins, nil)
+	count, err := CreateSemanticEdges(db, ins, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Errorf("no embedding: want 0, got %d", count)
 	}
@@ -468,7 +506,10 @@ func TestEngine_OnInsightCreated(t *testing.T) {
 
 	// New insight with causal signal and shared entity
 	ins := insertInsight(t, db, "eng-2", "chose Go because of concurrency and SQLite support", "user", 3, []string{"Go"}, now)
-	stats := engine.OnInsightCreated(ins)
+	stats, err := engine.OnInsightCreated(ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Should have temporal edges (backbone)
 	if stats.Temporal == 0 {
@@ -492,7 +533,10 @@ func TestEngine_OnInsightCreated_EntityModeProvided(t *testing.T) {
 	insertInsight(t, db, "eng-p-1", "Docker Redis prior", "user", 3, []string{"deployment-pipeline"}, now.Add(-1*time.Hour))
 	ins := insertInsight(t, db, "eng-p-2", "We deploy HttpServer on Docker with Redis", "user", 3, []string{"deployment-pipeline"}, now)
 
-	stats := engine.OnInsightCreated(ins)
+	stats, err := engine.OnInsightCreated(ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 	has := make(map[string]bool, len(ins.Entities))
 	for _, e := range ins.Entities {
 		has[e] = true
@@ -559,7 +603,10 @@ func TestCreateSemanticEdges_WithCache(t *testing.T) {
 		"wc-2": vec2,
 	}
 
-	count := CreateSemanticEdges(db, ins2, cache)
+	count, err := CreateSemanticEdges(db, ins2, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count == 0 {
 		t.Error("want semantic edges via cache, got 0")
 	}
@@ -595,7 +642,10 @@ func TestCreateSemanticEdges_CacheExcludesDeleted(t *testing.T) {
 		"del-2": vec2,
 	}
 
-	count := CreateSemanticEdges(db, ins2, cache)
+	count, err := CreateSemanticEdges(db, ins2, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Errorf("want 0 edges (deleted excluded from cache), got %d", count)
 	}
@@ -605,7 +655,10 @@ func TestCreateSemanticEdges_CacheExcludesDeleted(t *testing.T) {
 		"del-1": vec1,
 		"del-2": vec2,
 	}
-	count2 := CreateSemanticEdges(db, ins2, cacheWithDeleted)
+	count2, err := CreateSemanticEdges(db, ins2, cacheWithDeleted)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count2 == 0 {
 		t.Error("control: want edges when deleted insight is in cache")
 	}
@@ -750,7 +803,10 @@ func TestEngine_WithCache(t *testing.T) {
 	}
 
 	engine := NewEngine(db, cache)
-	stats := engine.OnInsightCreated(ins)
+	stats, err := engine.OnInsightCreated(ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Semantic edges should be created via cache
 	if stats.Semantic == 0 {
@@ -771,7 +827,10 @@ func TestBuildEmbedCache(t *testing.T) {
 	db.UpdateEmbedding("bc-1", embed.SerializeVector(vec1))
 	db.UpdateEmbedding("bc-2", embed.SerializeVector(vec2))
 
-	cache := buildEmbedCache(db)
+	cache, err := buildEmbedCache(db)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cache == nil {
 		t.Fatal("want non-nil cache")
 	}
@@ -788,7 +847,10 @@ func TestBuildEmbedCache_Empty(t *testing.T) {
 	db := testDB(t)
 	insertInsight(t, db, "be-1", "no embedding", "user", 3, nil, time.Now().UTC())
 
-	cache := buildEmbedCache(db)
+	cache, err := buildEmbedCache(db)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cache != nil {
 		t.Errorf("want nil cache when no embeddings, got %v", cache)
 	}
@@ -809,7 +871,10 @@ func TestCreateSemanticEdges_NilCacheFallback(t *testing.T) {
 	db.UpdateEmbedding("nf-2", embed.SerializeVector(vec2))
 
 	// nil cache — should load from DB
-	count := CreateSemanticEdges(db, ins2, nil)
+	count, err := CreateSemanticEdges(db, ins2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count == 0 {
 		t.Error("want semantic edges via DB fallback")
 	}
@@ -912,7 +977,10 @@ func TestCreateEntityEdges_TotalEdgeCap(t *testing.T) {
 	// New insight with all 15 entities
 	ins := insertInsight(t, db, "cap-new", "new insight with many entities", "user", 3, entities, now)
 
-	count := CreateEntityEdges(db, ins)
+	count, err := CreateEntityEdges(db, ins)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if count > maxTotalEntityEdges {
 		t.Errorf("total entity edges should be capped at %d, got %d", maxTotalEntityEdges, count)
 	}

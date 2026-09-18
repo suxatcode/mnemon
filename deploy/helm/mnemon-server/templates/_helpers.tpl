@@ -49,11 +49,31 @@ true
 {{- end -}}
 {{- end -}}
 
+{{- define "mnemon-server.jwtSecretName" -}}
+{{- include "mnemon-server.appSecretName" . -}}
+{{- end -}}
+
 {{- define "mnemon-server.tlsSecretName" -}}
 {{- if .Values.server.tls.existingSecret -}}
 {{- .Values.server.tls.existingSecret -}}
+{{- else if .Values.certManager.enabled -}}
+{{- default (printf "%s-tls" (include "mnemon-server.fullname" .)) .Values.certManager.secretName -}}
+{{- else if and .Values.server.tls.enabled .Values.server.existingSecret -}}
+{{- printf "%s-tls" (include "mnemon-server.fullname" .) -}}
 {{- else -}}
-{{- include "mnemon-server.appSecretName" . -}}
+{{- include "mnemon-server.jwtSecretName" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "mnemon-server.generateTLS" -}}
+{{- if and .Values.server.tls.enabled (not .Values.server.tls.existingSecret) (not .Values.certManager.enabled) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{- define "mnemon-server.mountCA" -}}
+{{- if and .Values.server.tls.enabled (or (include "mnemon-server.generateTLS" .) .Values.server.tls.caKey) -}}
+true
 {{- end -}}
 {{- end -}}
 
@@ -69,7 +89,11 @@ true
 {{- if .Values.database.existingSecret -}}
 {{- .Values.database.existingSecret -}}
 {{- else if .Values.database.url -}}
+{{- if .Values.server.existingSecret -}}
+{{- printf "%s-database" (include "mnemon-server.fullname" .) -}}
+{{- else -}}
 {{- include "mnemon-server.appSecretName" . -}}
+{{- end -}}
 {{- else -}}
 {{- include "mnemon-server.postgresSecretName" . -}}
 {{- end -}}

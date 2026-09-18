@@ -35,6 +35,7 @@ var (
 	issueRole       string
 	issueServerName string
 	issueTTLDays    int
+	issueTTL        time.Duration
 )
 
 func main() {
@@ -129,7 +130,11 @@ func userCmd() *cobra.Command {
 				return err
 			}
 			defer db.Close()
+			fmt.Fprintf(os.Stderr, "mnemon-server: issuing against store %s\n", db.DisplayPath())
 			ttl := time.Duration(issueTTLDays) * 24 * time.Hour
+			if issueTTL > 0 {
+				ttl = issueTTL
+			}
 			token, ident, err := remoteauth.Issuer{DB: db, Key: key}.Issue(issuePrincipal, issueRole, ttl)
 			if err != nil {
 				return err
@@ -175,6 +180,7 @@ func userCmd() *cobra.Command {
 	issue.Flags().StringVar(&issuePrincipal, "principal", "", "principal to issue")
 	issue.Flags().StringVar(&issueRole, "role", model.RoleUser, "role: user or org")
 	issue.Flags().IntVar(&issueTTLDays, "ttl-days", 90, "token lifetime in days")
+	issue.Flags().DurationVar(&issueTTL, "ttl", 0, "token lifetime (overrides --ttl-days when set)")
 	issue.Flags().StringVar(&issueServer, "server", "", "server host:port clients should dial")
 	issue.Flags().StringVar(&issueServerName, "server-name", "", "TLS ServerName (SNI), if different from --server")
 	issue.Flags().StringVar(&issueOut, "out", "-", "invite file output path")

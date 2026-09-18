@@ -3,9 +3,11 @@ package store
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -316,9 +318,8 @@ func TestFindInsightsWithEntity(t *testing.T) {
 
 func TestInTransaction_Commit(t *testing.T) {
 	db := testDB(t)
-	err := db.InTransaction(func() error {
-		db.InsertInsight(makeInsight("tx-1", "in transaction", 3))
-		return nil
+	err := db.InTransaction(func(tx *DB) error {
+		return tx.InsertInsight(makeInsight("tx-1", "in transaction", 3))
 	})
 	if err != nil {
 		t.Fatalf("transaction: %v", err)
@@ -331,8 +332,10 @@ func TestInTransaction_Commit(t *testing.T) {
 
 func TestInTransaction_Rollback(t *testing.T) {
 	db := testDB(t)
-	err := db.InTransaction(func() error {
-		db.InsertInsight(makeInsight("tx-2", "will be rolled back", 3))
+	err := db.InTransaction(func(tx *DB) error {
+		if err := tx.InsertInsight(makeInsight("tx-2", "will be rolled back", 3)); err != nil {
+			return err
+		}
 		return errRollback
 	})
 	if err == nil {
@@ -352,11 +355,42 @@ func (e *rollbackError) Error() string { return "rollback" }
 
 func TestInTransaction_Nested(t *testing.T) {
 	db := testDB(t)
-	err := db.InTransaction(func() error {
-		return db.InTransaction(func() error { return nil })
+	err := db.InTransaction(func(tx *DB) error {
+		return tx.InTransaction(func(*DB) error { return nil })
 	})
 	if err == nil {
 		t.Error("nested transactions should return error")
+	}
+}
+
+func TestInTransaction_Concurrent(t *testing.T) {
+	db := testDB(t)
+	const n = 16
+	errCh := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			id := fmt.Sprintf("tx-c-%d", i)
+			errCh <- db.InTransaction(func(tx *DB) error {
+				return tx.InsertInsight(makeInsight(id, "concurrent write "+id, 3))
+			})
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("concurrent tx: %v", err)
+		}
+	}
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("tx-c-%d", i)
+		got, err := db.GetInsightByID(id)
+		if err != nil || got == nil {
+			t.Fatalf("missing concurrent insight %s: %v", id, err)
+		}
 	}
 }
 

@@ -1,25 +1,33 @@
 mnemon-server {{ .Chart.AppVersion }}
 
-HTTPS JSON API: {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}
+{{ if .Values.server.tls.enabled }}HTTPS{{ else }}HTTP{{ end }} JSON API: {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}
 Probes: GET /health  GET /ready
 
 Database: {{ if include "mnemon-server.useBundledPostgres" . }}bundled Postgres{{ else if include "mnemon-server.useExternalDatabase" . }}external Postgres DSN{{ else }}SQLite (single replica){{ end }}
 Replicas: {{ include "mnemon-server.replicas" . }}
 Max insights (per principal, personal layer): {{ .Values.maxInsights }}
+JWT secret: {{ include "mnemon-server.jwtSecretName" . }}
+{{- if .Values.server.tls.enabled }}
+TLS secret: {{ include "mnemon-server.tlsSecretName" . }}
+{{- end }}
 
-Issue a user (no restart required):
+Issue a user (no restart required). In-pod `MNEMON_DATA_DIR=/data` and, when using Postgres, `MNEMON_DATABASE_URL` already match `serve` — omit `--data-dir` unless you overrode the store path.
 
   kubectl exec -it deploy/{{ include "mnemon-server.fullname" . }} -- \
     mnemon-server user issue \
       --principal alice@team --role user \
-      --server {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }} \
-      --server-name {{ include "mnemon-server.fullname" . }} \
-      --jwt-key /config/jwt.key \
+      --server {{ if .Values.server.tls.enabled }}{{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}{{ else }}http://{{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}{{ end }} \
+      --jwt-key /config/{{ .Values.server.jwtKeyKey }} \
+      {{- if and .Values.server.tls.enabled (include "mnemon-server.mountCA" .) }}
       --ca-file /config/ca.crt \
-      --data-dir /data \
+      --server-name {{ include "mnemon-server.fullname" . }} \
+      {{- end }}
       --out -
 
 Then on the client: mnemon auth login --default invite.json
 
-Production AWS: use values-rds.yaml with postgresql.enabled=false and an RDS DSN secret.
-Users live in Postgres (`principals` and `issued_tokens` tables). Adding a user is an INSERT plus JWT issue; no pod restart.
+Production AWS: use values-aws.yaml (or values-rds.yaml) with postgresql.enabled=false, a DSN secret, and optionally server.existingSecret for an HS256 key from External Secrets / AWS Secrets Manager. Users live in Postgres (`principals` and `issued_tokens` tables). Adding a user is an INSERT plus JWT issue; no pod restart.
+{{- if .Values.ingress.enabled }}
+
+Ingress: {{ (index .Values.ingress.hosts 0).host }}
+{{- end }}

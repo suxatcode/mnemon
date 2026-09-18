@@ -42,10 +42,13 @@ type SemanticCandidate struct {
 type EmbedCache map[string][]float64
 
 // buildEmbedCache loads all embeddings from DB into a map.
-func buildEmbedCache(db *store.DB) EmbedCache {
+func buildEmbedCache(db *store.DB) (EmbedCache, error) {
 	allEmbedded, err := db.GetAllEmbeddings()
-	if err != nil || len(allEmbedded) == 0 {
-		return nil
+	if err != nil {
+		return nil, err
+	}
+	if len(allEmbedded) == 0 {
+		return nil, nil
 	}
 	cache := make(EmbedCache, len(allEmbedded))
 	for _, e := range allEmbedded {
@@ -53,21 +56,26 @@ func buildEmbedCache(db *store.DB) EmbedCache {
 			cache[e.ID] = v
 		}
 	}
-	return cache
+	return cache, nil
 }
 
 // CreateSemanticEdges auto-creates semantic edges for insights with high
 // embedding cosine similarity (MAGMA §3.2: cos(v_i, v_j) > θ_sim).
 // If embedCache is non-nil, it is used instead of querying the database.
-// Returns the number of edges created.
-func CreateSemanticEdges(db *store.DB, insight *model.Insight, embedCache EmbedCache) int {
+// Returns the number of edges created. Query and insert errors are returned
+// so a surrounding SQL transaction can roll back.
+func CreateSemanticEdges(db *store.DB, insight *model.Insight, embedCache EmbedCache) (int, error) {
 	if embedCache == nil {
-		embedCache = buildEmbedCache(db)
+		var err error
+		embedCache, err = buildEmbedCache(db)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	insightVec := embedCache[insight.ID]
 	if insightVec == nil {
-		return 0
+		return 0, nil
 	}
 
 	type scored struct {
@@ -86,7 +94,7 @@ func CreateSemanticEdges(db *store.DB, insight *model.Insight, embedCache EmbedC
 	}
 
 	if len(candidates) == 0 {
-		return 0
+		return 0, nil
 	}
 
 	sort.Slice(candidates, func(i, j int) bool {
@@ -104,24 +112,24 @@ func CreateSemanticEdges(db *store.DB, insight *model.Insight, embedCache EmbedC
 			"created_by": "auto",
 			"cosine":     fmt.Sprintf("%.4f", c.similarity),
 		}
-		err1 := db.InsertEdge(&model.Edge{
+		if err := db.InsertEdge(&model.Edge{
 			SourceID: insight.ID, TargetID: c.id,
 			EdgeType: model.EdgeSemantic, Weight: c.similarity,
 			Metadata: meta, CreatedAt: now,
-		})
-		err2 := db.InsertEdge(&model.Edge{
+		}); err != nil {
+			return count, err
+		}
+		count++
+		if err := db.InsertEdge(&model.Edge{
 			SourceID: c.id, TargetID: insight.ID,
 			EdgeType: model.EdgeSemantic, Weight: c.similarity,
 			Metadata: meta, CreatedAt: now,
-		})
-		if err1 == nil {
-			count++
+		}); err != nil {
+			return count, err
 		}
-		if err2 == nil {
-			count++
-		}
+		count++
 	}
-	return count
+	return count, nil
 }
 
 // FindSemanticCandidates returns insights that are potential semantic matches
@@ -132,7 +140,11 @@ func CreateSemanticEdges(db *store.DB, insight *model.Insight, embedCache EmbedC
 // edges via `mnemon link`.
 func FindSemanticCandidates(db *store.DB, insight *model.Insight, embedCache EmbedCache) []SemanticCandidate {
 	if embedCache == nil {
-		embedCache = buildEmbedCache(db)
+		loaded, err := buildEmbedCache(db)
+		if err != nil {
+			return findCandidatesByTokenOverlap(db, insight)
+		}
+		embedCache = loaded
 	}
 	// Try embedding-based candidates first (P4: MAGMA compliance)
 	if candidates := findCandidatesByEmbedding(db, insight, embedCache); candidates != nil {

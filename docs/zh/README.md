@@ -8,7 +8,7 @@
 
 **LLM 智能体的持久记忆系统** — LLM 监督式、钩子集成、四图架构。
 
-[![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![CI](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mnemon-dev/mnemon)](https://goreportcard.com/report/github.com/mnemon-dev/mnemon)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
@@ -253,7 +253,7 @@ mnemon setup --eject  # 移除所有集成
 make help           # 显示所有目标
 ```
 
-**依赖**：Go 1.24+、`modernc.org/sqlite`、`spf13/cobra`、`google/uuid`
+**依赖**：Go 1.25+、`modernc.org/sqlite`、`spf13/cobra`、`google/uuid`
 
 **可选**：[Ollama](https://ollama.ai) + `nomic-embed-text` 嵌入支持
 

@@ -9,6 +9,7 @@ import (
 	"github.com/mnemon-dev/mnemon/internal/graph"
 	"github.com/mnemon-dev/mnemon/internal/model"
 	"github.com/mnemon-dev/mnemon/internal/search"
+	"github.com/mnemon-dev/mnemon/internal/store"
 )
 
 type RememberInput struct {
@@ -23,6 +24,9 @@ type RememberInput struct {
 }
 
 func (s *Service) Remember(actor Actor, req RememberInput) (Result, error) {
+	if err := s.assertWritable(); err != nil {
+		return Result{}, err
+	}
 	var warnings []string
 	content := req.Content
 	if len(content) > 8000 {
@@ -175,20 +179,19 @@ func (s *Service) Remember(actor Actor, req RememberInput) (Result, error) {
 	var ei float64
 	var pruned int
 	var embedded bool
-	err = db.InTransaction(func() error {
+	err = db.InTransaction(func(tx *store.DB) error {
 		if diffAction == "updated" && replacedID != "" {
-			if err := db.SoftDeleteInsight(replacedID); err != nil {
-				warnf(&warnings, "soft-delete %s: %v", replacedID, err)
-			} else {
-				db.LogOp("diff-replace", replacedID, fmt.Sprintf("principal=%s replaced by %s", actor.Principal, insight.ID))
-				delete(embedCache, replacedID)
+			if err := tx.SoftDeleteInsight(replacedID); err != nil {
+				return fmt.Errorf("soft-delete %s: %w", replacedID, err)
 			}
+			tx.LogOp("diff-replace", replacedID, fmt.Sprintf("principal=%s replaced by %s", actor.Principal, insight.ID))
+			delete(embedCache, replacedID)
 		}
-		if err := db.InsertInsight(insight); err != nil {
+		if err := tx.InsertInsight(insight); err != nil {
 			return err
 		}
 		if embeddingBlob != nil {
-			if err := db.UpdateEmbedding(insight.ID, embeddingBlob); err != nil {
+			if err := tx.UpdateEmbedding(insight.ID, embeddingBlob); err != nil {
 				return err
 			}
 			embedded = true
@@ -196,26 +199,30 @@ func (s *Service) Remember(actor Actor, req RememberInput) (Result, error) {
 				embedCache[insight.ID] = embeddingVec
 			}
 		}
-		engine := graph.NewEngineWithEntityMode(db, embedCache, entityMode)
-		edgeStats = engine.OnInsightCreated(insight)
+		engine := graph.NewEngineWithEntityMode(tx, embedCache, entityMode)
+		var statsErr error
+		edgeStats, statsErr = engine.OnInsightCreated(insight)
+		if statsErr != nil {
+			return statsErr
+		}
 		if len(insight.Entities) > 0 {
-			if err := db.UpdateEntities(insight.ID, insight.Entities); err != nil {
-				warnf(&warnings, "update entities: %v", err)
+			if err := tx.UpdateEntities(insight.ID, insight.Entities); err != nil {
+				return fmt.Errorf("update entities: %w", err)
 			}
 		}
 		var eiErr error
-		ei, eiErr = db.RefreshEffectiveImportance(insight.ID)
+		ei, eiErr = tx.RefreshEffectiveImportance(insight.ID)
 		if eiErr != nil {
-			warnf(&warnings, "refresh EI: %v", eiErr)
+			return fmt.Errorf("refresh EI: %w", eiErr)
 		}
 		if actor.Role != RoleOrg {
 			var pruneErr error
-			pruned, pruneErr = db.AutoPruneOwned(s.pruneOwner(actor), s.maxInsights, []string{insight.ID})
+			pruned, pruneErr = tx.AutoPruneOwned(s.pruneOwner(actor), s.maxInsights, []string{insight.ID})
 			if pruneErr != nil {
-				warnf(&warnings, "auto-prune: %v", pruneErr)
+				return fmt.Errorf("auto-prune: %w", pruneErr)
 			}
 		}
-		db.LogOp("remember", insight.ID, fmt.Sprintf("principal=%s %s", actor.Principal, insight.Content))
+		tx.LogOp("remember", insight.ID, fmt.Sprintf("principal=%s %s", actor.Principal, insight.Content))
 		return nil
 	})
 	if err != nil {
