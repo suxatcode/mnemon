@@ -1,4 +1,4 @@
-name: Publish mnemon-server image
+name: Publish mnemon-server image and Helm chart
 
 on:
   workflow_dispatch:
@@ -65,3 +65,40 @@ jobs:
           build-args: |
             VERSION=${{ steps.meta.outputs.tag }}
             GO_VERSION=1.25.3
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package and push Helm chart
+        run: |
+          set -euo pipefail
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          helm lint deploy/helm/mnemon-server
+          mkdir -p /tmp/charts
+          pkg_args=(deploy/helm/mnemon-server --destination /tmp/charts)
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            ver="${GITHUB_REF_NAME#v}"
+            pkg_args+=(--version "$ver" --app-version "$ver")
+          fi
+          helm package "${pkg_args[@]}"
+          shopt -s nullglob
+          files=(/tmp/charts/mnemon-server-*.tgz)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "expected one chart tarball, got: ${files[*]:-none}" >&2
+            exit 1
+          fi
+          helm push "${files[0]}" "oci://ghcr.io/${owner}/charts"

@@ -70,7 +70,13 @@ mnemon --version
 
 上游已发布版本（无团队网关）：`brew install mnemon-dev/tap/mnemon` 或 `go install github.com/mnemon-dev/mnemon@latest`。
 
-在团队远端上，`mnemon link` 可以连接**任何人**可召回的记忆 — 包括同事的。这是共享图的构建方式。召回对全队可见；forget/update 仍按所有者隔离。Helm **不会**捆绑 Postgres，见 [部署](../DEPLOYMENT.md)。
+在团队远端上，`mnemon link` 可以连接**任何人**可召回的记忆 — 包括同事的。这是共享图的构建方式。召回对全队可见；forget/update 仍按所有者隔离。Helm **不会**捆绑 Postgres。Chart 发布在 GHCR：
+
+```bash
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
+```
+
+见 [部署](../DEPLOYMENT.md)。
 
 ### Claude Code
 

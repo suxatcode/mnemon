@@ -3,4 +3,10 @@ name: mnemon-server
 description: Remote Mnemon memory gateway
 type: application
 version: 0.1.0
-appVersion: dev
+appVersion: "dev"
+home: https://github.com/suxatcode/mnemon
+sources:
+  - https://github.com/suxatcode/mnemon
+annotations:
+  org.opencontainers.image.source: https://github.com/suxatcode/mnemon
+  org.opencontainers.image.description: Remote Mnemon memory gateway

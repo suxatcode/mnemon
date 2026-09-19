@@ -99,6 +99,46 @@ func TestHelmChartSourceHasNoUsersJSON(t *testing.T) {
 	}
 }
 
+func TestHelmChartMetadata(t *testing.T) {
+	chart, err := os.ReadFile(filepath.Join(chartDir(t), "Chart.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(chart)
+	for _, want := range []string{
+		"name: mnemon-server",
+		"version: 0.1.0",
+		"home: https://github.com/suxatcode/mnemon",
+		"org.opencontainers.image.source: https://github.com/suxatcode/mnemon",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("Chart.yaml missing %q", want)
+		}
+	}
+	values, err := os.ReadFile(filepath.Join(chartDir(t), "values.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(values), "repository: ghcr.io/suxatcode/mnemon-server") {
+		t.Fatal("values.yaml must default image.repository to the public GHCR image")
+	}
+}
+
+func TestHelmPackage(t *testing.T) {
+	dir := t.TempDir()
+	out, err := exec.Command(helmBin(t), "package", chartDir(t), "--destination", dir).CombinedOutput()
+	if err != nil {
+		t.Fatalf("helm package: %v\n%s", err, out)
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, "mnemon-server-*.tgz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected one packaged chart, got %v", matches)
+	}
+}
+
 func TestHelmChartDoesNotBundlePostgres(t *testing.T) {
 	root := chartDir(t)
 	for _, name := range []string{"postgres.yaml", "postgres-secret.yaml"} {
@@ -120,6 +160,9 @@ func TestHelmTemplateModes(t *testing.T) {
 	helmBin(t)
 
 	out := helmTemplate(t)
+	if !strings.Contains(out, "image: \"ghcr.io/suxatcode/mnemon-server:dev\"") {
+		t.Fatal("default render must pull the public GHCR image")
+	}
 	if strings.Contains(out, "users.json") {
 		t.Fatal("default render contains users.json")
 	}

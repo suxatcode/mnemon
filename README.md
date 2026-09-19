@@ -70,7 +70,13 @@ mnemon --version
 
 Released upstream (no team gateway): `brew install mnemon-dev/tap/mnemon` or `go install github.com/mnemon-dev/mnemon@latest`.
 
-`mnemon link` on a team remote can connect **anyone's** recallable memories — including a coworker's. That is how the shared graph is built. Recall is team-visible; forget/update stay owner-scoped. Helm never bundles Postgres; see [Deployment](docs/DEPLOYMENT.md).
+`mnemon link` on a team remote can connect **anyone's** recallable memories — including a coworker's. That is how the shared graph is built. Recall is team-visible; forget/update stay owner-scoped. Helm never bundles Postgres. The chart is on GHCR:
+
+```bash
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
+```
+
+See [Deployment](docs/DEPLOYMENT.md).
 
 ### Claude Code
 

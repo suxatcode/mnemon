@@ -5,9 +5,9 @@ replicaCount: 1
 hostname: ""
 
 image:
-  # Local/dev default (minikube loads this tag). Production: ghcr.io/<org>/mnemon-server
-  # — see docs/DEPLOYMENT.md. This chart does not pull from Docker Hub by default.
-  repository: mnemon-dev/mnemon-server
+  # GHCR (public). Minikube overrides this to mnemon-dev/mnemon-server with
+  # pullPolicy=Never after loading a local image — see docs/DEPLOYMENT.md.
+  repository: ghcr.io/suxatcode/mnemon-server
   tag: dev
   pullPolicy: IfNotPresent
   pullSecrets: []

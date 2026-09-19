@@ -116,8 +116,8 @@ First-class production knobs:
 | `certManager.*` | Optional Certificate CR; does not install cert-manager. Set `issuerName` / `issuerGroup` |
 | `server.tls.enabled` | In-pod TLS. `false` for edge TLS (Istio/Ingress) |
 | `database.url` / `database.existingSecret` | External Postgres DSN. Required for HA (`replicaCount` > 1) |
-| `image.pullSecrets` | Private registry pull |
-| `image.repository` | Production: `ghcr.io/<org>/mnemon-server` (see below) |
+| `image.pullSecrets` | Private registry pull (not needed for the public GHCR image) |
+| `image.repository` | Default: `ghcr.io/suxatcode/mnemon-server` |
 
 Issue a user (takes effect immediately, no pod restart):
 
@@ -133,21 +133,26 @@ kubectl exec deploy/mnemon -- \
 
 When the chart generated in-pod TLS, also pass `--ca-file /config/ca.crt`. Public Ingress/Let's Encrypt does not need that. Issue prints the store path on stderr. On the client: `mnemon auth login --default invite.json`. Use `mnemon --local ...` only to bypass the team store.
 
-### Container image registry
+### Container image and Helm chart (GHCR)
 
-Prefer **GHCR** (`ghcr.io/suxatcode/mnemon-server`) over Docker Hub (`docker.io`):
+Prefer **GHCR** over Docker Hub (`docker.io`):
 
-- GitHub Packages is free for public images, uses `GITHUB_TOKEN`, and avoids Docker Hub anonymous pull rate limits on CI/Kubernetes.
-- The Go module path stays `github.com/mnemon-dev/mnemon`; the image name can live under the fork that publishes it.
-- `.github/workflows/image.yml` publishes **linux/amd64 and linux/arm64** on pushes to `feat/remote-gateway`, `workflow_dispatch`, and `v*` tags. After the first run, make the package public under GitHub → Packages. Until then, minikube/Helm keep the local name `mnemon-dev/mnemon-server`.
+- Image: `ghcr.io/suxatcode/mnemon-server` (linux/amd64 + linux/arm64)
+- Chart: `oci://ghcr.io/suxatcode/charts/mnemon-server` (Helm 3.8+)
+- GitHub Packages is free for public artifacts, uses `GITHUB_TOKEN`, and avoids Docker Hub anonymous pull rate limits on CI/Kubernetes.
+- The Go module path stays `github.com/mnemon-dev/mnemon`; image and chart live under the fork that publishes them.
+- `.github/workflows/image.yml` publishes both on pushes to `feat/remote-gateway`, `workflow_dispatch`, and `v*` tags. Chart version comes from `Chart.yaml` (`0.1.0`); git tags `v*` override that version. After the first chart push, make the **charts/mnemon-server** package public under GitHub → Packages (same one-way Danger Zone as the image). Minikube still loads a local `mnemon-dev/mnemon-server` tag and `--set`s `image.repository`.
 
 ```bash
 # After this branch is pushed:
 gh workflow run image.yml --ref feat/remote-gateway
-# optional: -f tag=dev
+# optional: -f tag=dev   (image only; chart version is Chart.yaml / git tag)
+
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
+# or: helm upgrade --install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
 ```
 
-Set `image.repository=ghcr.io/suxatcode/mnemon-server` (and `image.tag`) after the first push. `image.pullSecrets` is only needed for a private package.
+The chart defaults `image.repository` to the public GHCR image. `image.pullSecrets` is only needed for a private package. There is no GitHub Pages `helm repo add` index; OCI is the published Helm repo.
 
 ### Minikube integration suite
 
@@ -161,32 +166,34 @@ Optional env: `MINIKUBE_PROFILE`, `SCENARIOS` (comma list: `postgres,url,rds,jwt
 
 ### Amazon RDS, AWS Ingress, and Istio
 
+Overlays (`values-rds.yaml`, `values-aws.yaml`, `values-istio.yaml`) ship inside the chart. Pull it, then `-f` the overlay:
+
+```bash
+helm pull oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0 --untar
+```
+
 DSN-only overlay:
 
 ```bash
-helm upgrade --install mnemon deploy/helm/mnemon-server \
-  -f deploy/helm/mnemon-server/values-rds.yaml \
-  --set image.repository=ghcr.io/suxatcode/mnemon-server \
-  --set image.tag=dev
+helm upgrade --install mnemon ./mnemon-server \
+  -f ./mnemon-server/values-rds.yaml
 ```
 
 AWS overlay (RDS DSN secret, JWT existingSecret, Ingress + cert-manager, **HTTP pods**, edge TLS):
 
 ```bash
-helm upgrade --install mnemon deploy/helm/mnemon-server \
-  -f deploy/helm/mnemon-server/values-aws.yaml \
+helm upgrade --install mnemon ./mnemon-server \
+  -f ./mnemon-server/values-aws.yaml \
   --set hostname=mnemon.example.com \
-  --set ingress.className=nginx \
-  --set image.tag=dev
+  --set ingress.className=nginx
 ```
 
 Istio / mesh overlay (no in-chart Ingress or Certificate; pods HTTP on port `8080` named `http`):
 
 ```bash
-helm upgrade --install mnemon deploy/helm/mnemon-server \
-  -f deploy/helm/mnemon-server/values-istio.yaml \
-  --set hostname=mnemon.example.com \
-  --set image.tag=dev
+helm upgrade --install mnemon ./mnemon-server \
+  -f ./mnemon-server/values-istio.yaml \
+  --set hostname=mnemon.example.com
 ```
 
 Point your existing Gateway/VirtualService at Service `mnemon:8080`. The chart does not install Istio CRDs.
