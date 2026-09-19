@@ -70,13 +70,20 @@ mnemon --version
 
 Released upstream (no team gateway): `brew install mnemon-dev/tap/mnemon` or `go install github.com/mnemon-dev/mnemon@latest`.
 
-`mnemon link` on a team remote can connect **anyone's** recallable memories — including a coworker's. That is how the shared graph is built. Recall is team-visible; forget/update stay owner-scoped. Helm never bundles Postgres. The chart is on GHCR:
+`mnemon link` on a team remote can connect **anyone's** recallable memories — including a coworker's. That is how the shared graph is built. Recall is team-visible; forget/update stay owner-scoped. Helm never bundles Postgres.
+
+This fork publishes the **server image** and **Helm chart** to GitHub Container Registry under `suxatcode` (not the `mnemon-dev` org, not Docker Hub):
+
+| Artifact | Location |
+|---|---|
+| Server image | [`ghcr.io/suxatcode/mnemon-server`](https://github.com/suxatcode/mnemon/pkgs/container/mnemon-server) — tags `:dev` and `:<12-char-sha>`, linux/amd64 + linux/arm64 |
+| Helm chart | `oci://ghcr.io/suxatcode/charts/mnemon-server` ([package](https://github.com/suxatcode/mnemon/pkgs/container/charts%2Fmnemon-server)) |
 
 ```bash
-helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.1
 ```
 
-See [Deployment](docs/DEPLOYMENT.md).
+Public defaults: resources are named `mnemon` (Service/Deployment, not `mnemon-mnemon-server`), and the pod pulls `ghcr.io/suxatcode/mnemon-server:dev`. See [Deployment](docs/DEPLOYMENT.md).
 
 ### Claude Code
 

@@ -70,13 +70,20 @@ mnemon --version
 
 上游已发布版本（无团队网关）：`brew install mnemon-dev/tap/mnemon` 或 `go install github.com/mnemon-dev/mnemon@latest`。
 
-在团队远端上，`mnemon link` 可以连接**任何人**可召回的记忆 — 包括同事的。这是共享图的构建方式。召回对全队可见；forget/update 仍按所有者隔离。Helm **不会**捆绑 Postgres。Chart 发布在 GHCR：
+在团队远端上，`mnemon link` 可以连接**任何人**可召回的记忆 — 包括同事的。这是共享图的构建方式。召回对全队可见；forget/update 仍按所有者隔离。Helm **不会**捆绑 Postgres。
+
+本 fork 把 **server 镜像** 和 **Helm chart** 发布到 GitHub Container Registry，命名空间是 `suxatcode`（不是 `mnemon-dev` org，也不是 Docker Hub）：
+
+| 产物 | 位置 |
+|---|---|
+| Server 镜像 | [`ghcr.io/suxatcode/mnemon-server`](https://github.com/suxatcode/mnemon/pkgs/container/mnemon-server) — 标签 `:dev` 与 `:<12 位 sha>`，linux/amd64 + linux/arm64 |
+| Helm chart | `oci://ghcr.io/suxatcode/charts/mnemon-server`（[package](https://github.com/suxatcode/mnemon/pkgs/container/charts%2Fmnemon-server)） |
 
 ```bash
-helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.1
 ```
 
-见 [部署](../DEPLOYMENT.md)。
+公开默认值：资源名为 `mnemon`（Service/Deployment，不是 `mnemon-mnemon-server`），Pod 拉取 `ghcr.io/suxatcode/mnemon-server:dev`。见 [部署](../DEPLOYMENT.md)。
 
 ### Claude Code
 

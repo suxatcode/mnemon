@@ -1,12 +1,17 @@
 replicaCount: 1
 
+# helm install mnemon → Service/Deployment `mnemon`, not `mnemon-mnemon-server`
+# (the chart name is mnemon-server). Override for a second release in one namespace.
+nameOverride: ""
+fullnameOverride: mnemon
+
 # Public DNS name used by Ingress, cert-manager dnsNames, and NOTES --server
 # when set. Ingress host and Certificate names fall back to this when empty.
 hostname: ""
 
 image:
-  # GHCR (public). Minikube overrides this to mnemon-dev/mnemon-server with
-  # pullPolicy=Never after loading a local image — see docs/DEPLOYMENT.md.
+  # Public default is GHCR. Minikube loads a local mnemon-dev/mnemon-server tag
+  # and --set image.repository — see docs/DEPLOYMENT.md.
   repository: ghcr.io/suxatcode/mnemon-server
   tag: dev
   pullPolicy: IfNotPresent

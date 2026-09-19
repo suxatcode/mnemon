@@ -107,7 +107,7 @@ func TestHelmChartMetadata(t *testing.T) {
 	text := string(chart)
 	for _, want := range []string{
 		"name: mnemon-server",
-		"version: 0.1.0",
+		"version: 0.1.1",
 		"home: https://github.com/suxatcode/mnemon",
 		"org.opencontainers.image.source: https://github.com/suxatcode/mnemon",
 	} {
@@ -119,8 +119,12 @@ func TestHelmChartMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(values), "repository: ghcr.io/suxatcode/mnemon-server") {
+	text = string(values)
+	if !strings.Contains(text, "repository: ghcr.io/suxatcode/mnemon-server") {
 		t.Fatal("values.yaml must default image.repository to the public GHCR image")
+	}
+	if !strings.Contains(text, "fullnameOverride: mnemon") {
+		t.Fatal("values.yaml must default fullnameOverride to mnemon")
 	}
 }
 
@@ -162,6 +166,12 @@ func TestHelmTemplateModes(t *testing.T) {
 	out := helmTemplate(t)
 	if !strings.Contains(out, "image: \"ghcr.io/suxatcode/mnemon-server:dev\"") {
 		t.Fatal("default render must pull the public GHCR image")
+	}
+	if strings.Contains(out, "mnemon-mnemon-server") {
+		t.Fatal("default fullname must be mnemon, not mnemon-mnemon-server")
+	}
+	if !strings.Contains(out, "name: mnemon-app") {
+		t.Fatal("default JWT secret should be mnemon-app")
 	}
 	if strings.Contains(out, "users.json") {
 		t.Fatal("default render contains users.json")

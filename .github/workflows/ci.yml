@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, feat/remote-gateway]
   pull_request:
-    branches: [master]
+    branches: [master, feat/remote-gateway]
 
 permissions:
   contents: read

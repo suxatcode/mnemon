@@ -101,7 +101,7 @@ Recall on a team remote is fully shared (personal notes are write-isolated, not 
 Chart defaults (internal bring-up):
 
 - SQLite, `replicaCount` forced to 1, no PVC unless `persistence.enabled`
-- JWT signing key generated in `{release}-app` (or `server.existingSecret`)
+- JWT signing key generated in `mnemon-app` (`fullnameOverride` defaults to `mnemon`; or `server.existingSecret`)
 - In-pod TLS generated in the same secret, or `{release}-tls` when JWT comes from an existing Secret
 - Probes on `GET /health` and `GET /ready`
 - `maxInsights: 25000` per principal (personal layer only)
@@ -117,7 +117,8 @@ First-class production knobs:
 | `server.tls.enabled` | In-pod TLS. `false` for edge TLS (Istio/Ingress) |
 | `database.url` / `database.existingSecret` | External Postgres DSN. Required for HA (`replicaCount` > 1) |
 | `image.pullSecrets` | Private registry pull (not needed for the public GHCR image) |
-| `image.repository` | Default: `ghcr.io/suxatcode/mnemon-server` |
+| `image.repository` | Default: `ghcr.io/suxatcode/mnemon-server` (`:dev`) |
+| `fullnameOverride` | Default: `mnemon` so Service/Deployment are not `mnemon-mnemon-server` |
 
 Issue a user (takes effect immediately, no pod restart):
 
@@ -141,15 +142,15 @@ Prefer **GHCR** over Docker Hub (`docker.io`):
 - Chart: `oci://ghcr.io/suxatcode/charts/mnemon-server` (Helm 3.8+)
 - GitHub Packages is free for public artifacts, uses `GITHUB_TOKEN`, and avoids Docker Hub anonymous pull rate limits on CI/Kubernetes.
 - The Go module path stays `github.com/mnemon-dev/mnemon`; image and chart live under the fork that publishes them.
-- `.github/workflows/image.yml` publishes both on pushes to `feat/remote-gateway`, `workflow_dispatch`, and `v*` tags. Chart version comes from `Chart.yaml` (`0.1.0`); git tags `v*` override that version. After the first chart push, make the **charts/mnemon-server** package public under GitHub → Packages (same one-way Danger Zone as the image). Minikube still loads a local `mnemon-dev/mnemon-server` tag and `--set`s `image.repository`.
+- `.github/workflows/image.yml` publishes both on pushes to `feat/remote-gateway`, `workflow_dispatch`, and `v*` tags. Chart version comes from `Chart.yaml` (`0.1.1`); git tags `v*` override that version. After the first chart push, make the **charts/mnemon-server** package public under GitHub → Packages (same one-way Danger Zone as the image). Minikube still loads a local `mnemon-dev/mnemon-server` tag and `--set`s `image.repository`.
 
 ```bash
 # After this branch is pushed:
 gh workflow run image.yml --ref feat/remote-gateway
 # optional: -f tag=dev   (image only; chart version is Chart.yaml / git tag)
 
-helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
-# or: helm upgrade --install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.1
+# or: helm upgrade --install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.1
 ```
 
 The chart defaults `image.repository` to the public GHCR image. `image.pullSecrets` is only needed for a private package. There is no GitHub Pages `helm repo add` index; OCI is the published Helm repo.
@@ -169,7 +170,7 @@ Optional env: `MINIKUBE_PROFILE`, `SCENARIOS` (comma list: `postgres,url,rds,jwt
 Overlays (`values-rds.yaml`, `values-aws.yaml`, `values-istio.yaml`) ship inside the chart. Pull it, then `-f` the overlay:
 
 ```bash
-helm pull oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.0 --untar
+helm pull oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.1 --untar
 ```
 
 DSN-only overlay:
