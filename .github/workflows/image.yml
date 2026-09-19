@@ -8,6 +8,8 @@ on:
         required: false
         default: ""
   push:
+    branches:
+      - feat/remote-gateway
     tags:
       - "v*"
 
