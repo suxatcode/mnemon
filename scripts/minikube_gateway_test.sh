@@ -7,7 +7,7 @@
 #
 # Usage:
 #   bash scripts/minikube_gateway_test.sh
-#   SCENARIOS=bundled,sqlite make test-minikube
+#   SCENARIOS=postgres,sqlite make test-minikube
 #
 set -euo pipefail
 
@@ -35,7 +35,7 @@ RELEASE="${HELM_RELEASE:-mnemon}"
 IMAGE_REPO="${IMAGE_REPO:-mnemon-dev/mnemon-server}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 LOCAL_PORT="${LOCAL_PORT:-17443}"
-SCENARIOS="${SCENARIOS:-bundled,external,rds,postgres,jwt-secret,sqlite,tls-off}"
+SCENARIOS="${SCENARIOS:-postgres,url,rds,jwt-secret,istio,sqlite,tls-off}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 KEEP_CLUSTER="${KEEP_CLUSTER:-1}"
 HELM_TIMEOUT="${HELM_TIMEOUT:-8m}"
@@ -151,7 +151,7 @@ dump_cluster() {
   k get pods,svc,pvc,secret,deploy,sts,ingress -o wide || true
   k get events --sort-by=.lastTimestamp | tail -n 40 || true
   k logs -l app.kubernetes.io/name=mnemon-server --tail=80 --all-containers=true || true
-  k logs -l app.kubernetes.io/component=postgresql --tail=40 || true
+  k logs -l app=ext-pg --tail=40 || true
 }
 
 stop_pf() {
@@ -250,7 +250,10 @@ install_chart() {
 
 start_pf() {
   stop_pf
-  k port-forward "deploy/mnemon" "${LOCAL_PORT}:7443" >"$WORKDIR/pf.log" 2>&1 &
+  local svc_port
+  svc_port=$(k get svc mnemon -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || true)
+  svc_port="${svc_port:-7443}"
+  k port-forward "deploy/mnemon" "${LOCAL_PORT}:${svc_port}" >"$WORKDIR/pf.log" 2>&1 &
   PF_PID=$!
   local i
   for i in $(seq 1 60); do
@@ -353,7 +356,16 @@ probe_k8s() {
     fail "unauthenticated /v1/status" "got $unauth body=$(tr '\n' ' ' <"$WORKDIR/curl.body")"
   fi
   if [[ "$expect_dialect_hint" == "postgres" ]]; then
-    k get sts mnemon-postgresql >/dev/null 2>&1 && pass "bundled postgres sts" "present" || pass "postgres" "external/no bundled sts"
+    if k get sts mnemon-postgresql >/dev/null 2>&1; then
+      fail "chart must not bundle a postgres STS" "mnemon-postgresql exists"
+    else
+      pass "no bundled postgres" "external DSN only"
+    fi
+    if k get deploy ext-pg >/dev/null 2>&1; then
+      pass "test postgres" "ext-pg"
+    else
+      pass "postgres" "external (no ext-pg in this overlay)"
+    fi
   elif [[ "$expect_dialect_hint" == "sqlite-pvc" ]]; then
     if k get pvc mnemon-data >/dev/null 2>&1; then
       pass "sqlite PVC" "mnemon-data"
@@ -439,10 +451,8 @@ run_user_operator_flows() {
   assert_jq "status remote ACL" "$st" '.remote' 'true'
   assert_jq "status principal" "$st" '.principal' 'alice@team'
   assert_jq "status max insights" "$st" '.max_insights' '25000'
-  if [[ "$dialect" == "postgres" ]] && k get secret mnemon-postgresql >/dev/null 2>&1; then
-    local pw
-    pw=$(k get secret mnemon-postgresql -o jsonpath='{.data.postgres-password}' | base64 -d)
-    assert_not_contains "status hides postgres password" "$st" "$pw"
+  if [[ "$dialect" == "postgres" ]]; then
+    assert_not_contains "status hides postgres password" "$st" "testdbpass"
   fi
   assert_not_contains "status has no postgres password scheme leak" "$st" ':s3cret@'
   if echo "$st" | grep -q 'postgres://'; then
@@ -667,9 +677,15 @@ EOF
   local rec_forge
   rec_forge=$(cli_capture "$ALICE_DIR" recall "forged-import-owner" --limit 5)
   assert_contains "forged import content" "$rec_forge" "forged-import-owner should stay alice personal"
-  assert_contains "forged import owner is alice" "$rec_forge" '"owner_principal": "alice@team"'
-  assert_contains "forged import layer personal" "$rec_forge" '"layer": "personal"'
-  assert_not_contains "forged import not org" "$rec_forge" '"layer": "org"'
+  local forge_hit
+  forge_hit=$(echo "$rec_forge" | jq -c --arg id "$forged_id" '[.results[]? | select(.id==$id)][0] // empty')
+  if [[ -n "$forge_hit" ]]; then
+    pass "forged import hit in recall" "$forged_id"
+    assert_jq "forged import owner is alice" "$forge_hit" '.owner_principal' 'alice@team'
+    assert_jq "forged import layer personal" "$forge_hit" '.layer' 'personal'
+  else
+    fail "forged import hit in recall" "$(echo "$rec_forge" | tr '\n' ' ' | head -c 240)"
+  fi
 
   step "embed --all without Ollama"
   assert_exit_fails "embed --all errors without model" "$ALICE_DIR" embed --all
@@ -703,10 +719,10 @@ EOF
     assert_contains "recall after replica kill" "$rec_after" "alice-only memory about widgets"
   fi
 
-  if k get sts mnemon-postgresql >/dev/null 2>&1; then
-    step "restart bundled Postgres"
-    k delete pod -l app.kubernetes.io/component=postgresql --wait=true --timeout=180s >/dev/null || true
-    k rollout status sts/mnemon-postgresql --timeout=180s >/dev/null
+  if k get deploy ext-pg >/dev/null 2>&1; then
+    step "restart external Postgres"
+    k rollout restart deploy/ext-pg >/dev/null
+    k rollout status deploy/ext-pg --timeout=180s >/dev/null
     k rollout status deploy/mnemon --timeout=180s >/dev/null
     start_pf
     local rec_pg
@@ -721,7 +737,14 @@ EOF
   fi
   local jwt_before jwt_after
   jwt_before=$(k get secret "$jwt_secret" -o jsonpath='{.data.jwt\.key}')
-  install_chart --set replicaCount=2 --set maxInsights=3
+  local upgrade=(--set replicaCount=2 --set maxInsights=3)
+  if k get secret mnemon-db >/dev/null 2>&1; then
+    upgrade+=(--set database.existingSecret=mnemon-db)
+  fi
+  if k get secret mnemon-jwt >/dev/null 2>&1; then
+    upgrade+=(--set server.existingSecret=mnemon-jwt)
+  fi
+  install_chart "${upgrade[@]}"
   save_ca
   start_pf
   jwt_after=$(k get secret "$jwt_secret" -o jsonpath='{.data.jwt\.key}')
@@ -758,6 +781,17 @@ stringData:
   postgres-password: testdbpass
 ---
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ext-pg
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: ext-pg
@@ -777,6 +811,8 @@ spec:
   selector:
     matchLabels:
       app: ext-pg
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -797,11 +833,20 @@ spec:
                 secretKeyRef:
                   name: ext-pg
                   key: postgres-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "mnemon"]
             initialDelaySeconds: 3
             periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ext-pg
 EOF
   k rollout status deploy/ext-pg --timeout=180s >/dev/null
   k delete secret mnemon-db --ignore-not-found >/dev/null
@@ -824,34 +869,35 @@ smoke_client() {
   assert_contains "smoke recall ($note)" "$reca" "smoke $note"
 }
 
-scenario_bundled() {
-  banner "A. Bundled Postgres (replicas=2, TLS)"
+scenario_postgres() {
+  banner "A. External Postgres (ext-pg + existingSecret, replicas=2, TLS)"
   SCHEME=https
   reset_namespace
-  install_chart --set replicaCount=2
+  deploy_external_postgres
+  install_chart --set database.existingSecret=mnemon-db --set replicaCount=2
   save_ca
   start_pf
   probe_k8s 2 postgres
   assert_tls_sans
+  local port_name
+  port_name=$(k get svc mnemon -o jsonpath='{.spec.ports[0].name}')
+  if [[ "$port_name" == "https" ]]; then
+    pass "in-pod TLS port name" "https"
+  else
+    fail "in-pod TLS port name" "got $port_name"
+  fi
   run_user_operator_flows postgres
   run_resilience_flows
   stop_pf
 }
 
 scenario_external() {
-  banner "B. External Postgres DSN (existingSecret)"
-  SCHEME=https
-  reset_namespace
-  deploy_external_postgres
-  install_chart --set postgresql.enabled=false --set database.existingSecret=mnemon-db --set replicaCount=2
-  save_ca
-  start_pf
-  probe_k8s 2 postgres
-  smoke_client postgres "external-dsn"
-  local st
-  st=$(cli_capture "$ALICE_DIR" status)
-  assert_not_contains "external DSN password redacted" "$st" "testdbpass"
-  stop_pf
+  scenario_postgres
+}
+
+scenario_bundled() {
+  banner "A'. bundled alias → external Postgres"
+  scenario_postgres
 }
 
 scenario_rds() {
@@ -889,7 +935,7 @@ scenario_sqlite() {
   banner "D. SQLite PVC + restart"
   SCHEME=https
   reset_namespace
-  install_chart --set postgresql.enabled=false --set persistence.enabled=true --set replicaCount=2
+  install_chart --set persistence.enabled=true
   save_ca
   start_pf
   probe_k8s 1 sqlite-pvc
@@ -910,12 +956,11 @@ scenario_sqlite() {
 }
 
 scenario_postgres_url() {
-  banner "F. Postgres image + database.url (not existingSecret)"
+  banner "F. Postgres database.url (not existingSecret)"
   SCHEME=https
   reset_namespace
   deploy_external_postgres
   install_chart \
-    --set postgresql.enabled=false \
     --set replicaCount=2 \
     --set database.url='postgres://mnemon:testdbpass@ext-pg:5432/mnemon?sslmode=disable'
   save_ca
@@ -934,19 +979,17 @@ scenario_postgres_url() {
 }
 
 scenario_jwt_secret() {
-  banner "G. JWT existingSecret + generated TLS + Ingress"
+  banner "G. JWT existingSecret + generated TLS + Ingress class/hostname"
   SCHEME=https
   reset_namespace
   k create secret generic mnemon-jwt \
     --from-literal=jwt.key='minikube-hs256-jwt-key-for-existing-secret-test' >/dev/null
   install_chart \
-    --set postgresql.enabled=false \
     --set persistence.enabled=false \
     --set server.existingSecret=mnemon-jwt \
+    --set hostname=mnemon.local \
     --set ingress.enabled=true \
-    --set ingress.hosts[0].host=mnemon.local \
-    --set ingress.hosts[0].paths[0].path=/ \
-    --set ingress.hosts[0].paths[0].pathType=Prefix \
+    --set ingress.className=nginx \
     --set 'ingress.tls[0].secretName=mnemon-tls' \
     --set 'ingress.tls[0].hosts[0]=mnemon.local'
   if k get secret mnemon-app >/dev/null 2>&1; then
@@ -964,6 +1007,19 @@ scenario_jwt_secret() {
   else
     fail "Ingress object" "missing"
   fi
+  local iclass ihost
+  iclass=$(k get ingress mnemon -o jsonpath='{.spec.ingressClassName}')
+  ihost=$(k get ingress mnemon -o jsonpath='{.spec.rules[0].host}')
+  if [[ "$iclass" == "nginx" ]]; then
+    pass "ingress className" "nginx"
+  else
+    fail "ingress className" "got ${iclass:-empty}"
+  fi
+  if [[ "$ihost" == "mnemon.local" ]]; then
+    pass "ingress host from hostname" "mnemon.local"
+  else
+    fail "ingress host from hostname" "got ${ihost:-empty}"
+  fi
   save_ca
   start_pf
   probe_k8s 1 sqlite
@@ -971,13 +1027,11 @@ scenario_jwt_secret() {
   local jwt_before jwt_after
   jwt_before=$(k get secret mnemon-jwt -o jsonpath='{.data.jwt\.key}')
   install_chart \
-    --set postgresql.enabled=false \
     --set persistence.enabled=false \
     --set server.existingSecret=mnemon-jwt \
+    --set hostname=mnemon.local \
     --set ingress.enabled=true \
-    --set ingress.hosts[0].host=mnemon.local \
-    --set ingress.hosts[0].paths[0].path=/ \
-    --set ingress.hosts[0].paths[0].pathType=Prefix \
+    --set ingress.className=nginx \
     --set replicaCount=1
   jwt_after=$(k get secret mnemon-jwt -o jsonpath='{.data.jwt\.key}')
   if [[ "$jwt_before" == "$jwt_after" ]]; then
@@ -993,11 +1047,42 @@ scenario_jwt_secret() {
   stop_pf
 }
 
+scenario_istio() {
+  banner "H. Istio-edge overlay (HTTP pods, no Ingress, external Postgres)"
+  SCHEME=http
+  reset_namespace
+  deploy_external_postgres
+  install_chart -f "$CHART/values-istio.yaml"
+  rm -f "$CA_FILE"
+  if k get ingress mnemon >/dev/null 2>&1; then
+    fail "istio overlay must not create Ingress" ""
+  else
+    pass "no in-chart Ingress" "mesh Gateway is external"
+  fi
+  if k get certificate mnemon >/dev/null 2>&1; then
+    fail "istio overlay must not create Certificate" ""
+  else
+    pass "no cert-manager Certificate" ""
+  fi
+  local port_name svc_port
+  port_name=$(k get svc mnemon -o jsonpath='{.spec.ports[0].name}')
+  svc_port=$(k get svc mnemon -o jsonpath='{.spec.ports[0].port}')
+  if [[ "$port_name" == "http" && "$svc_port" == "8080" ]]; then
+    pass "mesh HTTP port" "http:8080"
+  else
+    fail "mesh HTTP port" "name=$port_name port=$svc_port"
+  fi
+  start_pf
+  probe_k8s 2 postgres
+  smoke_client postgres "istio-edge"
+  stop_pf
+}
+
 scenario_tls_off() {
   banner "E. TLS disabled (HTTP)"
   SCHEME=http
   reset_namespace
-  install_chart --set server.tls.enabled=false --set postgresql.enabled=false --set persistence.enabled=false
+  install_chart --set server.tls.enabled=false --set persistence.enabled=false
   rm -f "$CA_FILE"
   start_pf
   probe_k8s 1 sqlite
@@ -1040,11 +1125,13 @@ main() {
   mkdir -p "$WORKDIR"
   start_minikube
   build_and_load
-  want_scenario bundled && scenario_bundled
-  want_scenario external && scenario_external
+  if want_scenario postgres || want_scenario bundled || want_scenario external; then
+    scenario_postgres
+  fi
+  want_scenario url && scenario_postgres_url
   want_scenario rds && scenario_rds
-  want_scenario postgres && scenario_postgres_url
   want_scenario jwt-secret && scenario_jwt_secret
+  want_scenario istio && scenario_istio
   want_scenario sqlite && scenario_sqlite
   want_scenario tls-off && scenario_tls_off
   summary

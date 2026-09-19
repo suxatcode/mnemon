@@ -1,18 +1,21 @@
-# Production overlay: AWS (RDS + optional External Secrets / cert-manager).
+# Production overlay: AWS (RDS + optional External Secrets / Ingress TLS).
 #
 # Create cluster secrets before helm install (External Secrets, CSI Secrets
-# Store, or kubectl). This chart does not talk to AWS APIs directly.
+# Store, or kubectl). This chart does not talk to AWS APIs directly and does
+# not install Ingress controllers, cert-manager, or Postgres.
 #
 #   mnemon-db   key `url`     postgres://user:pass@rds:5432/mnemon?sslmode=require
 #   mnemon-jwt  key `jwt.key` HS256 HMAC material, at least 32 bytes
-#   mnemon-tls                kubernetes.io/tls from cert-manager (optional)
+#   mnemon-tls                written by cert-manager for the Ingress
+#
+# Edge TLS: nginx/ALB terminates HTTPS. Pods speak HTTP on the Service port.
+# Set ingress.className to your controller (nginx, alb, ...).
 #
 # Postgres backup/restore stays with RDS (snapshots, PITR). Mnemon does not
 # ship a backup job.
+hostname: mnemon.example.com
 replicaCount: 2
 maxInsights: 25000
-postgresql:
-  enabled: false
 persistence:
   enabled: false
 database:
@@ -21,29 +24,25 @@ database:
 server:
   existingSecret: mnemon-jwt
   tls:
-    enabled: true
-    existingSecret: mnemon-tls
+    enabled: false
 ingress:
   enabled: true
   className: nginx
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
-    - host: mnemon.example.com
+    - host: "" # uses hostname
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: mnemon-tls
-      hosts:
-        - mnemon.example.com
+  tls: [] # filled from cert-manager + hostname
 certManager:
   enabled: true
   issuerKind: ClusterIssuer
   issuerName: letsencrypt-prod
+  issuerGroup: cert-manager.io
   secretName: mnemon-tls
-  dnsNames:
-    - mnemon.example.com
+  dnsNames: [] # uses hostname
 resources:
   requests:
     cpu: 250m

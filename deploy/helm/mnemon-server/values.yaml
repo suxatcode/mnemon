@@ -1,18 +1,29 @@
-replicaCount: 2
+replicaCount: 1
+
+# Public DNS name used by Ingress, cert-manager dnsNames, and NOTES --server
+# when set. Ingress host and Certificate names fall back to this when empty.
+hostname: ""
 
 image:
+  # Local/dev default (minikube loads this tag). Production: ghcr.io/<org>/mnemon-server
+  # — see docs/DEPLOYMENT.md. This chart does not pull from Docker Hub by default.
   repository: mnemon-dev/mnemon-server
   tag: dev
   pullPolicy: IfNotPresent
+  pullSecrets: []
 
 service:
   type: ClusterIP
   port: 7443
+  annotations: {}
+  labels: {}
 
 # Per-principal personal insight cap (org layer is not auto-pruned).
 maxInsights: 25000
 
-# SQLite PVC is off by default. Helm serves Postgres (bundled or external).
+# The only in-chart volume is SQLite. Off by default (emptyDir). Enable for
+# a single-replica PVC. Postgres is never bundled — point database.* at
+# managed storage (RDS, Cloud SQL, a cluster Postgres you already run).
 persistence:
   enabled: false
   size: 1Gi
@@ -27,52 +38,83 @@ server:
   tlsCertKey: tls.crt
   tlsKeyKey: tls.key
   tls:
+    # In-pod TLS. Set false when an edge proxy (nginx Ingress, Istio Gateway,
+    # ALB) terminates HTTPS and forwards HTTP to this Service.
     enabled: true
     existingSecret: ""
     # Mount this key from the TLS secret as /config/ca.crt. Empty means
     # mount ca.crt only when this chart generated the TLS secret.
     caKey: ""
 
-# Ingress is off by default. Pair with cert-manager or an existing TLS secret.
+# Kubernetes Ingress. Off by default. className is required in clusters
+# with multiple IngressClasses (nginx, alb, istio, ...).
 ingress:
   enabled: false
   className: ""
   annotations: {}
   hosts:
-    - host: mnemon.local
+    - host: "" # empty → hostname
       paths:
         - path: /
           pathType: Prefix
-  tls: []
+  tls: [] # empty + certManager.enabled + hostname → TLS stanza for that secret
 
-# Optional cert-manager Certificate. When enabled, set server.tls.existingSecret
-# to the same secretName (cert-manager writes tls.crt/tls.key).
+# Optional cert-manager Certificate. The chart does not install cert-manager.
+# When enabled, set issuerName (and usually hostname or dnsNames). Pair with
+# server.tls.enabled=false if the Ingress/mesh presents the cert, or set
+# server.tls.existingSecret to the same secretName for in-pod TLS.
 certManager:
   enabled: false
   issuerKind: ClusterIssuer
-  issuerName: letsencrypt-prod
+  issuerName: ""
+  issuerGroup: cert-manager.io
   secretName: ""
-  dnsNames: []
+  dnsNames: [] # empty → hostname
+  duration: ""
+  renewBefore: ""
+  annotations: {}
 
-# Bundled Postgres for first bring-up. Disable and set database.url or
-# database.existingSecret for Amazon RDS.
-postgresql:
-  enabled: true
-  image: postgres:16-alpine
-  auth:
-    username: mnemon
-    database: mnemon
-    password: ""
-  persistence:
-    enabled: true
-    size: 5Gi
-    storageClass: ""
-
-# External DSN disables bundled Postgres when url or existingSecret is set.
+# External Postgres DSN. Never creates a Postgres StatefulSet or PVC.
 database:
   url: ""
   existingSecret: ""
   existingSecretKey: url
+
+podAnnotations: {}
+extraEnv: []
+
+# Non-root UID matches Dockerfile USER 65532. fsGroup lets a SQLite PVC be writable.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automount: false
+
+# Emitted when replicas > 1 (Postgres HA). SQLite is always one replica.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  maxUnavailable: ""
+
+# Postgres only. Requires metrics-server. Do not enable for SQLite.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
 
 resources:
   requests:

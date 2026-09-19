@@ -27,12 +27,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod \
 
 FROM alpine:3.22 AS runtime
 RUN apk add --no-cache ca-certificates tzdata \
-  && addgroup -S mnemon \
-  && adduser -S -G mnemon -h /home/mnemon mnemon \
+  && addgroup -S -g 65532 mnemon \
+  && adduser -S -u 65532 -G mnemon -h /home/mnemon mnemon \
   && mkdir -p /mnemon \
   && chown -R mnemon:mnemon /mnemon /home/mnemon
 COPY --from=build /out/mnemon /usr/local/bin/mnemon
-USER mnemon
+USER 65532:65532
 ENV MNEMON_DATA_DIR=/mnemon \
     MNEMON_STORE=default
 VOLUME ["/mnemon"]
@@ -41,12 +41,12 @@ CMD ["status"]
 
 FROM alpine:3.22 AS server
 RUN apk add --no-cache ca-certificates tzdata \
-  && addgroup -S mnemon \
-  && adduser -S -G mnemon -h /home/mnemon mnemon \
+  && addgroup -S -g 65532 mnemon \
+  && adduser -S -u 65532 -G mnemon -h /home/mnemon mnemon \
   && mkdir -p /data \
   && chown -R mnemon:mnemon /data /home/mnemon
 COPY --from=build /out/mnemon-server /usr/local/bin/mnemon-server
-USER mnemon
+USER 65532:65532
 ENV MNEMON_DATA_DIR=/data
 VOLUME ["/data"]
 EXPOSE 7443

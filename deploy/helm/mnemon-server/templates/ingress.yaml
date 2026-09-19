@@ -1,4 +1,9 @@
 {{- if .Values.ingress.enabled }}
+{{- $hostname := include "mnemon-server.hostname" . }}
+{{- $ingTLS := .Values.ingress.tls }}
+{{- if and (not $ingTLS) .Values.certManager.enabled $hostname }}
+{{- $ingTLS = list (dict "secretName" (include "mnemon-server.tlsSecretName" .) "hosts" (list $hostname)) }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -15,9 +20,9 @@ spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className | quote }}
   {{- end }}
-  {{- if .Values.ingress.tls }}
+  {{- if $ingTLS }}
   tls:
-    {{- range .Values.ingress.tls }}
+    {{- range $ingTLS }}
     - hosts:
         {{- range .hosts }}
         - {{ . | quote }}
@@ -27,13 +32,15 @@ spec:
   {{- end }}
   rules:
     {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    {{- $host := .host | default $hostname }}
+    {{- $paths := .paths }}
+    {{- if not $paths }}
+    {{- $paths = list (dict "path" "/" "pathType" "Prefix") }}
+    {{- end }}
+    {{- if $host }}
+    - host: {{ $host | quote }}
       http:
         paths:
-          {{- $paths := .paths }}
-          {{- if not $paths }}
-          {{- $paths = list (dict "path" "/" "pathType" "Prefix") }}
-          {{- end }}
           {{- range $paths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}
@@ -43,5 +50,18 @@ spec:
                 port:
                   number: {{ $.Values.service.port }}
           {{- end }}
+    {{- else }}
+    - http:
+        paths:
+          {{- range $paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "mnemon-server.fullname" $ }}
+                port:
+                  number: {{ $.Values.service.port }}
+          {{- end }}
+    {{- end }}
     {{- end }}
 {{- end }}

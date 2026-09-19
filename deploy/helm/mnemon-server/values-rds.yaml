@@ -1,10 +1,10 @@
 # Production overlay: Amazon RDS (or other external Postgres).
 # Point database.existingSecret at a Secret whose `url` key is a postgres:// DSN
 # (for example from External Secrets / AWS Secrets Manager).
+#
+# This chart never deploys Postgres. Create the DSN secret first.
 replicaCount: 2
 maxInsights: 25000
-postgresql:
-  enabled: false
 persistence:
   enabled: false
 database:

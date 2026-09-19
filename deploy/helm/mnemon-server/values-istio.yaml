@@ -1,0 +1,34 @@
+# Overlay: Istio (or any mesh / Gateway) already terminates TLS at the edge.
+#
+# This chart does not install Istio, a Gateway, or a VirtualService. Point
+# your existing Gateway/VirtualService (or Ingress className: istio) at the
+# ClusterIP Service. The pod port is named `http` so mesh routing matches.
+#
+#   mnemon-db  key `url`  postgres://...  (required; Postgres is never bundled)
+#
+# Clients still dial https://<hostname> — the mesh presents the cert. Issue
+# invites with --server <hostname> (no http:// prefix; the CLI adds https://).
+#
+# Alternative: Kubernetes Ingress with class istio, still HTTP to the pod:
+#   ingress.enabled=true ingress.className=istio server.tls.enabled=false
+#   certManager.enabled=false   # Gateway/Ingress owns the cert
+hostname: mnemon.example.com
+replicaCount: 2
+persistence:
+  enabled: false
+database:
+  existingSecret: mnemon-db
+  existingSecretKey: url
+server:
+  addr: ":8080"
+  tls:
+    enabled: false
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+ingress:
+  enabled: false
+certManager:
+  enabled: false
+podAnnotations: {}

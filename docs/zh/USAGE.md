@@ -107,8 +107,11 @@ mnemon forget <id>
 
 ### 图操作
 
+在团队远端上，`mnemon link` 可以连接任意两条可召回的记忆，包括同事的。
+这是共享图的构建方式。Forget、GC 和 `--keep` 仍按所有者隔离。
+
 ```bash
-# Link — 创建类型化边
+# Link — 类型化边（团队远端上也可连接同事的记忆）
 mnemon link <source_id> <target_id> --type semantic --weight 0.85
 mnemon link <source_id> <target_id> --type causal --weight 0.8 \
   --meta '{"sub_type":"causes","reason":"..."}'

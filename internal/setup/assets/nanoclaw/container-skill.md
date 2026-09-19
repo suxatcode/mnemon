@@ -56,6 +56,7 @@ Run this decision tree after every substantive response:
    - Diff is built-in: duplicates skipped, conflicts auto-replaced.
    - Output includes `action` (added/updated/skipped), `semantic_candidates`, `causal_candidates`.
 2. **Link** (evaluate candidates from step 1 — use judgment, not mechanical rules):
+   - On a team remote you MAY link another teammate's memory to yours (or two teammates' memories). That is how the shared graph is built. Do not forget or update their content.
    - Review `causal_candidates`: does a genuine cause-effect relationship exist? `causal_signal` is regex-based and prone to false positives — only link if the memories are truly causally related.
    - Review `semantic_candidates`: are these memories meaningfully related? High `similarity` alone is not sufficient — skip candidates that share keywords but discuss unrelated topics.
    - Syntax: `mnemon link <id> <candidate> --type <causal|semantic> --weight <0-1> [--meta '<json>']`
@@ -65,7 +66,7 @@ Run this decision tree after every substantive response:
 
 ```bash
 mnemon remember "<fact>" --cat <cat> --imp <1-5> --entities "e1,e2" --source agent
-mnemon link <id1> <id2> --type <type> --weight <0-1> [--meta '<json>']
+mnemon link <id1> <id2> --type <type> --weight <0-1> [--meta '<json>']  # any two recallable team memories, including a coworker's
 mnemon recall "<query>" --limit 10
 mnemon recall "<query>" --store global --readonly --limit 10
 mnemon search "<query>" --limit 10
@@ -84,7 +85,7 @@ When a remote is configured (`mnemon auth login`), this is a **team-shared brain
 - Recall/search/related/status are **fully team-visible**. Personal layer is write-isolated, not read-isolated: you will see other people's personal notes. They are not private. Attribute every hit by `owner_principal` and `layer` in the JSON (`remember` also returns these fields).
 - `layer: org` is organizational ground truth. Do not treat a coworker's personal notes as org policy.
 - You may add, edit, `forget`, or GC **only your own** personal memories. Do not "update" or delete someone else's insight; the server rejects it.
-- `mnemon link` is **not owner-scoped**. You may link any two insights the team can recall, including someone else's. Forget / GC / `--keep` stay owner-scoped.
+- `mnemon link` is **not owner-scoped**. You MAY link another teammate's memory to yours, or two teammates' memories — that is the shared graph. Forget / GC / `--keep` stay owner-scoped.
 - Org memories are written only by an organization principal (`role=org`). Regular skills never write org.
 - Use `mnemon --local ...` only when you deliberately want the machine-local SQLite store instead of the team gateway.
 

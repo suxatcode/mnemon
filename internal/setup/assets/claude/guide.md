@@ -1,6 +1,6 @@
 ### Team memory
 
-When a remote is configured (`mnemon auth login`), Mnemon is a **team-shared brain**. Recall is fully team-visible: personal notes are write-isolated, not read-isolated. Attribute hits by `owner_principal` and `layer`. `layer: org` is policy; do not treat personal notes as org policy. `mnemon link` may connect any two recallable insights (not owner-scoped). Do not `forget` or "update" someone else's insight. Use `--local` only when deliberately off the team store.
+When a remote is configured (`mnemon auth login`), Mnemon is a **team-shared brain**. Recall is fully team-visible: personal notes are write-isolated, not read-isolated. Attribute hits by `owner_principal` and `layer`. `layer: org` is policy; do not treat personal notes as org policy. `mnemon link` MAY connect another teammate's memory to yours (not owner-scoped). Do not `forget` or "update" someone else's insight. Use `--local` only when deliberately off the team store.
 
 ### Recall — before responding
 

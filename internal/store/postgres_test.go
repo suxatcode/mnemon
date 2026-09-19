@@ -145,6 +145,10 @@ func openPostgresTestDB(t *testing.T) *DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := admin.Ping(); err != nil {
+		admin.Close()
+		t.Skipf("TEST_POSTGRES_URL unreachable: %v", err)
+	}
 	if _, err := admin.Exec("CREATE SCHEMA " + schema); err != nil {
 		admin.Close()
 		t.Fatal(err)

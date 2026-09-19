@@ -1,33 +1,71 @@
 mnemon-server {{ .Chart.AppVersion }}
 
-{{ if .Values.server.tls.enabled }}HTTPS{{ else }}HTTP{{ end }} JSON API: {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}
+{{ if .Values.server.tls.enabled }}HTTPS{{ else }}HTTP{{ end }} JSON API: {{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }} (port name {{ include "mnemon-server.portName" . }})
 Probes: GET /health  GET /ready
 
-Database: {{ if include "mnemon-server.useBundledPostgres" . }}bundled Postgres{{ else if include "mnemon-server.useExternalDatabase" . }}external Postgres DSN{{ else }}SQLite (single replica){{ end }}
+Database: {{ if include "mnemon-server.useExternalDatabase" . }}external Postgres DSN{{ else }}SQLite (single replica; the only in-chart volume){{ end }}
 Replicas: {{ include "mnemon-server.replicas" . }}
 Max insights (per principal, personal layer): {{ .Values.maxInsights }}
 JWT secret: {{ include "mnemon-server.jwtSecretName" . }}
+{{- $hostname := include "mnemon-server.hostname" . }}
+{{- if $hostname }}
+Hostname: {{ $hostname }}
+{{- end }}
 {{- if .Values.server.tls.enabled }}
-TLS secret: {{ include "mnemon-server.tlsSecretName" . }}
+TLS secret: {{ include "mnemon-server.tlsSecretName" . }} (in-pod)
+{{- else }}
+TLS: edge (Ingress / mesh Gateway). Pods speak HTTP.
+{{- end }}
+{{- if .Values.ingress.enabled }}
+Ingress class: {{ .Values.ingress.className | default "(cluster default)" }}
+{{- end }}
+{{- if .Values.certManager.enabled }}
+cert-manager issuer: {{ .Values.certManager.issuerKind }}/{{ .Values.certManager.issuerName }}
 {{- end }}
 
 Issue a user (no restart required). In-pod `MNEMON_DATA_DIR=/data` and, when using Postgres, `MNEMON_DATABASE_URL` already match `serve` — omit `--data-dir` unless you overrode the store path.
 
+{{- $svc := printf "%s:%v" (include "mnemon-server.fullname" .) .Values.service.port }}
+{{- $target := $svc }}
+{{- if $hostname }}
+{{- $target = $hostname }}
+{{- else if not .Values.server.tls.enabled }}
+{{- $target = printf "http://%s" $svc }}
+{{- end }}
+
   kubectl exec -it deploy/{{ include "mnemon-server.fullname" . }} -- \
     mnemon-server user issue \
       --principal alice@team --role user \
-      --server {{ if .Values.server.tls.enabled }}{{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}{{ else }}http://{{ include "mnemon-server.fullname" . }}:{{ .Values.service.port }}{{ end }} \
+      --server {{ $target }} \
       --jwt-key /config/{{ .Values.server.jwtKeyKey }} \
+      {{- if $hostname }}
+      --server-name {{ $hostname }} \
+      {{- else if .Values.server.tls.enabled }}
+      --server-name {{ include "mnemon-server.fullname" . }} \
+      {{- end }}
       {{- if and .Values.server.tls.enabled (include "mnemon-server.mountCA" .) }}
       --ca-file /config/ca.crt \
-      --server-name {{ include "mnemon-server.fullname" . }} \
       {{- end }}
       --out -
 
 Then on the client: mnemon auth login --default invite.json
 
-Production AWS: use values-aws.yaml (or values-rds.yaml) with postgresql.enabled=false, a DSN secret, and optionally server.existingSecret for an HS256 key from External Secrets / AWS Secrets Manager. Users live in Postgres (`principals` and `issued_tokens` tables). Adding a user is an INSERT plus JWT issue; no pod restart.
+From a workstation that can reach Postgres (no kubectl), copy `jwt.key` and the DSN:
+
+  mnemon-server user issue \
+    --database-url "$MNEMON_DATABASE_URL" \
+    --jwt-key ./jwt.key \
+    --principal alice@team --role user \
+    --server {{ $target }} \
+    --out invite.json
+
+Revoke every token for a principal (takes effect immediately):
+
+  kubectl exec deploy/{{ include "mnemon-server.fullname" . }} -- \
+    mnemon-server user revoke --principal bob@team
+
+Postgres is always external. Production: values-aws.yaml (Ingress + cert-manager, HTTP pods), values-istio.yaml (mesh Gateway, HTTP pods), or values-rds.yaml (DSN only). Users live in Postgres (`principals` and `issued_tokens` tables). Adding a user is an INSERT plus JWT issue; no pod restart. Rotating `jwt.key` invalidates every existing token — re-issue after a key change.
 {{- if .Values.ingress.enabled }}
 
-Ingress: {{ (index .Values.ingress.hosts 0).host }}
+Ingress host: {{ $hostname | default "(all hosts)" }}
 {{- end }}

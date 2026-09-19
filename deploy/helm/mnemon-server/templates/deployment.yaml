@@ -6,7 +6,9 @@ metadata:
     app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ include "mnemon-server.replicas" . }}
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
@@ -18,11 +20,29 @@ spec:
         app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: server
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
+      serviceAccountName: {{ include "mnemon-server.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: mnemon-server
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           args:
             - serve
             - --addr={{ .Values.server.addr }}
@@ -47,21 +67,24 @@ spec:
                   name: {{ include "mnemon-server.databaseSecretName" . }}
                   key: {{ include "mnemon-server.databaseSecretKey" . }}
             {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           ports:
-            - name: https
+            - name: {{ include "mnemon-server.portName" . }}
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           livenessProbe:
             httpGet:
               path: /health
-              port: https
+              port: {{ include "mnemon-server.portName" . }}
               scheme: {{ if .Values.server.tls.enabled }}HTTPS{{ else }}HTTP{{ end }}
             initialDelaySeconds: 15
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /ready
-              port: https
+              port: {{ include "mnemon-server.portName" . }}
               scheme: {{ if .Values.server.tls.enabled }}HTTPS{{ else }}HTTP{{ end }}
             initialDelaySeconds: 10
             periodSeconds: 10

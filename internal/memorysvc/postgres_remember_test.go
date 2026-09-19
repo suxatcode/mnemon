@@ -16,6 +16,9 @@ func TestPostgresRememberDoesNotRollback(t *testing.T) {
 	}
 	db, err := store.OpenWithOptions(store.Options{DatabaseURL: url})
 	if err != nil {
+		if strings.Contains(err.Error(), "connect") || strings.Contains(err.Error(), "dial") {
+			t.Skipf("TEST_POSTGRES_URL unreachable: %v", err)
+		}
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })

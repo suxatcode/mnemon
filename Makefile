@@ -85,7 +85,7 @@ codex-eval-smoke: ## Run real Codex app-server eval projection smoke check
 docker-build: ## Build runtime Docker image
 	docker build --target runtime --build-arg VERSION=$(VERSION) -t mnemon-dev/mnemon:$(VERSION) .
 
-docker-build-server: ## Build mnemon-server Docker image
+docker-build-server: ## Build mnemon-server Docker image (local name; publish to ghcr.io/<org>/mnemon-server)
 	docker build --target server --build-arg VERSION=$(VERSION) -t mnemon-dev/mnemon-server:$(VERSION) .
 
 docker-run: ## Run mnemon status in Docker with local .env

@@ -15,22 +15,24 @@
 {{- end -}}
 {{- end -}}
 
+{{/* Public DNS name for Ingress, cert-manager, and client --server. */}}
+{{- define "mnemon-server.hostname" -}}
+{{- if .Values.hostname -}}
+{{- .Values.hostname -}}
+{{- else if and .Values.ingress.enabled .Values.ingress.hosts -}}
+{{- (index .Values.ingress.hosts 0).host -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Postgres is always external: a DSN in values or an existing Secret. */}}
 {{- define "mnemon-server.useExternalDatabase" -}}
 {{- if or .Values.database.url .Values.database.existingSecret -}}
 true
 {{- end -}}
 {{- end -}}
 
-{{- define "mnemon-server.useBundledPostgres" -}}
-{{- if and .Values.postgresql.enabled (not (include "mnemon-server.useExternalDatabase" .)) -}}
-true
-{{- end -}}
-{{- end -}}
-
 {{- define "mnemon-server.usePostgres" -}}
-{{- if or (include "mnemon-server.useExternalDatabase" .) (include "mnemon-server.useBundledPostgres" .) -}}
-true
-{{- end -}}
+{{- include "mnemon-server.useExternalDatabase" . -}}
 {{- end -}}
 
 {{- define "mnemon-server.replicas" -}}
@@ -39,6 +41,10 @@ true
 {{- else -}}
 1
 {{- end -}}
+{{- end -}}
+
+{{- define "mnemon-server.portName" -}}
+{{- if .Values.server.tls.enabled -}}https{{- else -}}http{{- end -}}
 {{- end -}}
 
 {{- define "mnemon-server.appSecretName" -}}
@@ -77,14 +83,6 @@ true
 {{- end -}}
 {{- end -}}
 
-{{- define "mnemon-server.postgresSecretName" -}}
-{{- printf "%s-postgresql" (include "mnemon-server.fullname" .) -}}
-{{- end -}}
-
-{{- define "mnemon-server.postgresHost" -}}
-{{- printf "%s-postgresql" (include "mnemon-server.fullname" .) -}}
-{{- end -}}
-
 {{- define "mnemon-server.databaseSecretName" -}}
 {{- if .Values.database.existingSecret -}}
 {{- .Values.database.existingSecret -}}
@@ -95,16 +93,22 @@ true
 {{- include "mnemon-server.appSecretName" . -}}
 {{- end -}}
 {{- else -}}
-{{- include "mnemon-server.postgresSecretName" . -}}
+{{- printf "%s-database" (include "mnemon-server.fullname" .) -}}
 {{- end -}}
 {{- end -}}
 
 {{- define "mnemon-server.databaseSecretKey" -}}
 {{- if .Values.database.existingSecret -}}
 {{- .Values.database.existingSecretKey | default "url" -}}
-{{- else if .Values.database.url -}}
-url
 {{- else -}}
-database-url
+url
+{{- end -}}
+{{- end -}}
+
+{{- define "mnemon-server.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "mnemon-server.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
 {{- end -}}

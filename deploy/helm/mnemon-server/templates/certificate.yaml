@@ -1,4 +1,12 @@
 {{- if .Values.certManager.enabled }}
+{{- $hostname := include "mnemon-server.hostname" . }}
+{{- $names := .Values.certManager.dnsNames }}
+{{- if and (eq (len $names) 0) $hostname }}
+{{- $names = list $hostname }}
+{{- end }}
+{{- if eq (len $names) 0 }}
+{{- fail "certManager.dnsNames or hostname is required when certManager.enabled is true" }}
+{{- end }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -7,13 +15,26 @@ metadata:
     app.kubernetes.io/name: {{ include "mnemon-server.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: tls
+  {{- with .Values.certManager.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   secretName: {{ default (include "mnemon-server.tlsSecretName" .) .Values.certManager.secretName }}
   issuerRef:
     kind: {{ .Values.certManager.issuerKind }}
-    name: {{ .Values.certManager.issuerName }}
+    name: {{ required "certManager.issuerName is required when certManager.enabled is true" .Values.certManager.issuerName }}
+    {{- with .Values.certManager.issuerGroup }}
+    group: {{ . | quote }}
+    {{- end }}
   dnsNames:
-    {{- range .Values.certManager.dnsNames }}
+    {{- range $names }}
     - {{ . | quote }}
     {{- end }}
+  {{- with .Values.certManager.duration }}
+  duration: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.certManager.renewBefore }}
+  renewBefore: {{ . | quote }}
+  {{- end }}
 {{- end }}

@@ -92,19 +92,32 @@ For host-based Ollama, set `MNEMON_EMBED_ENDPOINT=http://host.docker.internal:11
 
 ## Team memory gateway
 
-Local `mnemon` without a remote stays SQLite (`~/.mnemon`, cap 1000). Helm/AWS runs `mnemon-server` against Postgres. TLS is on by default (HTTPS JSON). Set `server.tls.enabled=false` for HTTP. JWTs are self-issued HS256; the signing key can be chart-generated or an existing Secret (`server.existingSecret`) from External Secrets / AWS Secrets Manager — TLS is independent (`server.tls.existingSecret` or a generated `*-tls` secret).
+Local `mnemon` without a remote stays SQLite (`~/.mnemon`, cap 1000). Helm/AWS runs `mnemon-server` against **external** Postgres. This chart never deploys a Postgres StatefulSet or PVC. The only in-chart volume is optional SQLite.
 
-Recall on a team remote is fully shared (personal notes are write-isolated, not read-isolated). `mnemon link` is not owner-scoped; forget / GC / `--keep` are.
+TLS defaults to in-pod (HTTPS JSON) for bring-up without an Ingress. Set `server.tls.enabled=false` when an edge proxy terminates HTTPS (nginx Ingress, Istio Gateway, ALB) and forwards HTTP. The Service port is named `https` or `http` to match. JWTs are self-issued HS256; the signing key can be chart-generated or an existing Secret (`server.existingSecret`) from External Secrets / AWS Secrets Manager — TLS is independent (`server.tls.existingSecret`, cert-manager, or generated `*-tls`).
+
+Recall on a team remote is fully shared (personal notes are write-isolated, not read-isolated). `mnemon link` is not owner-scoped: it may connect another teammate's memory to yours. Forget / GC / `--keep` are owner-scoped.
 
 Chart defaults (internal bring-up):
 
-- Bundled Postgres StatefulSet
-- `replicaCount: 2`
+- SQLite, `replicaCount` forced to 1, no PVC unless `persistence.enabled`
 - JWT signing key generated in `{release}-app` (or `server.existingSecret`)
-- TLS generated in the same secret, or `{release}-tls` when JWT comes from an existing Secret
+- In-pod TLS generated in the same secret, or `{release}-tls` when JWT comes from an existing Secret
 - Probes on `GET /health` and `GET /ready`
 - `maxInsights: 25000` per principal (personal layer only)
 - `MNEMON_DATA_DIR=/data` in the pod, so `mnemon-server user issue` uses the same SQLite path as `serve` without passing `--data-dir`. Postgres issue uses `MNEMON_DATABASE_URL`.
+
+First-class production knobs:
+
+| Value | Purpose |
+|---|---|
+| `hostname` | DNS name for Ingress host, cert-manager `dnsNames`, and NOTES `--server` |
+| `ingress.enabled` / `ingress.className` | Kubernetes Ingress; class is `nginx`, `alb`, `istio`, … — not hardcoded |
+| `certManager.*` | Optional Certificate CR; does not install cert-manager. Set `issuerName` / `issuerGroup` |
+| `server.tls.enabled` | In-pod TLS. `false` for edge TLS (Istio/Ingress) |
+| `database.url` / `database.existingSecret` | External Postgres DSN. Required for HA (`replicaCount` > 1) |
+| `image.pullSecrets` | Private registry pull |
+| `image.repository` | Production: `ghcr.io/<org>/mnemon-server` (see below) |
 
 Issue a user (takes effect immediately, no pod restart):
 
@@ -112,46 +125,108 @@ Issue a user (takes effect immediately, no pod restart):
 kubectl exec deploy/mnemon -- \
   mnemon-server user issue \
     --principal alice@team --role user \
-    --server mnemon.example.com:7443 \
+    --server mnemon.example.com \
     --server-name mnemon.example.com \
     --jwt-key /config/jwt.key \
-    --ca-file /config/ca.crt \
     --out -
 ```
 
-Issue prints the store path on stderr. On the client: `mnemon auth login --default invite.json`. Use `mnemon --local ...` only to bypass the team store.
+When the chart generated in-pod TLS, also pass `--ca-file /config/ca.crt`. Public Ingress/Let's Encrypt does not need that. Issue prints the store path on stderr. On the client: `mnemon auth login --default invite.json`. Use `mnemon --local ...` only to bypass the team store.
+
+### Container image registry
+
+Prefer **GHCR** (`ghcr.io/suxatcode/mnemon-server`) over Docker Hub (`docker.io`):
+
+- GitHub Packages is free for public images, uses `GITHUB_TOKEN`, and avoids Docker Hub anonymous pull rate limits on CI/Kubernetes.
+- The Go module path stays `github.com/mnemon-dev/mnemon`; the image name can live under the fork that publishes it.
+- `.github/workflows/image.yml` publishes **linux/amd64 and linux/arm64** on `workflow_dispatch` and `v*` tags. After the first run, make the package public under GitHub → Packages. Until then, minikube/Helm keep the local name `mnemon-dev/mnemon-server`.
+
+```bash
+# After this branch is pushed:
+gh workflow run image.yml --ref feat/remote-gateway
+# optional: -f tag=dev
+```
+
+Set `image.repository=ghcr.io/suxatcode/mnemon-server` (and `image.tag`) after the first push. `image.pullSecrets` is only needed for a private package.
 
 ### Minikube integration suite
 
-The suite uses a dedicated profile (`mnemon-gateway`) and does not switch your current kubectl context for other commands. It covers bundled Postgres, external DSN / `database.url` / `values-rds.yaml`, JWT `existingSecret`, Ingress objects, SQLite PVC restart, TLS off, and operator flows (concurrent writes, replica kill, token TTL, GC prune, forged import owner).
+The suite uses a dedicated profile (`mnemon-gateway`) and does not switch your current kubectl context for other commands. It deploys **its own** Postgres Deployment (`ext-pg`) for tests and points Helm at `database.existingSecret`. It covers that DSN, `database.url`, `values-rds.yaml`, `values-istio.yaml` (HTTP, port name `http`, no Ingress), JWT `existingSecret`, Ingress class + hostname, SQLite PVC restart, TLS off, and operator flows (concurrent writes, replica kill, token TTL, GC prune, forged import owner).
 
 ```bash
 make test-minikube
 ```
 
-Optional env: `MINIKUBE_PROFILE`, `SCENARIOS` (comma list: `bundled,external,rds,postgres,jwt-secret,ingress,sqlite,tls-off`), `IMAGE_TAG` (default unique `dev-<timestamp>`), `SKIP_BUILD=1`, `KEEP_CLUSTER=0` (delete the profile at the end).
+Optional env: `MINIKUBE_PROFILE`, `SCENARIOS` (comma list: `postgres,url,rds,jwt-secret,istio,sqlite,tls-off`; `bundled`/`external` alias `postgres`), `IMAGE_TAG` (default unique `dev-<timestamp>`), `SKIP_BUILD=1`, `KEEP_CLUSTER=0` (delete the profile at the end).
 
-### Amazon RDS and AWS secrets (production)
+### Amazon RDS, AWS Ingress, and Istio
 
 DSN-only overlay:
 
 ```bash
 helm upgrade --install mnemon deploy/helm/mnemon-server \
   -f deploy/helm/mnemon-server/values-rds.yaml \
+  --set image.repository=ghcr.io/suxatcode/mnemon-server \
   --set image.tag=dev
 ```
 
-Full AWS overlay (RDS DSN secret, JWT existingSecret, Ingress + cert-manager Certificate):
+AWS overlay (RDS DSN secret, JWT existingSecret, Ingress + cert-manager, **HTTP pods**, edge TLS):
 
 ```bash
 helm upgrade --install mnemon deploy/helm/mnemon-server \
   -f deploy/helm/mnemon-server/values-aws.yaml \
+  --set hostname=mnemon.example.com \
+  --set ingress.className=nginx \
   --set image.tag=dev
 ```
 
-Create `mnemon-db` (`url`) and `mnemon-jwt` (`jwt.key`, ≥32 bytes) first — typically via External Secrets from AWS Secrets Manager. `values-aws.yaml` expects cert-manager to write `mnemon-tls`. Postgres backup/restore stays with RDS; this chart does not ship a backup job.
+Istio / mesh overlay (no in-chart Ingress or Certificate; pods HTTP on port `8080` named `http`):
 
-`values-rds.yaml` / `values-aws.yaml` set `postgresql.enabled: false`. Principals and token `jti` rows live in that Postgres; there is no `users.json`.
+```bash
+helm upgrade --install mnemon deploy/helm/mnemon-server \
+  -f deploy/helm/mnemon-server/values-istio.yaml \
+  --set hostname=mnemon.example.com \
+  --set image.tag=dev
+```
+
+Point your existing Gateway/VirtualService at Service `mnemon:8080`. The chart does not install Istio CRDs.
+
+Create `mnemon-db` (`url`) and, for AWS, `mnemon-jwt` (`jwt.key`, ≥32 bytes) first — typically via External Secrets from AWS Secrets Manager. `values-aws.yaml` expects cert-manager to write `mnemon-tls` for the Ingress. Postgres backup/restore stays with RDS; this chart does not ship a backup job. There is no `users.json`.
+
+The chart creates a non-root ServiceAccount (`automountServiceAccountToken: false`), runs UID/GID 65532 (matching the image), and emits a PodDisruptionBudget when `replicaCount` > 1. Optional HPA: `--set autoscaling.enabled=true` (Postgres only; needs metrics-server).
+
+### Issue, revoke, and JWT rotation
+
+Issue from the pod (NOTES prints the exact command) or from a laptop that can reach Postgres:
+
+```bash
+mnemon-server jwt keygen --out jwt.key   # once; store in mnemon-jwt
+
+mnemon-server user issue \
+  --database-url "$MNEMON_DATABASE_URL" \
+  --jwt-key ./jwt.key \
+  --principal alice@team --role user \
+  --server mnemon.example.com \
+  --out invite.json
+
+mnemon auth login --default invite.json
+```
+
+Revoke every token for one principal without rotating the HMAC key:
+
+```bash
+kubectl exec deploy/mnemon -- mnemon-server user revoke --principal bob@team
+# or, with the DSN on a workstation:
+mnemon-server user revoke --database-url "$MNEMON_DATABASE_URL" --principal bob@team
+```
+
+Rotate the signing key when it may be leaked:
+
+1. Generate a new key (`mnemon-server jwt keygen --out jwt.key`) and write it to `mnemon-jwt` / External Secrets (`jwt.key`, ≥32 bytes).
+2. Restart the server pods so they mount the new key (`kubectl rollout restart deploy/mnemon`). Helm does not restart on an out-of-band Secret mutation.
+3. Every existing JWT fails signature checks immediately. Re-issue each principal with `user issue` as above.
+
+Do not keep the old HMAC key in the cluster after rotation.
 
 ## Release Deployment
 

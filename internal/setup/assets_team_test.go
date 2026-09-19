@@ -21,7 +21,15 @@ func TestSkillAssetsDescribeTeamMemory(t *testing.T) {
 	}
 	for name, body := range files {
 		text := string(body)
-		for _, want := range []string{"team-shared brain", "owner_principal", "layer: org", "--local", "write-isolated"} {
+		for _, want := range []string{
+			"team-shared brain",
+			"owner_principal",
+			"layer: org",
+			"--local",
+			"write-isolated",
+			"another teammate's",
+			"mnemon link",
+		} {
 			if !strings.Contains(text, want) {
 				t.Errorf("%s missing %q", name, want)
 			}

@@ -121,8 +121,12 @@ verbose payloads return the raw score for callers that prefer their own threshol
 
 ### Graph Operations
 
+On a team remote, `mnemon link` may connect any two recallable memories,
+including another teammate's. That is how the shared graph is built. Forget,
+GC, and `--keep` stay owner-scoped.
+
 ```bash
-# Link — create a typed edge
+# Link — typed edge (including a coworker's memory on a team remote)
 mnemon link <source_id> <target_id> --type semantic --weight 0.85
 mnemon link <source_id> <target_id> --type causal --weight 0.8 \
   --meta '{"sub_type":"causes","reason":"..."}'

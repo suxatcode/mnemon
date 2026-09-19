@@ -17,10 +17,14 @@ var (
 
 var linkCmd = &cobra.Command{
 	Use:   "link <source_id> <target_id>",
-	Short: "Create or update an edge between two insights",
-	Long: `Create or update a typed edge between two insights. Used by Claude to create semantic edges after evaluating candidates.
+	Short: "Link two memories, including another teammate's",
+	Long: `Create or update a typed edge between two insights.
 
-Link is not owner-scoped: any two insights the caller can recall may be linked, including another person's. Forget, GC, and --keep remain owner-scoped.`,
+On a team remote this is how the shared graph is built: you may link any two
+insights the caller can recall, including another teammate's. Forget, GC, and
+--keep remain owner-scoped.
+
+Agents use this after evaluating semantic/causal candidates from remember.`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceID := args[0]

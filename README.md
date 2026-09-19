@@ -59,30 +59,18 @@ See [Design & Architecture](docs/DESIGN.md) for details.
 
 ### Install
 
-**Homebrew** (macOS / Linux):
+This fork's team gateway lives on `feat/remote-gateway`. The Go module path is still `github.com/mnemon-dev/mnemon`, so `go install github.com/suxatcode/mnemon@...` will not resolve — clone and `make install`:
 
 ```bash
-brew install mnemon-dev/tap/mnemon
-```
-
-**Go install**:
-
-```bash
-go install github.com/mnemon-dev/mnemon@latest
-```
-
-**From source**:
-
-```bash
-git clone https://github.com/mnemon-dev/mnemon.git && cd mnemon
+git clone -b feat/remote-gateway https://github.com/suxatcode/mnemon.git
+cd mnemon
 make install
-```
-
-**Verify installation**:
-
-```bash
 mnemon --version
 ```
+
+Released upstream (no team gateway): `brew install mnemon-dev/tap/mnemon` or `go install github.com/mnemon-dev/mnemon@latest`.
+
+`mnemon link` on a team remote can connect **anyone's** recallable memories — including a coworker's. That is how the shared graph is built. Recall is team-visible; forget/update stay owner-scoped. Helm never bundles Postgres; see [Deployment](docs/DEPLOYMENT.md).
 
 ### Claude Code
 

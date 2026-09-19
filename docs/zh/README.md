@@ -59,30 +59,18 @@ Mnemon 同时填补了协议栈中的空白。MCP 标准化了 LLM 如何发现�
 
 ### 安装
 
-**Homebrew**（macOS / Linux）：
+本 fork 的团队网关在 `feat/remote-gateway` 分支。Go module 路径仍是 `github.com/mnemon-dev/mnemon`，因此 `go install github.com/suxatcode/mnemon@...` 无法解析 — 请 clone 后 `make install`：
 
 ```bash
-brew install mnemon-dev/tap/mnemon
-```
-
-**Go install**：
-
-```bash
-go install github.com/mnemon-dev/mnemon@latest
-```
-
-**从源码构建**：
-
-```bash
-git clone https://github.com/mnemon-dev/mnemon.git && cd mnemon
+git clone -b feat/remote-gateway https://github.com/suxatcode/mnemon.git
+cd mnemon
 make install
-```
-
-**验证安装**：
-
-```bash
 mnemon --version
 ```
+
+上游已发布版本（无团队网关）：`brew install mnemon-dev/tap/mnemon` 或 `go install github.com/mnemon-dev/mnemon@latest`。
+
+在团队远端上，`mnemon link` 可以连接**任何人**可召回的记忆 — 包括同事的。这是共享图的构建方式。召回对全队可见；forget/update 仍按所有者隔离。Helm **不会**捆绑 Postgres，见 [部署](../DEPLOYMENT.md)。
 
 ### Claude Code
 
