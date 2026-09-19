@@ -139,7 +139,7 @@ Prefer **GHCR** (`ghcr.io/suxatcode/mnemon-server`) over Docker Hub (`docker.io`
 
 - GitHub Packages is free for public images, uses `GITHUB_TOKEN`, and avoids Docker Hub anonymous pull rate limits on CI/Kubernetes.
 - The Go module path stays `github.com/mnemon-dev/mnemon`; the image name can live under the fork that publishes it.
-- `.github/workflows/image.yml` publishes **linux/amd64 and linux/arm64** on `workflow_dispatch` and `v*` tags. After the first run, make the package public under GitHub → Packages. Until then, minikube/Helm keep the local name `mnemon-dev/mnemon-server`.
+- `.github/workflows/image.yml` publishes **linux/amd64 and linux/arm64** on pushes to `feat/remote-gateway`, `workflow_dispatch`, and `v*` tags. After the first run, make the package public under GitHub → Packages. Until then, minikube/Helm keep the local name `mnemon-dev/mnemon-server`.
 
 ```bash
 # After this branch is pushed:
