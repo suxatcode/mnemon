@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Image tag (default: git sha)
+        description: "Image tag (default: git sha)"
         required: false
         default: ""
   push:
@@ -28,7 +28,7 @@ jobs:
         run: |
           owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
           echo "image=ghcr.io/${owner}/mnemon-server" >> "$GITHUB_OUTPUT"
-          tag="${{ github.event.inputs.tag }}"
+          tag="${{ inputs.tag }}"
           if [ -z "$tag" ]; then
             if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
               tag="${GITHUB_REF_NAME}"
