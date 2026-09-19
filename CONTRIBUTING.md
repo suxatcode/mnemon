@@ -52,22 +52,22 @@ Prefix with a verb in imperative form. The CHANGELOG filter excludes `docs:`, `t
 
 ## Submitting Changes
 
-1. Fork the repository and create a feature branch from `master`.
+1. Fork the repository and create a feature branch from `main`.
 2. Make your changes and ensure `make unit` and `make test` pass.
 3. Update documentation (USAGE.md, DESIGN.md, or README) if your change affects user-facing behavior.
 4. For user-facing changes, describe the release-note impact in the PR body. Maintainers update `CHANGELOG.md` during release preparation unless they explicitly ask for a changelog entry in the PR.
-5. Open a pull request against `master`.
+5. Open a pull request against `main`.
 
 ## Releasing
 
-Releases are fully automated. Maintainers tag and push:
+Releases are automated. Maintainers tag and push:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
-This triggers GitHub Actions → runs tests → builds cross-platform binaries via GoReleaser → publishes a GitHub Release → updates the Homebrew tap.
+This runs tests, publishes GitHub Release binaries, the GHCR image, and the Helm chart. There is no Homebrew formula for this fork yet.
 
 ## License
 
