@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
 )
 
 // An oversize ingest body must be rejected at the edge (a 400), not buffered into memory and decoded.

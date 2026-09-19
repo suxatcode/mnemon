@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/kernel"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
 )
 
 // TestP2ChannelEndToEnd is the P2 gate's positive path: a runtime booted with ONE in-memory binding

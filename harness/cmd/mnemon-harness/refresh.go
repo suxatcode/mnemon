@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
+	"github.com/suxatcode/mnemon/harness/internal/app"
 	"github.com/spf13/cobra"
 )
 

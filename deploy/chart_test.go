@@ -107,7 +107,7 @@ func TestHelmChartMetadata(t *testing.T) {
 	text := string(chart)
 	for _, want := range []string{
 		"name: mnemon-server",
-		"version: 0.1.1",
+		"version: 1.0.0",
 		"home: https://github.com/suxatcode/mnemon",
 		"org.opencontainers.image.source: https://github.com/suxatcode/mnemon",
 	} {

@@ -8,9 +8,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/hostsurface"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // Driver drives one runtime's background duties. reproject is invoked only when a Tick actually

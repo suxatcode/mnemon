@@ -3,7 +3,7 @@ package reconcile
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // #4: a decision must carry the triggering event's IngestSeq (event<->decision audit link).

@@ -3,7 +3,7 @@ package channel
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // ClampRefs is the ONE scope-clamp for the binding ceiling (pull / sync / status previously carried

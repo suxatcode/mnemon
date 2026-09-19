@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
-	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/model"
 )
 
 // DiffSuggestion classifies how a new fact relates to existing content.

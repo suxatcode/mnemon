@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // loopdefActivator is the well-known principal under which a booting daemon records that a

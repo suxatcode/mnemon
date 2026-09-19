@@ -9,8 +9,8 @@
 **LLM-supervised persistent memory for AI agents.**
 
 [![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-[![CI](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mnemon-dev/mnemon)](https://goreportcard.com/report/github.com/mnemon-dev/mnemon)
+[![CI](https://github.com/suxatcode/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/suxatcode/mnemon/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/suxatcode/mnemon)](https://goreportcard.com/report/github.com/suxatcode/mnemon)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
 ---
@@ -59,31 +59,26 @@ See [Design & Architecture](docs/DESIGN.md) for details.
 
 ### Install
 
-This fork's team gateway lives on `feat/remote-gateway`. The Go module path is still `github.com/mnemon-dev/mnemon`, so `go install github.com/suxatcode/mnemon@...` will not resolve — clone and `make install`:
-
 ```bash
-git clone -b feat/remote-gateway https://github.com/suxatcode/mnemon.git
-cd mnemon
-make install
+go install github.com/suxatcode/mnemon@v1.0.0
+# or: git clone https://github.com/suxatcode/mnemon.git && cd mnemon && make install
 mnemon --version
 ```
 
-Released upstream (no team gateway): `brew install mnemon-dev/tap/mnemon` or `go install github.com/mnemon-dev/mnemon@latest`.
-
-`mnemon link` on a team remote can connect **anyone's** recallable memories — including a coworker's. That is how the shared graph is built. Recall is team-visible; forget/update stay owner-scoped. Helm never bundles Postgres.
-
-This fork publishes the **server image** and **Helm chart** to GitHub Container Registry under `suxatcode` (not the `mnemon-dev` org, not Docker Hub):
+This is the **suxatcode** fork (`github.com/suxatcode/mnemon`). Team gateway is on `main` (v1.0.0).
 
 | Artifact | Location |
 |---|---|
-| Server image | [`ghcr.io/suxatcode/mnemon-server`](https://github.com/suxatcode/mnemon/pkgs/container/mnemon-server) — tags `:dev` and `:<12-char-sha>`, linux/amd64 + linux/arm64 |
+| Server image | [`ghcr.io/suxatcode/mnemon-server`](https://github.com/suxatcode/mnemon/pkgs/container/mnemon-server) — `:dev` (main), `:1.0.0` (release) |
 | Helm chart | `oci://ghcr.io/suxatcode/charts/mnemon-server` ([package](https://github.com/suxatcode/mnemon/pkgs/container/charts%2Fmnemon-server)) |
 
 ```bash
-helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.1
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 1.0.0
 ```
 
-Public defaults: resources are named `mnemon` (Service/Deployment, not `mnemon-mnemon-server`), and the pod pulls `ghcr.io/suxatcode/mnemon-server:dev`. See [Deployment](docs/DEPLOYMENT.md).
+Resources are named `mnemon`. Pin `--version 1.0.0` in production (`:dev` is floating). Dev vs production hosting: [Deployment](docs/DEPLOYMENT.md).
+
+`mnemon link` on a team remote can connect **anyone's** recallable memories — including a coworker's. Recall is team-visible; forget/update stay owner-scoped. Helm never bundles Postgres.
 
 ### Claude Code
 

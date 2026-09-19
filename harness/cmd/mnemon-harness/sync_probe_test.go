@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 	"github.com/spf13/cobra"
 )
 

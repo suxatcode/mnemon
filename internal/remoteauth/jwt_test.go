@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 func TestJWTValidExpiredRevokedAndForgedSub(t *testing.T) {

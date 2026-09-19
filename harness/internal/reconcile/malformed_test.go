@@ -3,7 +3,7 @@ package reconcile
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // #3: a malformed boundary event (no decodable "writes" in the payload) must reconcile to a Rejected

@@ -3,7 +3,7 @@ package kernel
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // A multi-write op must target DISTINCT resources (Invariant #5: multi-RESOURCE all-or-nothing). If two

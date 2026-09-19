@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // maxSyncBodyBytes caps a sync request body so an oversize batch is rejected at the edge rather

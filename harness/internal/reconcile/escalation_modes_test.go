@@ -3,7 +3,7 @@ package reconcile
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // Round-2 MED: the durable escalation count must count ONLY rebase deferrals (NextAction=="rebase"),

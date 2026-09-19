@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/internal/setup"
-	"github.com/mnemon-dev/mnemon/internal/setup/assets"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/setup"
+	"github.com/suxatcode/mnemon/internal/setup/assets"
+	"github.com/suxatcode/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
 

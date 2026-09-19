@@ -3,7 +3,7 @@ package reconcile
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // #1: the reconciler cursor must be durable. A fresh Reconciler over the same store (a "restart") must

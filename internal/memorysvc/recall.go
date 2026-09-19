@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
-	"github.com/mnemon-dev/mnemon/internal/graph"
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/search"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/graph"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/search"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 type compactResult struct {

@@ -6,8 +6,8 @@ package rule
 import (
 	"fmt"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/projection"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/projection"
 )
 
 // RuleInput is the typed, read-only input to a rule: the triggering event and the scoped projection it was

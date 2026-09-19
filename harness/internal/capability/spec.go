@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // CapabilitySpec is the DATA form of a built-in capability: what a capability author declares in

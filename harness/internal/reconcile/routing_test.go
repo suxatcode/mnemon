@@ -3,7 +3,7 @@ package reconcile
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // R2#2: the event log carries BOTH observations and proposed operations. A non-proposal (observation)

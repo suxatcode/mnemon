@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
 )
 
 // RiskEvidenceGate is the mid-risk governance gate (P3 three-tier risk): a candidate for this

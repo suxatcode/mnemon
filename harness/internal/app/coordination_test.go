@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // P3a: the AgentTeam coordination kinds (project_intent/assignment/progress_digest) are ordinary

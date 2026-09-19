@@ -10,7 +10,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/model"
 )
 
 func TestDisplayPathRedactsPassword(t *testing.T) {

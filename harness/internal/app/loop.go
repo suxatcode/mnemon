@@ -11,11 +11,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
-	"github.com/mnemon-dev/mnemon/harness/internal/capability"
-	"github.com/mnemon-dev/mnemon/harness/internal/hostsurface"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
-	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/capability"
+	"github.com/suxatcode/mnemon/harness/internal/hostsurface"
+	"github.com/suxatcode/mnemon/harness/internal/kernel"
+	"github.com/suxatcode/mnemon/harness/internal/manifest"
 )
 
 // LoopValidate validates the embedded harness loop/host/binding manifests unconditionally, then —

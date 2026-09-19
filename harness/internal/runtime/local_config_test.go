@@ -1,11 +1,11 @@
 package runtime
 
 import (
-	"github.com/mnemon-dev/mnemon/harness/internal/capability"
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/capability"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/kernel"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
 )
 
 // localRuntimeConfigT mirrors app.LocalRuntimeConfigFromBindings for the runtime-level integration

@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // review #5: the content digest (D8), budget reserve (S6), and lease TTL read need a resource's FIELD

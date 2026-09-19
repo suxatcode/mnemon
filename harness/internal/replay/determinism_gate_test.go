@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/capability"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/capability"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/kernel"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 const gateActor = contract.ActorID("codex@project")

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // The T2 security baseline (locked decision 4 / v1.1), pinned at the wire the standalone hub

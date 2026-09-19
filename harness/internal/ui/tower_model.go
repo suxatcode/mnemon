@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
+	"github.com/suxatcode/mnemon/harness/internal/app"
 )
 
 // TowerPage is one of the Control Tower's four pages (§3.3 IA).

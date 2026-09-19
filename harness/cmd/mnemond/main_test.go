@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
+	"github.com/suxatcode/mnemon/harness/internal/app"
 )
 
 // Boot smoke: without setup artifacts the daemon refuses with the SAME product remediation

@@ -18,8 +18,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/store"
-	"github.com/mnemon-dev/mnemon/harness/internal/syncserver"
+	"github.com/suxatcode/mnemon/harness/internal/store"
+	"github.com/suxatcode/mnemon/harness/internal/syncserver"
 )
 
 func main() {

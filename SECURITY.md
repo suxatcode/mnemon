@@ -5,7 +5,7 @@
 If you discover a security vulnerability in Mnemon, please report it responsibly:
 
 1. **Do NOT open a public GitHub issue.**
-2. Use [GitHub Security Advisories](https://github.com/mnemon-dev/mnemon/security/advisories/new) to report privately.
+2. Use [GitHub Security Advisories](https://github.com/suxatcode/mnemon/security/advisories/new) to report privately.
 3. Include steps to reproduce, affected versions, and potential impact.
 
 We will acknowledge receipt within 48 hours and aim to release a fix within 7 days for critical issues.

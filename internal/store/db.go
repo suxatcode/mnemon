@@ -13,7 +13,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/mnemon-dev/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/embed"
 	_ "modernc.org/sqlite"
 )
 

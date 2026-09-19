@@ -3,10 +3,10 @@ package runtime
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
-	"github.com/mnemon-dev/mnemon/harness/internal/store"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/kernel"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/store"
 )
 
 // The bridge must stamp the PRODUCING rule's actor. r1 (alice) and r2 (bob) share the same (handles, emits),

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
-	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/manifest"
 )
 
 type CodexOptions struct {

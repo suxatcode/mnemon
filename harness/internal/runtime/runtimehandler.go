@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // NewRuntimeHandler is the Local Mnemon HTTP channel endpoint over a Runtime.

@@ -4,7 +4,7 @@
 
 BINARY      := mnemon
 VERSION     ?= dev
-LDFLAGS     := -s -w -X github.com/mnemon-dev/mnemon/cmd.version=$(VERSION)
+LDFLAGS     := -s -w -X github.com/suxatcode/mnemon/cmd.version=$(VERSION)
 GOBIN       := $(shell go env GOBIN)
 ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin

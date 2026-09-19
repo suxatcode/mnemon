@@ -60,7 +60,7 @@ func TestGuardLogicIsNotVacuous(t *testing.T) {
 	}
 	hit := false
 	for _, forbid := range forbiddenImports {
-		if strings.Contains("github.com/mnemon-dev/mnemon/harness/internal/app", forbid) {
+		if strings.Contains("github.com/suxatcode/mnemon/harness/internal/app", forbid) {
 			hit = true
 		}
 	}

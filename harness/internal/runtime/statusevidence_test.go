@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // TestChannelStatusEvidence pins P2.3: status is richer than a pull alias — it carries the binding

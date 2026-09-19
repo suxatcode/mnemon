@@ -3,7 +3,7 @@ package kernel
 import (
 	"fmt"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // AuthorityRules.Enforce takes NO Version (authorization is not concurrency, Invariant #11).

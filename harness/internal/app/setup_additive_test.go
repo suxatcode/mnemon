@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
 )
 
 // Installing skill after memory for the same principal must be ADDITIVE: the binding keeps the memory

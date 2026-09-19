@@ -1,4 +1,4 @@
-module github.com/mnemon-dev/mnemon
+module github.com/suxatcode/mnemon
 
 go 1.25.0
 

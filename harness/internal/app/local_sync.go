@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/capability"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/remotesync"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/capability"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/remotesync"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // ImportLocalSyncPull re-enters pulled remote commits through Event Intake (the import runtime), then

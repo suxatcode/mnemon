@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // S1: exactly-once ingest. A retried (Source,ExternalID) returns the same seq and never double-applies.

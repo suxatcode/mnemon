@@ -23,10 +23,10 @@ func TestHubImportBoundaryExcludesLocalTrustDomain(t *testing.T) {
 		t.Fatalf("go list -deps: %v\n%s", err, out)
 	}
 	forbidden := map[string]bool{
-		"github.com/mnemon-dev/mnemon/harness/internal/channel":     true,
-		"github.com/mnemon-dev/mnemon/harness/internal/runtime":     true,
-		"github.com/mnemon-dev/mnemon/harness/internal/app":         true,
-		"github.com/mnemon-dev/mnemon/harness/internal/hostsurface": true,
+		"github.com/suxatcode/mnemon/harness/internal/channel":     true,
+		"github.com/suxatcode/mnemon/harness/internal/runtime":     true,
+		"github.com/suxatcode/mnemon/harness/internal/app":         true,
+		"github.com/suxatcode/mnemon/harness/internal/hostsurface": true,
 	}
 	for _, dep := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		if forbidden[strings.TrimSpace(dep)] {

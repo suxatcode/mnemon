@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 func (s *Service) Status(actor Actor) (Result, error) {

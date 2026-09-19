@@ -5,12 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mnemon-dev/mnemon/internal/memorysvc"
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/remoteauth"
-	"github.com/mnemon-dev/mnemon/internal/remoteclient"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/memorysvc"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteauth"
+	"github.com/suxatcode/mnemon/internal/remoteclient"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 func authConfigPath() string {

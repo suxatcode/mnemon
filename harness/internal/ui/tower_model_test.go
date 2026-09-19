@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/app"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 func sampleView() app.TowerView {

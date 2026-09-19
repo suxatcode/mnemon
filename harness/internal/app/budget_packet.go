@@ -1,9 +1,9 @@
 package app
 
 import (
-	"github.com/mnemon-dev/mnemon/harness/internal/capability"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/projection"
+	"github.com/suxatcode/mnemon/harness/internal/capability"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/projection"
 )
 
 // budgetShapeProjection returns a copy of proj whose per-resource Content is shaped to the subscriber's

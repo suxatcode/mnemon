@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 func TestBuildReceiptOmitsRawDetails(t *testing.T) {

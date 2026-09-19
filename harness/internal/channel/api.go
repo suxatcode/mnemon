@@ -1,8 +1,8 @@
 package channel
 
 import (
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/projection"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/projection"
 )
 
 // ServerAPI is the edge<->server boundary (D5). Production HTTP/gRPC+mTLS is a thin adapter over it

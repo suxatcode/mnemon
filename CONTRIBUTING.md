@@ -14,7 +14,7 @@ For significant features or architectural changes, please **open an issue first*
 ## Development Setup
 
 ```bash
-git clone https://github.com/mnemon-dev/mnemon.git
+git clone https://github.com/suxatcode/mnemon.git
 cd mnemon
 make build
 ```

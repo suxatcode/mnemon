@@ -22,7 +22,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
+	"github.com/suxatcode/mnemon/harness/internal/app"
 )
 
 func main() {

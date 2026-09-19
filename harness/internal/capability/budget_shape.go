@@ -1,6 +1,6 @@
 package capability
 
-import "github.com/mnemon-dev/mnemon/harness/internal/contract"
+import "github.com/suxatcode/mnemon/harness/internal/contract"
 
 // Budget item caps per tier (P4b). REDUCER-FREE by construction: a tier bounds the COUNT of items the
 // local mirror renders (most-recent-first), never a model summary (which would be a reducer — out of

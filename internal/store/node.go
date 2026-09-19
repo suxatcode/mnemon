@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/model"
 )
 
 // Lifecycle constants

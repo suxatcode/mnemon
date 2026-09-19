@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
 )
 
 func TestPrintRemoteResponseWritesWarnings(t *testing.T) {

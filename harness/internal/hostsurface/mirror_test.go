@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/projection"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/projection"
 )
 
 func mirrorProj(tag string) projection.Projection {

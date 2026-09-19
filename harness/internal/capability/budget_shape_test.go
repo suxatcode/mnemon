@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // makeItems builds n id-bearing items (id-bearing because itemsFromFields requires a non-empty id),

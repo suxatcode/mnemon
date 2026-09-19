@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
 )
 
 // bareMnemonCLI matches an invocation of the legacy `mnemon` binary (a space-delimited command), but

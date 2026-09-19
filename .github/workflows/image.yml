@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag (default: git sha)"
+        description: "Image tag (default: git sha on main, version on tags)"
         required: false
         default: ""
   push:
     branches:
-      - feat/remote-gateway
+      - main
     tags:
       - "v*"
 
@@ -18,7 +18,26 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Test
+        run: go test ./...
+
   image:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,16 +46,25 @@ jobs:
         id: meta
         run: |
           owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-          echo "image=ghcr.io/${owner}/mnemon-server" >> "$GITHUB_OUTPUT"
+          image="ghcr.io/${owner}/mnemon-server"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
           tag="${{ inputs.tag }}"
           if [ -z "$tag" ]; then
             if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-              tag="${GITHUB_REF_NAME}"
+              tag="${GITHUB_REF_NAME#v}"
             else
               tag="${GITHUB_SHA::12}"
             fi
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          {
+            echo "tags<<EOF"
+            echo "${image}:${tag}"
+            if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+              echo "${image}:dev"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -59,14 +87,14 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
-            ${{ steps.meta.outputs.image }}:dev
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             VERSION=${{ steps.meta.outputs.tag }}
             GO_VERSION=1.25.3
 
   chart:
+    needs: test
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,14 +115,23 @@ jobs:
         run: |
           set -euo pipefail
           owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          ver="${GITHUB_REF_NAME#v}"
+          python3 -c "
+          from pathlib import Path
+          p = Path('deploy/helm/mnemon-server/values.yaml')
+          text = p.read_text()
+          old = '  tag: dev'
+          new = '  tag: ${ver}'
+          if old not in text:
+              raise SystemExit('image.tag: dev not found in values.yaml')
+          p.write_text(text.replace(old, new, 1))
+          "
           helm lint deploy/helm/mnemon-server
           mkdir -p /tmp/charts
-          pkg_args=(deploy/helm/mnemon-server --destination /tmp/charts)
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            ver="${GITHUB_REF_NAME#v}"
-            pkg_args+=(--version "$ver" --app-version "$ver")
-          fi
-          helm package "${pkg_args[@]}"
+          helm package deploy/helm/mnemon-server \
+            --version "$ver" \
+            --app-version "$ver" \
+            --destination /tmp/charts
           shopt -s nullglob
           files=(/tmp/charts/mnemon-server-*.tgz)
           if [ "${#files[@]}" -ne 1 ]; then

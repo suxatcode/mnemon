@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
-	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/manifest"
 )
 
 // corePaths is the host config dir + the project-local mnemon state dir.

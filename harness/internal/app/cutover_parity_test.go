@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assembler"
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/assembler"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // The boot path (LocalRuntimeConfigFromBindings) must produce decision-equivalent outcomes to direct

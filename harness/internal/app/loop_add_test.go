@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/capability"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
+	"github.com/suxatcode/mnemon/harness/internal/capability"
+	"github.com/suxatcode/mnemon/harness/internal/kernel"
 )
 
 const widgetPackageSpec = `{"schema_version":1,"name":"widget","observed_type":"widget.write_candidate.observed",

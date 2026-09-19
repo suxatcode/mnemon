@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-19
+
+First release of this fork (`github.com/suxatcode/mnemon`). Adds the team memory gateway (`mnemon-server`), Helm/OCI on GHCR, and Postgres as the production store.
+
 ## [0.1.14] - 2026-06-08
 
 ### Added
@@ -241,7 +245,8 @@ Initial public release.
 - Release pipeline: GoReleaser, GitHub Actions, Homebrew tap
 - Comprehensive documentation with Chinese translations
 
-[Unreleased]: https://github.com/mnemon-dev/mnemon/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/suxatcode/mnemon/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/suxatcode/mnemon/releases/tag/v1.0.0
 [0.1.14]: https://github.com/mnemon-dev/mnemon/compare/v0.1.13...v0.1.14
 [0.1.11]: https://github.com/mnemon-dev/mnemon/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/mnemon-dev/mnemon/compare/v0.1.9...v0.1.10

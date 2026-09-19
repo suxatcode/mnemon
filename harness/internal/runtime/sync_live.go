@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // Live-store sync passthroughs (v1.1 #2): the in-process sync worker operates the ALREADY-OPEN

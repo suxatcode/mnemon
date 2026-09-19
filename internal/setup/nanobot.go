@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mnemon-dev/mnemon/internal/setup/assets"
+	"github.com/suxatcode/mnemon/internal/setup/assets"
 )
 
 // NanobotWriteSkill writes the SKILL.md to the nanobot skills directory.

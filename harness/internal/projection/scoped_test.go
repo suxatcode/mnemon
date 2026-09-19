@@ -3,7 +3,7 @@ package projection
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // S9: a scoped view contains ONLY the subscription's refs — an out-of-scope resource never appears.

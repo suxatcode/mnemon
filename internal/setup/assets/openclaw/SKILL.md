@@ -7,14 +7,9 @@ metadata:
     requires:
       bins: ["mnemon"]
     install:
-      - id: "brew"
-        kind: "brew"
-        formula: "mnemon-dev/tap/mnemon"
-        bins: ["mnemon"]
-        label: "Install mnemon (Homebrew)"
       - id: "go"
         kind: "go"
-        package: "github.com/mnemon-dev/mnemon@latest"
+        package: "github.com/suxatcode/mnemon@v1.0.0"
         bins: ["mnemon"]
         label: "Install mnemon (go install)"
 ---
@@ -25,16 +20,8 @@ metadata:
 
 ### 1. Install the binary
 
-**Homebrew** (macOS / Linux):
-
 ```bash
-brew install mnemon-dev/tap/mnemon
-```
-
-**Go install**:
-
-```bash
-go install github.com/mnemon-dev/mnemon@latest
+go install github.com/suxatcode/mnemon@v1.0.0
 ```
 
 ### 2. Set up OpenClaw integration

@@ -3,7 +3,7 @@ package replay
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // replay 必须在与 live server 完全相同的模式下归约,否则重放可接受 live 已拒绝的冲突

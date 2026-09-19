@@ -12,7 +12,7 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X github.com/mnemon-dev/mnemon/cmd.version={{.Version}}
+      - -s -w -X github.com/suxatcode/mnemon/cmd.version={{.Version}}
     goos:
       - linux
       - darwin
@@ -44,34 +44,10 @@ changelog:
       - "^ci:"
       - "^chore:"
       - "^Merge"
-      # Harness modules and evaluations are still experimental. Keep them out of
-      # stable release notes until their public contract is ready.
-      - "(?i)harness"
-      - "(?i)eval"
-      - "(?i)codex app-server"
-      - "(?i)skill loop"
-      - "(?i)memory loop"
-      - "(?i)modular"
-      - "(?i)self-evolution"
-      - "(?i)agent memory"
-
-brews:
-  - repository:
-      owner: mnemon-dev
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
-    homepage: "https://github.com/mnemon-dev/mnemon"
-    description: "Persistent memory for LLM agents"
-    license: "Apache-2.0"
-    test: |
-      system "#{bin}/mnemon", "--version"
-    install: |
-      bin.install "mnemon"
 
 release:
   github:
-    owner: mnemon-dev
+    owner: suxatcode
     name: mnemon
   draft: false
   prerelease: auto

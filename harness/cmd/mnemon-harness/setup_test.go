@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
 )
 
 func TestSetupProductFlagsSelectLoops(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // ChannelBinding.ClampRefs must DELEGATE to contract.ClampRefs — the ONE clamp implementation the

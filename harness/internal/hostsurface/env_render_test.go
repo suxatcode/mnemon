@@ -3,8 +3,8 @@ package hostsurface
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
-	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/manifest"
 )
 
 // The declared env (loop.json env) must render env.sh byte-identically to the retired hardcoded

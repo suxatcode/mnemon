@@ -3,10 +3,10 @@ package runtime
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/kernel"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
-	"github.com/mnemon-dev/mnemon/harness/internal/store"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/kernel"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/store"
 )
 
 // The wire boundary (channel.ServerAPI.Ingest) admits ONLY observations. A *.proposed / *.diagnostic is an INTERNAL

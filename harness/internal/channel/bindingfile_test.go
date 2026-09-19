@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 func TestLoadBindingFile(t *testing.T) {

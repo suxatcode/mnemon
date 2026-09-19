@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/model"
 )
 
 func TestTokenize_English(t *testing.T) {

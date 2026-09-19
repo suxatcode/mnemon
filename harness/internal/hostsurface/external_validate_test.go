@@ -5,7 +5,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
+	"github.com/suxatcode/mnemon/harness/internal/manifest"
 )
 
 // loop-package-v2 external-trust rules (PD3/PD4): an external package's host assets are screened at

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // The T2 downgrade gate (v1.1 #3): plaintext is allowed only inside the loopback boundary; a

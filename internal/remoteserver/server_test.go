@@ -1,6 +1,7 @@
 package remoteserver
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -18,12 +19,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/memorysvc"
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/remoteauth"
-	"github.com/mnemon-dev/mnemon/internal/remoteclient"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/memorysvc"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteauth"
+	"github.com/suxatcode/mnemon/internal/remoteclient"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 func writeTestCert(t *testing.T, dir string) (certPath, keyPath, caPath string) {
@@ -352,5 +353,46 @@ func TestHealthOK(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Fatalf("health: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHTTPServerTimeouts(t *testing.T) {
+	srv := newHTTPServer(":0", http.NotFoundHandler())
+	if srv.ReadHeaderTimeout != readHeaderTimeout {
+		t.Fatalf("ReadHeaderTimeout=%v", srv.ReadHeaderTimeout)
+	}
+	if srv.ReadTimeout != readTimeout {
+		t.Fatalf("ReadTimeout=%v", srv.ReadTimeout)
+	}
+	if srv.IdleTimeout != idleTimeout {
+		t.Fatalf("IdleTimeout=%v", srv.IdleTimeout)
+	}
+}
+
+func TestServeGracefulShutdown(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "jwt.key")
+	if err := os.WriteFile(keyPath, []byte("0123456789abcdef0123456789abcdef\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	errc := make(chan error, 1)
+	go func() {
+		errc <- serve(ctx, ServeOptions{
+			Addr:        "127.0.0.1:0",
+			DataDir:     dir,
+			JWTKeyFile:  keyPath,
+			MaxInsights: 100,
+		})
+	}()
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-errc:
+		if err != nil {
+			t.Fatalf("serve shutdown: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not shut down")
 	}
 }

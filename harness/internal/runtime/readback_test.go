@@ -3,8 +3,8 @@ package runtime
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
 )
 
 // S9/D7: a pull is scoped to the subscription and identity-bound — sub.Actor must equal the authenticated

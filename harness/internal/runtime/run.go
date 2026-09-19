@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
 )
 
 // DefaultStorePath is the canonical Local Mnemon kernel-store path under the

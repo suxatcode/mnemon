@@ -3,7 +3,7 @@ package rule
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // The reducer must carry the PRODUCING rule's actor on the reduced decision, so the server stamps the bridge

@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
 )
 
 // Rerunning setup with --token=false must CLEAR the binding's token credential, not keep the old one.

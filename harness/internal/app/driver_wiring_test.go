@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/driver"
-	"github.com/mnemon-dev/mnemon/harness/internal/store"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/driver"
+	"github.com/suxatcode/mnemon/harness/internal/store"
 )
 
 func setupHost(t *testing.T, root, host string) {

@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
 )
 
 const HashPrefix = "sha256:"

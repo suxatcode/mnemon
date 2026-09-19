@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
-	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/model"
 )
 
 // testDB creates a fresh SQLite database in a temp directory, auto-closed on test cleanup.

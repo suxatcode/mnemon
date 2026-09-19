@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 // Maximum number of existing nodes to link per entity (avoid hot-entity explosion).

@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/autopilot"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/autopilot"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // Roles used by the scripted-brain tests. They are ordinary host-agent principals from

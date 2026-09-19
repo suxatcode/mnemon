@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
+	"github.com/suxatcode/mnemon/harness/internal/app"
 )
 
 // P6c: the vocabulary lint (in the gates — it is an ordinary go test). The Control Tower speaks the

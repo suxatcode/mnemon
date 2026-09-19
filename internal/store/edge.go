@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/model"
 )
 
 // InsertEdge inserts or replaces an edge.

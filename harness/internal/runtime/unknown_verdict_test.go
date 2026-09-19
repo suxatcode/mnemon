@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
 )
 
 // S7 fail-closed (new with the job-lane removal): a rule that returns an UNKNOWN verdict string —

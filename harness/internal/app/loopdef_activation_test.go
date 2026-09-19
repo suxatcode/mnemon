@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // P3e-4: booting with a materialized loopdef package records a G4 activation event in the log,

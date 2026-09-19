@@ -1,8 +1,8 @@
 package graph
 
 import (
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 // BFSNode represents a node discovered during BFS traversal.

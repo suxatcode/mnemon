@@ -3,7 +3,7 @@ package kernel
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // D3/S5/S6: lease and budget are first-class versioned resources. Their per-resource Version IS the

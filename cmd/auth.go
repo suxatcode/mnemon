@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/remoteauth"
-	"github.com/mnemon-dev/mnemon/internal/remoteclient"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteauth"
+	"github.com/suxatcode/mnemon/internal/remoteclient"
 	"github.com/spf13/cobra"
 )
 

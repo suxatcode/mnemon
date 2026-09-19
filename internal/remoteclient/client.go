@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
 )
 
 type Client struct {

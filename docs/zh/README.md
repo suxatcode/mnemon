@@ -9,8 +9,8 @@
 **LLM 智能体的持久记忆系统** — LLM 监督式、钩子集成、四图架构。
 
 [![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-[![CI](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/mnemon-dev/mnemon/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mnemon-dev/mnemon)](https://goreportcard.com/report/github.com/mnemon-dev/mnemon)
+[![CI](https://github.com/suxatcode/mnemon/actions/workflows/ci.yml/badge.svg)](https://github.com/suxatcode/mnemon/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/suxatcode/mnemon)](https://goreportcard.com/report/github.com/suxatcode/mnemon)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
 ---
@@ -59,31 +59,26 @@ Mnemon 同时填补了协议栈中的空白。MCP 标准化了 LLM 如何发现�
 
 ### 安装
 
-本 fork 的团队网关在 `feat/remote-gateway` 分支。Go module 路径仍是 `github.com/mnemon-dev/mnemon`，因此 `go install github.com/suxatcode/mnemon@...` 无法解析 — 请 clone 后 `make install`：
-
 ```bash
-git clone -b feat/remote-gateway https://github.com/suxatcode/mnemon.git
-cd mnemon
-make install
+go install github.com/suxatcode/mnemon@v1.0.0
+# 或: git clone https://github.com/suxatcode/mnemon.git && cd mnemon && make install
 mnemon --version
 ```
 
-上游已发布版本（无团队网关）：`brew install mnemon-dev/tap/mnemon` 或 `go install github.com/mnemon-dev/mnemon@latest`。
-
-在团队远端上，`mnemon link` 可以连接**任何人**可召回的记忆 — 包括同事的。这是共享图的构建方式。召回对全队可见；forget/update 仍按所有者隔离。Helm **不会**捆绑 Postgres。
-
-本 fork 把 **server 镜像** 和 **Helm chart** 发布到 GitHub Container Registry，命名空间是 `suxatcode`（不是 `mnemon-dev` org，也不是 Docker Hub）：
+这是 **suxatcode** fork（`github.com/suxatcode/mnemon`）。团队网关在 `main`（v1.0.0）。
 
 | 产物 | 位置 |
 |---|---|
-| Server 镜像 | [`ghcr.io/suxatcode/mnemon-server`](https://github.com/suxatcode/mnemon/pkgs/container/mnemon-server) — 标签 `:dev` 与 `:<12 位 sha>`，linux/amd64 + linux/arm64 |
+| Server 镜像 | [`ghcr.io/suxatcode/mnemon-server`](https://github.com/suxatcode/mnemon/pkgs/container/mnemon-server) — `:dev`（main）、`:1.0.0`（release） |
 | Helm chart | `oci://ghcr.io/suxatcode/charts/mnemon-server`（[package](https://github.com/suxatcode/mnemon/pkgs/container/charts%2Fmnemon-server)） |
 
 ```bash
-helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 0.1.1
+helm install mnemon oci://ghcr.io/suxatcode/charts/mnemon-server --version 1.0.0
 ```
 
-公开默认值：资源名为 `mnemon`（Service/Deployment，不是 `mnemon-mnemon-server`），Pod 拉取 `ghcr.io/suxatcode/mnemon-server:dev`。见 [部署](../DEPLOYMENT.md)。
+资源名为 `mnemon`。生产环境请钉死 `--version 1.0.0`（`:dev` 会浮动）。开发 / 生产托管见 [部署](../DEPLOYMENT.md)。
+
+在团队远端上，`mnemon link` 可以连接**任何人**可召回的记忆 — 包括同事的。召回对全队可见；forget/update 仍按所有者隔离。Helm **不会**捆绑 Postgres。
 
 ### Claude Code
 

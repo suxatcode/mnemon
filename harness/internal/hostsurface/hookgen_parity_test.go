@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
 )
 
 var (

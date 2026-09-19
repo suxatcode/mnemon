@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mnemon-dev/mnemon/internal/setup/assets"
+	"github.com/suxatcode/mnemon/internal/setup/assets"
 )
 
 // CodexWriteSkill writes the mnemon skill to the Codex skills directory.

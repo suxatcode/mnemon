@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // #3: an op with zero writes must NOT be committed as an Accepted no-op (it mutated nothing, so

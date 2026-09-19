@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/model"
 )
 
 // CurrentSchemaVersion is the only schema version this build can import.

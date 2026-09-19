@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
 )
 
 // hookgen renders host hook shells from data: loop-side intents (loops/<loop>/hooks/intents.json)

@@ -19,7 +19,7 @@ RUN go mod download
 COPY . .
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod \
-  -ldflags "-s -w -X github.com/mnemon-dev/mnemon/cmd.version=${VERSION}" \
+  -ldflags "-s -w -X github.com/suxatcode/mnemon/cmd.version=${VERSION}" \
   -o /out/mnemon . \
   && CGO_ENABLED=0 GOOS=linux go build -mod=mod \
   -ldflags "-s -w" \

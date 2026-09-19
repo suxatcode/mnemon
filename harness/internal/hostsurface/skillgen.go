@@ -8,9 +8,9 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
-	"github.com/mnemon-dev/mnemon/harness/internal/capability"
-	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/capability"
+	"github.com/suxatcode/mnemon/harness/internal/manifest"
 )
 
 // skillgen renders the "Payload contract" section of a payload-constructing SKILL.md from the

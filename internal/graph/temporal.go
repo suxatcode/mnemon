@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 // Temporal proximity window in hours (MAGMA: 24h).

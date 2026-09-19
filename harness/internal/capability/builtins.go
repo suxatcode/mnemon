@@ -6,7 +6,7 @@ import (
 	"path"
 	"sort"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
 )
 
 // embeddedCatalog is the FIRST-PARTY capability catalog, compiled from the embedded capability specs

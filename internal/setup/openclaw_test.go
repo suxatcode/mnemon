@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/internal/setup/assets"
+	"github.com/suxatcode/mnemon/internal/setup/assets"
 )
 
 func TestOpenClawRegisterPluginWritesSelection(t *testing.T) {

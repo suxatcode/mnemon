@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/mnemon-dev/mnemon/internal/memorysvc"
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/memorysvc"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
 	"github.com/spf13/cobra"
 )
 

@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/remoteauth"
-	"github.com/mnemon-dev/mnemon/internal/remoteserver"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteauth"
+	"github.com/suxatcode/mnemon/internal/remoteserver"
+	"github.com/suxatcode/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
 

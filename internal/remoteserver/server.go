@@ -1,6 +1,7 @@
 package remoteserver
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -8,13 +9,23 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/memorysvc"
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/remoteauth"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/memorysvc"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteauth"
+	"github.com/suxatcode/mnemon/internal/store"
+)
+
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	idleTimeout       = 120 * time.Second
+	shutdownTimeout   = 15 * time.Second
 )
 
 type Server struct {
@@ -254,7 +265,23 @@ type ServeOptions struct {
 	MaxInsights int
 }
 
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+}
+
 func Serve(opts ServeOptions) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return serve(ctx, opts)
+}
+
+func serve(ctx context.Context, opts ServeOptions) error {
 	db, err := openStore(opts)
 	if err != nil {
 		return fmt.Errorf("open store: %w", err)
@@ -275,17 +302,32 @@ func Serve(opts ServeOptions) error {
 		StoreName:   opts.StoreName,
 	})
 	handler := New(svc, remoteauth.StoreVerifier{DB: db, Key: key}, db).Handler()
-	srv := &http.Server{
-		Addr:              opts.Addr,
-		Handler:           handler,
-		ReadHeaderTimeout: 10 * time.Second,
-	}
+	srv := newHTTPServer(opts.Addr, handler)
 	ln, err := listen(opts)
 	if err != nil {
 		return err
 	}
 	log.Printf("mnemon-server listening on %s", ln.Addr())
-	return srv.Serve(ln)
+	errc := make(chan error, 1)
+	go func() { errc <- srv.Serve(ln) }()
+	select {
+	case err := <-errc:
+		if err == http.ErrServerClosed {
+			return nil
+		}
+		return err
+	case <-ctx.Done():
+		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(shutCtx); err != nil {
+			return err
+		}
+		err := <-errc
+		if err == http.ErrServerClosed {
+			return nil
+		}
+		return err
+	}
 }
 
 func openStore(opts ServeOptions) (*store.DB, error) {

@@ -3,8 +3,8 @@ package hostsurface
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/assets"
-	"github.com/mnemon-dev/mnemon/harness/internal/manifest"
+	"github.com/suxatcode/mnemon/harness/internal/assets"
+	"github.com/suxatcode/mnemon/harness/internal/manifest"
 )
 
 // PD4 hook-options sink: codex applies the declared per-loop intent directly; claude takes Remind

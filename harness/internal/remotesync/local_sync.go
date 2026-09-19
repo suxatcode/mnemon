@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/store"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/store"
 )
 
 // LiveStore is the open-handle surface the sync passes drive: satisfied by *store.Store (the offline

@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // R2#3: AppendEvent is the durable ingest stream — a payload that cannot be marshalled must FAIL, not

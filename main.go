@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mnemon-dev/mnemon/cmd"
+import "github.com/suxatcode/mnemon/cmd"
 
 func main() {
 	cmd.Execute()

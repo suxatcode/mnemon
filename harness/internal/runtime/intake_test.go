@@ -3,8 +3,8 @@ package runtime
 import (
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
 )
 
 // mustEventAtSeq reads the stored event at ingest seq via the durable log (re-stamped from rowid).

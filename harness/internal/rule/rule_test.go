@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
 )
 
 // evidenceRule denies if the observed event has no "evidence", else proposes a memory write.

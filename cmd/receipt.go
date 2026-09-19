@@ -3,9 +3,9 @@ package cmd
 import (
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/memorysvc"
-	"github.com/mnemon-dev/mnemon/internal/remoteapi"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/memorysvc"
+	"github.com/suxatcode/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
 

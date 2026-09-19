@@ -2,8 +2,8 @@ apiVersion: v2
 name: mnemon-server
 description: Remote Mnemon memory gateway
 type: application
-version: 0.1.1
-appVersion: "dev"
+version: 1.0.0
+appVersion: "1.0.0"
 home: https://github.com/suxatcode/mnemon
 sources:
   - https://github.com/suxatcode/mnemon

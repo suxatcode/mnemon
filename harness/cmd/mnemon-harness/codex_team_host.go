@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/app"
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	hruntime "github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/app"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	hruntime "github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // codexTeamRuntimeHandle is the in-process Local Mnemon runtime the codex-team-loop demo drives.

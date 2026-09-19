@@ -3,9 +3,9 @@ package runtime
 import (
 	"fmt"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/channel"
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/syncserver"
+	"github.com/suxatcode/mnemon/harness/internal/channel"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/syncserver"
 )
 
 // The runtime's sync verbs are the CO-HOSTED hub form: the same syncserver adjudication mnemon-hub

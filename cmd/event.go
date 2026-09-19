@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/mnemon-dev/mnemon/internal/daemonemit"
+	"github.com/suxatcode/mnemon/internal/daemonemit"
 	"github.com/spf13/cobra"
 )
 

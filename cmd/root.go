@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/store"
 	"github.com/spf13/cobra"
 )
 

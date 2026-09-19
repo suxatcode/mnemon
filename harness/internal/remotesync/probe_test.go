@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/store"
+	"github.com/suxatcode/mnemon/harness/internal/store"
 )
 
 // ProbeAvailable lets the standalone sync detect a co-hosted Local Mnemon before it tries to open a

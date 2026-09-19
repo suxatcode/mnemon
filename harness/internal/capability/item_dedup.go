@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/rule"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/rule"
 )
 
 // itemDedupImport is the "item-dedup" remote-import strategy (capability-spec v2 §Sync): the GENERIC

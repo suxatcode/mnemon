@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/mnemon-dev/mnemon/internal/model"
-	"github.com/mnemon-dev/mnemon/internal/search"
-	"github.com/mnemon-dev/mnemon/internal/store"
+	"github.com/suxatcode/mnemon/internal/model"
+	"github.com/suxatcode/mnemon/internal/search"
+	"github.com/suxatcode/mnemon/internal/store"
 )
 
 // Minimum token overlap ratio to create a causal edge.

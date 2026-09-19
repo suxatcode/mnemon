@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/harness/internal/contract"
-	"github.com/mnemon-dev/mnemon/harness/internal/runtime"
+	"github.com/suxatcode/mnemon/harness/internal/contract"
+	"github.com/suxatcode/mnemon/harness/internal/runtime"
 )
 
 // foreignGoalCommit simulates a NEWER hub serving a kind this replica cannot import ("goal" is a

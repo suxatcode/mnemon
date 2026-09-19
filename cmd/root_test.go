@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mnemon-dev/mnemon/internal/embed"
+	"github.com/suxatcode/mnemon/internal/embed"
 )
 
 func TestOpenDBRejectsInvalidStoreNameFromEnv(t *testing.T) {

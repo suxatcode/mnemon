@@ -5,7 +5,7 @@ description: Add persistent graph-based memory to NanoClaw agents using mnemon. 
 
 # /add-mnemon
 
-Add [mnemon](https://github.com/mnemon-dev/mnemon) persistent memory to your NanoClaw installation. After running this skill, every agent session will have access to a per-group memory graph that persists across conversations.
+Add [mnemon](https://github.com/suxatcode/mnemon) persistent memory to your NanoClaw installation. After running this skill, every agent session will have access to a per-group memory graph that persists across conversations.
 
 ## Architecture
 
@@ -26,8 +26,7 @@ Each group gets its own isolated mnemon store. An optional global store provides
    mnemon --version
    ```
    If not installed:
-   - **macOS / Linux (Homebrew)**: `brew install mnemon-dev/tap/mnemon`
-   - **Go install**: `go install github.com/mnemon-dev/mnemon@latest`
+   - **Go:** `go install github.com/suxatcode/mnemon@v1.0.0`
 
 2. Verify the container image exists:
    ```bash
@@ -36,7 +35,7 @@ Each group gets its own isolated mnemon store. An optional global store provides
 
 3. Fetch the latest mnemon version for the Dockerfile:
    ```bash
-   curl -s https://api.github.com/repos/mnemon-dev/mnemon/releases/latest | grep -o '"tag_name": "v[^"]*"' | cut -d'"' -f4 | sed 's/^v//'
+   curl -s https://api.github.com/repos/suxatcode/mnemon/releases/latest | grep -o '"tag_name": "v[^"]*"' | cut -d'"' -f4 | sed 's/^v//'
    ```
 
 ---
@@ -53,7 +52,7 @@ Add the following block **after** the `apt-get install` section and **before** t
 # Install mnemon for persistent agent memory
 ARG MNEMON_VERSION=0.1.1
 RUN ARCH=$(dpkg --print-architecture) && \
-    curl -fsSL "https://github.com/mnemon-dev/mnemon/releases/download/v${MNEMON_VERSION}/mnemon_${MNEMON_VERSION}_linux_${ARCH}.tar.gz" \
+    curl -fsSL "https://github.com/suxatcode/mnemon/releases/download/v${MNEMON_VERSION}/mnemon_${MNEMON_VERSION}_linux_${ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin mnemon && \
     chmod +x /usr/local/bin/mnemon
 ```
