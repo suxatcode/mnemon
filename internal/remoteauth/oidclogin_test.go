@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,14 +19,18 @@ func TestLoginOIDCAndRefresh(t *testing.T) {
 	idp.SetGroups("alice", []string{"mnemon-users"})
 	idp.NextAccessTTL = 30 * time.Second
 	dir := t.TempDir()
+	var authURL string
 	remote, err := LoginOIDC(context.Background(), OIDCLoginRequest{
-		Issuer:      idp.Issuer,
-		ClientID:    "mnemon-cli",
-		Server:      "http://127.0.0.1:9",
-		Name:        "team",
-		DataDir:     dir,
-		Timeout:     10 * time.Second,
-		OpenBrowser: followLogin(t),
+		Issuer:   idp.Issuer,
+		ClientID: "mnemon-cli",
+		Server:   "http://127.0.0.1:9",
+		Name:     "team",
+		DataDir:  dir,
+		Timeout:  10 * time.Second,
+		OpenBrowser: func(raw string) error {
+			authURL = raw
+			return followLogin(t)(raw)
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -49,6 +55,52 @@ func TestLoginOIDCAndRefresh(t *testing.T) {
 	if cfg.DefaultRemote != "" {
 		t.Fatal("login without MakeDefault must not set the default remote")
 	}
+	scope := scopeParam(t, authURL)
+	if !strings.Contains(scope, "openid") || !strings.Contains(scope, "profile") {
+		t.Fatalf("default scope %q", scope)
+	}
+	if strings.Contains(scope, "offline_access") {
+		t.Fatalf("default login must not request offline_access: %q", scope)
+	}
+}
+
+func TestLoginOIDCExtraScopes(t *testing.T) {
+	idp := oidctest.New(t)
+	idp.SetGroups("alice", []string{"mnemon-users"})
+	var authURL string
+	_, err := LoginOIDC(context.Background(), OIDCLoginRequest{
+		Issuer:   idp.Issuer,
+		ClientID: "mnemon-cli",
+		Server:   "http://127.0.0.1:9",
+		DataDir:  t.TempDir(),
+		Timeout:  10 * time.Second,
+		Scopes:   []string{"api://example/access", "offline_access", "openid", "  "},
+		OpenBrowser: func(raw string) error {
+			authURL = raw
+			return followLogin(t)(raw)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := scopeParam(t, authURL)
+	for _, want := range []string{"openid", "profile", "api://example/access", "offline_access"} {
+		if !strings.Contains(scope, want) {
+			t.Fatalf("scope %q missing %q", scope, want)
+		}
+	}
+	if strings.Count(scope, "openid") != 1 {
+		t.Fatalf("openid duplicated in %q", scope)
+	}
+}
+
+func scopeParam(t *testing.T, raw string) string {
+	t.Helper()
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u.Query().Get("scope")
 }
 
 func followLogin(t *testing.T) func(string) error {

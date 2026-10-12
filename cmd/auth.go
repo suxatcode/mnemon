@@ -23,6 +23,7 @@ var (
 	authPrincipalClaim string
 	authCAFile         string
 	authServerName     string
+	authScopes         []string
 )
 
 var authCmd = &cobra.Command{
@@ -175,6 +176,7 @@ func loginOIDC() error {
 		CAFile:         authCAFile,
 		ServerName:     authServerName,
 		MakeDefault:    authLoginDefault,
+		Scopes:         authScopes,
 	})
 	if err != nil {
 		return err
@@ -210,6 +212,7 @@ func init() {
 	authLoginCmd.Flags().StringVar(&authPrincipalClaim, "principal-claim", "preferred_username", "access-token claim stored as the principal")
 	authLoginCmd.Flags().StringVar(&authCAFile, "ca-file", "", "CA PEM for the mnemon server, when it uses a private certificate")
 	authLoginCmd.Flags().StringVar(&authServerName, "server-name", "", "TLS ServerName for the mnemon server")
+	authLoginCmd.Flags().StringArrayVar(&authScopes, "scope", nil, "extra OIDC scope, repeatable; openid and profile are always requested")
 	authCmd.AddCommand(authLoginCmd, authStatusCmd)
 	rootCmd.AddCommand(authCmd)
 }

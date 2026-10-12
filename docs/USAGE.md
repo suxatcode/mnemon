@@ -59,11 +59,13 @@ Invite files remain the default. When the gateway has OIDC enabled, a public cli
 mnemon auth login --oidc --default \
   --issuer https://idp.example/realms/mnemon \
   --client-id mnemon-cli \
-  --server https://mnemon.example.com
+  --server https://mnemon.example.com \
+  --scope api://example/access \
+  --scope offline_access
 mnemon auth status
 ```
 
-Open the printed URL if a browser does not start. Login asks for the `openid` and `profile` scopes only. A refresh token is stored when the IdP returns one; the `offline_access` scope is not requested. Access tokens are team credentials: recall is team-visible, and IdP logout does not revoke a token until it expires or an operator runs `mnemon-server user revoke`.
+Open the printed URL if a browser does not start. Login always requests `openid` and `profile`. Repeat `--scope` for anything else: an API scope so the access token's `aud` is the resource server, and `offline_access` only when that IdP allows offline tokens. A refresh token is stored when the IdP returns one. Access tokens are team credentials: recall is team-visible, and IdP logout does not revoke a token until it expires or an operator runs `mnemon-server user revoke`.
 
 ## CLI Commands
 

@@ -74,6 +74,9 @@ type OIDCLoginRequest struct {
 	CAFile         string
 	ServerName     string
 	MakeDefault    bool
+	// Scopes are requested in addition to openid and profile. Blank entries and
+	// duplicates are dropped. offline_access is not included unless listed here.
+	Scopes []string
 	// OpenBrowser is called with the authorization URL. Nil prints the URL and
 	// tries the OS opener. Tests can complete the redirect themselves.
 	OpenBrowser func(url string) error
@@ -128,10 +131,9 @@ func LoginOIDC(ctx context.Context, req OIDCLoginRequest) (remoteapi.RemoteConfi
 			AuthStyle: oauth2.AuthStyleInParams,
 		},
 		RedirectURL: redirect,
-		// offline_access is not requested: many IdPs reject it unless the
-		// client is explicitly allowed to mint offline tokens. A normal
-		// authorization-code refresh token is stored when the IdP returns one.
-		Scopes: []string{"openid", "profile"},
+		// offline_access stays off unless the caller lists it. Some IdPs reject
+		// that scope unless the client is allowed to mint offline tokens.
+		Scopes: oidcLoginScopes(req.Scopes),
 	}
 	authURL := conf.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier))
 	code, err := waitForCode(ctx, ln, state, authURL, req)
@@ -350,6 +352,20 @@ func principalFromAccess(token, claim string) (string, error) {
 		return "", fmt.Errorf("access token missing %q", claim)
 	}
 	return principal, nil
+}
+
+func oidcLoginScopes(extra []string) []string {
+	scopes := []string{"openid", "profile"}
+	seen := map[string]bool{"openid": true, "profile": true}
+	for _, scope := range extra {
+		scope = strings.TrimSpace(scope)
+		if scope == "" || seen[scope] {
+			continue
+		}
+		seen[scope] = true
+		scopes = append(scopes, scope)
+	}
+	return scopes
 }
 
 func isJWT(token string) bool {
