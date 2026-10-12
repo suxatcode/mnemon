@@ -18,14 +18,16 @@ const (
 	defaultExpiry = 90 * 24 * time.Hour
 )
 
-// Identity is the verified actor from a JWT. Principal always comes from sub.
+// Identity is the verified actor. Invite tokens take the principal from sub.
+// OIDC tokens take it from the configured principal claim.
 type Identity struct {
 	Principal string
 	Role      string
 	JTI       string
 }
 
-// Verifier validates a bearer token. Implementations can later be swapped for OIDC.
+// Verifier validates a bearer token. StoreVerifier checks invite JWTs.
+// OIDCVerifier checks IdP access tokens. DispatchVerifier accepts both.
 type Verifier interface {
 	Verify(token string) (Identity, error)
 }

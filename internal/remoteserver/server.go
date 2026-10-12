@@ -263,6 +263,7 @@ type ServeOptions struct {
 	EmbedModel  string
 	JWTKeyFile  string
 	MaxInsights int
+	OIDC        remoteauth.OIDCConfig
 }
 
 func newHTTPServer(addr string, handler http.Handler) *http.Server {
@@ -287,9 +288,9 @@ func serve(ctx context.Context, opts ServeOptions) error {
 		return fmt.Errorf("open store: %w", err)
 	}
 	defer db.Close()
-	key, err := remoteauth.LoadKey(opts.JWTKeyFile)
+	verifier, err := remoteauth.NewVerifier(db, opts.JWTKeyFile, opts.OIDC)
 	if err != nil {
-		return fmt.Errorf("jwt key: %w", err)
+		return err
 	}
 	max := opts.MaxInsights
 	if max <= 0 {
@@ -301,7 +302,7 @@ func serve(ctx context.Context, opts ServeOptions) error {
 		EnforceACL:  true,
 		StoreName:   opts.StoreName,
 	})
-	handler := New(svc, remoteauth.StoreVerifier{DB: db, Key: key}, db).Handler()
+	handler := New(svc, verifier, db).Handler()
 	srv := newHTTPServer(opts.Addr, handler)
 	ln, err := listen(opts)
 	if err != nil {

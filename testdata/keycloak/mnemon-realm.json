@@ -1,0 +1,86 @@
+{
+  "realm": "mnemon",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "mnemon-cli",
+      "name": "mnemon CLI",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://127.0.0.1:*", "http://localhost:*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-mnemon",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "mnemon",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "mnemon-cli-no-aud",
+      "name": "mnemon CLI without API audience",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://127.0.0.1:*"]
+    }
+  ],
+  "groups": [
+    {"name": "mnemon-users"}
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Example",
+      "emailVerified": true,
+      "groups": ["/mnemon-users"],
+      "credentials": [
+        {"type": "password", "value": "alice-test-password", "temporary": false}
+      ]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "email": "bob@example.com",
+      "firstName": "Bob",
+      "lastName": "Example",
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {"type": "password", "value": "bob-test-password", "temporary": false}
+      ]
+    }
+  ]
+}

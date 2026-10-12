@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/suxatcode/mnemon/internal/embed"
 	"github.com/suxatcode/mnemon/internal/model"
 	"github.com/suxatcode/mnemon/internal/remoteapi"
 	"github.com/suxatcode/mnemon/internal/remoteauth"
 	"github.com/suxatcode/mnemon/internal/remoteserver"
 	"github.com/suxatcode/mnemon/internal/store"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -36,6 +36,16 @@ var (
 	issueServerName string
 	issueTTLDays    int
 	issueTTL        time.Duration
+
+	oidcIssuer         string
+	oidcAudience       string
+	oidcJWKSURL        string
+	oidcPrincipalClaim string
+	oidcAllowClaim     string
+	oidcAllowValue     string
+	oidcRoleClaim      string
+	oidcOrgValue       string
+	oidcProvision      string
 )
 
 func main() {
@@ -62,8 +72,8 @@ func serveCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "Serve the remote Mnemon HTTPS API",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if jwtKeyFile == "" {
-				return fmt.Errorf("--jwt-key is required")
+			if jwtKeyFile == "" && oidcIssuer == "" {
+				return fmt.Errorf("--jwt-key is required unless --oidc-issuer is set")
 			}
 			return remoteserver.Serve(remoteserver.ServeOptions{
 				Addr:        addr,
@@ -75,6 +85,17 @@ func serveCmd() *cobra.Command {
 				EmbedModel:  embedModel,
 				JWTKeyFile:  jwtKeyFile,
 				MaxInsights: maxInsights,
+				OIDC: remoteauth.OIDCConfig{
+					Issuer:         oidcIssuer,
+					Audience:       oidcAudience,
+					JWKSURL:        oidcJWKSURL,
+					PrincipalClaim: oidcPrincipalClaim,
+					AllowClaim:     oidcAllowClaim,
+					AllowValue:     oidcAllowValue,
+					RoleClaim:      oidcRoleClaim,
+					OrgValue:       oidcOrgValue,
+					Provision:      oidcProvision,
+				},
 			})
 		},
 	}
@@ -84,7 +105,16 @@ func serveCmd() *cobra.Command {
 	cmd.Flags().StringVar(&databaseURL, "database-url", os.Getenv("MNEMON_DATABASE_URL"), "postgres URL; if set, SQLite is not used")
 	cmd.Flags().StringVar(&tlsCert, "tls-cert", "", "TLS certificate PEM (required for TLS)")
 	cmd.Flags().StringVar(&tlsKey, "tls-key", "", "TLS private key PEM")
-	cmd.Flags().StringVar(&jwtKeyFile, "jwt-key", "", "HMAC JWT signing key file (min 32 bytes)")
+	cmd.Flags().StringVar(&jwtKeyFile, "jwt-key", "", "HMAC JWT signing key file (min 32 bytes); optional when --oidc-issuer is set")
+	cmd.Flags().StringVar(&oidcIssuer, "oidc-issuer", "", "OIDC issuer URL; enables access-token login")
+	cmd.Flags().StringVar(&oidcAudience, "oidc-audience", "", "expected access-token audience")
+	cmd.Flags().StringVar(&oidcJWKSURL, "oidc-jwks-url", "", "JWKS URL when the issuer URL is not reachable from this process")
+	cmd.Flags().StringVar(&oidcPrincipalClaim, "oidc-principal-claim", "preferred_username", "access-token claim used as the principal")
+	cmd.Flags().StringVar(&oidcAllowClaim, "oidc-allow-claim", "", "claim that must contain --oidc-allow-value")
+	cmd.Flags().StringVar(&oidcAllowValue, "oidc-allow-value", "", "required value of --oidc-allow-claim")
+	cmd.Flags().StringVar(&oidcRoleClaim, "oidc-role-claim", "", "claim that grants role=org when it contains --oidc-org-value")
+	cmd.Flags().StringVar(&oidcOrgValue, "oidc-org-value", "", "value of --oidc-role-claim that maps to role=org")
+	cmd.Flags().StringVar(&oidcProvision, "oidc-provision", remoteauth.ProvisionAuto, "auto (first valid token creates a user) or allowlist")
 	cmd.Flags().IntVar(&maxInsights, "max-insights", store.MaxInsightsFromEnv(store.ServerDefaultMaxInsights), "per-principal personal insight cap (env: MNEMON_MAX_INSIGHTS)")
 	cmd.Flags().StringVar(&embedModel, "embed-model", "", fmt.Sprintf("Ollama embedding model (default: %s)", embed.DefaultModel))
 	return cmd
@@ -213,7 +243,38 @@ func userCmd() *cobra.Command {
 	revoke.Flags().StringVar(&storeName, "store", store.DefaultStoreName, "server store name")
 	revoke.Flags().StringVar(&databaseURL, "database-url", os.Getenv("MNEMON_DATABASE_URL"), "postgres URL")
 	revoke.Flags().StringVar(&issuePrincipal, "principal", "", "principal to revoke")
-	root.AddCommand(issue, revoke)
+
+	add := &cobra.Command{
+		Use:   "add",
+		Short: "Create a principal without issuing a JWT (for OIDC allowlist)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if issuePrincipal == "" {
+				return fmt.Errorf("--principal is required")
+			}
+			if issueRole == "" {
+				issueRole = model.RoleUser
+			}
+			if issueRole != model.RoleUser && issueRole != model.RoleOrg {
+				return fmt.Errorf("role must be user or org")
+			}
+			db, err := openIssueDB()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			if err := db.UpsertPrincipal(issuePrincipal, issueRole); err != nil {
+				return err
+			}
+			fmt.Printf("added principal %s role %s\n", issuePrincipal, issueRole)
+			return nil
+		},
+	}
+	add.Flags().StringVar(&dataDir, "data-dir", defaultServerDataDir(), "server data directory (SQLite)")
+	add.Flags().StringVar(&storeName, "store", store.DefaultStoreName, "server store name")
+	add.Flags().StringVar(&databaseURL, "database-url", os.Getenv("MNEMON_DATABASE_URL"), "postgres URL")
+	add.Flags().StringVar(&issuePrincipal, "principal", "", "principal to add")
+	add.Flags().StringVar(&issueRole, "role", model.RoleUser, "role: user or org")
+	root.AddCommand(issue, revoke, add)
 	return root
 }
 

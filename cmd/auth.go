@@ -1,20 +1,29 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
 	"github.com/suxatcode/mnemon/internal/remoteapi"
 	"github.com/suxatcode/mnemon/internal/remoteauth"
 	"github.com/suxatcode/mnemon/internal/remoteclient"
-	"github.com/spf13/cobra"
 )
 
 var (
-	authLoginDefault bool
-	authLoginName    string
+	authLoginDefault   bool
+	authLoginName      string
+	authOIDC           bool
+	authIssuer         string
+	authClientID       string
+	authServer         string
+	authPrincipalClaim string
+	authCAFile         string
+	authServerName     string
+	authScopes         []string
 )
 
 var authCmd = &cobra.Command{
@@ -23,10 +32,21 @@ var authCmd = &cobra.Command{
 }
 
 var authLoginCmd = &cobra.Command{
-	Use:   "login <invite-file>",
-	Short: "Install a remote invite file",
-	Args:  cobra.ExactArgs(1),
+	Use:   "login [invite-file]",
+	Short: "Install a remote invite file, or log in with OIDC",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if authOIDC {
+			if len(args) != 0 {
+				return fmt.Errorf("oidc login does not take an invite file")
+			}
+			return nil
+		}
+		return cobra.ExactArgs(1)(cmd, args)
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if authOIDC {
+			return loginOIDC()
+		}
 		data, err := os.ReadFile(args[0])
 		if err != nil {
 			return err
@@ -142,9 +162,57 @@ func defaultRemoteClientFor(remote remoteapi.RemoteConfig) (*remoteclient.Client
 	return remoteclient.Dial(remote)
 }
 
+func loginOIDC() error {
+	if authIssuer == "" || authClientID == "" || authServer == "" {
+		return fmt.Errorf("--issuer, --client-id, and --server are required with --oidc")
+	}
+	remote, err := remoteauth.LoginOIDC(cmdContext(), remoteauth.OIDCLoginRequest{
+		Issuer:         authIssuer,
+		ClientID:       authClientID,
+		Server:         authServer,
+		Name:           authLoginName,
+		DataDir:        dataDir,
+		PrincipalClaim: authPrincipalClaim,
+		CAFile:         authCAFile,
+		ServerName:     authServerName,
+		MakeDefault:    authLoginDefault,
+		Scopes:         authScopes,
+	})
+	if err != nil {
+		return err
+	}
+	status := "installed"
+	if authLoginDefault {
+		status = "installed_default"
+	}
+	out := map[string]any{
+		"status":    status,
+		"remote":    remote.Name,
+		"server":    remote.Server,
+		"principal": remote.Principal,
+		"default":   authLoginDefault,
+		"auth":      "oidc",
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
+}
+
+func cmdContext() context.Context {
+	return context.Background()
+}
+
 func init() {
 	authLoginCmd.Flags().BoolVar(&authLoginDefault, "default", false, "make this remote the default storage backend")
 	authLoginCmd.Flags().StringVar(&authLoginName, "name", "", "remote name")
+	authLoginCmd.Flags().BoolVar(&authOIDC, "oidc", false, "log in with OIDC authorization code and PKCE instead of an invite file")
+	authLoginCmd.Flags().StringVar(&authIssuer, "issuer", "", "OIDC issuer URL")
+	authLoginCmd.Flags().StringVar(&authClientID, "client-id", "", "OIDC public client id")
+	authLoginCmd.Flags().StringVar(&authServer, "server", "", "mnemon-server base URL")
+	authLoginCmd.Flags().StringVar(&authPrincipalClaim, "principal-claim", "preferred_username", "access-token claim stored as the principal")
+	authLoginCmd.Flags().StringVar(&authCAFile, "ca-file", "", "CA PEM for the mnemon server, when it uses a private certificate")
+	authLoginCmd.Flags().StringVar(&authServerName, "server-name", "", "TLS ServerName for the mnemon server")
+	authLoginCmd.Flags().StringArrayVar(&authScopes, "scope", nil, "extra OIDC scope, repeatable; openid and profile are always requested")
 	authCmd.AddCommand(authLoginCmd, authStatusCmd)
 	rootCmd.AddCommand(authCmd)
 }

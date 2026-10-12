@@ -79,6 +79,21 @@ certManager:
   renewBefore: ""
   annotations: {}
 
+# Opt-in OIDC access-token login. Off by default, so installs keep invite JWTs only.
+# Auto provision requires allowClaim and allowValue. Use provision=allowlist to
+# admit only principals created with `mnemon-server user add`.
+oidc:
+  enabled: false
+  issuer: ""
+  audience: ""
+  jwksUrl: ""
+  principalClaim: preferred_username
+  allowClaim: ""
+  allowValue: ""
+  roleClaim: ""
+  orgValue: ""
+  provision: auto
+
 # External Postgres DSN. Never creates a Postgres StatefulSet or PVC.
 database:
   url: ""

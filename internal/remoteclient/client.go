@@ -2,6 +2,7 @@ package remoteclient
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/suxatcode/mnemon/internal/remoteapi"
+	"github.com/suxatcode/mnemon/internal/remoteauth"
 )
 
 type Client struct {
@@ -23,9 +25,9 @@ type Client struct {
 }
 
 func Dial(remote remoteapi.RemoteConfig) (*Client, error) {
-	tokenBytes, err := os.ReadFile(remote.TokenFile)
+	token, err := remoteauth.FreshAccessToken(context.Background(), remote)
 	if err != nil {
-		return nil, fmt.Errorf("read token file: %w", err)
+		return nil, err
 	}
 	cfg := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -54,7 +56,7 @@ func Dial(remote remoteapi.RemoteConfig) (*Client, error) {
 			},
 		},
 		base:  strings.TrimRight(host, "/"),
-		token: strings.TrimSpace(string(tokenBytes)),
+		token: token,
 		agent: "mnemon-cli",
 	}, nil
 }

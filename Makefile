@@ -10,7 +10,7 @@ ifeq ($(GOBIN),)
   GOBIN     := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: deps build build-server harness-build install uninstall test unit vet test-minikube harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-build-server docker-run compose-up compose-down compose-dev release-snapshot clean help
+.PHONY: deps build build-server harness-build install uninstall test unit vet test-minikube test-minikube-oidc harness-validate harness-docs-check eval-router-check codex-app-eval codex-app-eval-suite codex-memory-deep-eval codex-skill-deep-eval codex-eval-smoke docker-build docker-build-server docker-run compose-up compose-down compose-dev release-snapshot clean help
 
 .DEFAULT_GOAL := help
 
@@ -52,6 +52,9 @@ unit: ## Run Go unit tests
 
 test-minikube: ## Run gateway Helm/client integration suite on a dedicated minikube profile
 	bash scripts/minikube_gateway_test.sh
+
+test-minikube-oidc: ## Keycloak OIDC scenario on the docker minikube profile
+	MINIKUBE_MEMORY=$${MINIKUBE_MEMORY:-4096} SCENARIOS=oidc bash scripts/minikube_gateway_test.sh
 
 vet: ## Run go vet static analysis
 	go vet ./...

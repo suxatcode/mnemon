@@ -48,6 +48,30 @@ spec:
             - --addr={{ .Values.server.addr }}
             - --max-insights={{ .Values.maxInsights }}
             - --jwt-key=/config/{{ .Values.server.jwtKeyKey }}
+            {{- if .Values.oidc.enabled }}
+            - --oidc-issuer={{ required "oidc.issuer is required when oidc.enabled" .Values.oidc.issuer }}
+            - --oidc-audience={{ required "oidc.audience is required when oidc.enabled" .Values.oidc.audience }}
+            {{- if .Values.oidc.jwksUrl }}
+            - --oidc-jwks-url={{ .Values.oidc.jwksUrl }}
+            {{- end }}
+            {{- if .Values.oidc.principalClaim }}
+            - --oidc-principal-claim={{ .Values.oidc.principalClaim }}
+            {{- end }}
+            {{- if ne (.Values.oidc.provision | default "auto") "allowlist" }}
+            - --oidc-allow-claim={{ required "oidc.allowClaim is required unless oidc.provision is allowlist" .Values.oidc.allowClaim }}
+            - --oidc-allow-value={{ required "oidc.allowValue is required unless oidc.provision is allowlist" .Values.oidc.allowValue }}
+            {{- else if and .Values.oidc.allowClaim .Values.oidc.allowValue }}
+            - --oidc-allow-claim={{ .Values.oidc.allowClaim }}
+            - --oidc-allow-value={{ .Values.oidc.allowValue }}
+            {{- end }}
+            {{- if .Values.oidc.provision }}
+            - --oidc-provision={{ .Values.oidc.provision }}
+            {{- end }}
+            {{- if and .Values.oidc.roleClaim .Values.oidc.orgValue }}
+            - --oidc-role-claim={{ .Values.oidc.roleClaim }}
+            - --oidc-org-value={{ .Values.oidc.orgValue }}
+            {{- end }}
+            {{- end }}
             {{- if not (include "mnemon-server.usePostgres" .) }}
             - --data-dir=/data
             {{- end }}

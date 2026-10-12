@@ -275,7 +275,8 @@ curl_health() {
   elif [[ "$SCHEME" == "https" ]]; then
     extra=(-k)
   fi
-  curl -sS --max-time 5 "${extra[@]}" "${SCHEME}://127.0.0.1:${LOCAL_PORT}$1"
+  # ${arr[@]+...} keeps an empty array from tripping set -u on bash 3.2.
+  curl -sS --max-time 5 ${extra[@]+"${extra[@]}"} "${SCHEME}://127.0.0.1:${LOCAL_PORT}$1"
 }
 
 curl_code() {
@@ -286,7 +287,7 @@ curl_code() {
   elif [[ "$SCHEME" == "https" ]]; then
     extra=(-k)
   fi
-  code=$(curl -sS --max-time 5 "${extra[@]}" -o "$WORKDIR/curl.body" -w '%{http_code}' "$@" || true)
+  code=$(curl -sS --max-time 5 ${extra[@]+"${extra[@]}"} -o "$WORKDIR/curl.body" -w '%{http_code}' "$@" || true)
   echo "${code:-000}"
 }
 
@@ -1134,7 +1135,224 @@ main() {
   want_scenario istio && scenario_istio
   want_scenario sqlite && scenario_sqlite
   want_scenario tls-off && scenario_tls_off
+  want_scenario oidc && scenario_oidc
   summary
+}
+
+# Keycloak is not part of the default suite. make test-minikube-oidc sets SCENARIOS=oidc.
+KC_LOCAL_PORT="${KC_LOCAL_PORT:-18080}"
+KC_IMAGE="${KC_IMAGE:-quay.io/keycloak/keycloak:26.4.2}"
+
+require_oidc_memory() {
+  local raw ki
+  raw=$(kubectl --context "$PROFILE" get nodes -o jsonpath='{.items[0].status.allocatable.memory}' 2>/dev/null || true)
+  ki="${raw%Ki}"
+  if [[ -z "$ki" || "$ki" == "$raw" ]]; then
+    fail "node memory" "could not read allocatable memory ($raw)"
+    exit 1
+  fi
+  if [[ "$ki" -lt 3500000 ]]; then
+    fail "node memory" "${raw} is too small for Keycloak; delete the ${PROFILE} profile and rerun make test-minikube-oidc (MINIKUBE_MEMORY=4096)"
+    exit 1
+  fi
+  pass "node memory" "$raw"
+}
+
+kc_password_grant() {
+  local client="$1" user="$2" pass="$3"
+  curl -sS --max-time 20 \
+    -d "grant_type=password" \
+    -d "client_id=${client}" \
+    -d "username=${user}" \
+    -d "password=${pass}" \
+    -d "scope=openid profile" \
+    "http://127.0.0.1:${KC_LOCAL_PORT}/realms/mnemon/protocol/openid-connect/token"
+}
+
+jwt_claim() {
+  python3 - "$1" "$2" <<'PY'
+import base64, json, sys
+token, claim = sys.argv[1], sys.argv[2]
+part = token.split(".")[1]
+part += "=" * ((4 - len(part) % 4) % 4)
+print(json.loads(base64.urlsafe_b64decode(part))[claim])
+PY
+}
+
+install_oidc_remote() {
+  local dir="$1" principal="$2" token="$3" issuer="$4"
+  mkdir -p "$dir/tokens"
+  printf '%s\n' "$token" >"$dir/tokens/team.token"
+  chmod 600 "$dir/tokens/team.token"
+  jq -n \
+    --arg server "http://127.0.0.1:${LOCAL_PORT}" \
+    --arg principal "$principal" \
+    --arg token "$dir/tokens/team.token" \
+    --arg issuer "$issuer" \
+    '{
+      schema_version: 1,
+      default_remote: "team",
+      remotes: [{
+        name: "team",
+        server: $server,
+        principal: $principal,
+        token_file: $token,
+        auth: "oidc",
+        issuer: $issuer,
+        client_id: "mnemon-cli",
+        workspace: "default"
+      }]
+    }' >"$dir/auth.json"
+}
+
+scenario_oidc() {
+  banner "F. OIDC with Keycloak"
+  require_oidc_memory
+  SCHEME=http
+  reset_namespace
+  step "deploy Keycloak"
+  kubectl --context "$PROFILE" -n "$NS" create configmap keycloak-realm \
+    --from-file=mnemon-realm.json="$ROOT/testdata/keycloak/mnemon-realm.json" >/dev/null
+  kubectl --context "$PROFILE" -n "$NS" apply -f - >/dev/null <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: ${KC_IMAGE}
+          args: ["start-dev", "--import-realm", "--http-port=8080"]
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              value: admin
+            - name: KC_HOSTNAME
+              value: "http://127.0.0.1:${KC_LOCAL_PORT}"
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_HTTP_ENABLED
+              value: "true"
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /realms/mnemon
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 40
+          resources:
+            requests:
+              cpu: 100m
+              memory: 768Mi
+            limits:
+              memory: 1536Mi
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+YAML
+  if ! k rollout status deploy/keycloak --timeout=300s >/dev/null; then
+    k logs deploy/keycloak --tail=80 || true
+    fail "keycloak ready" "rollout failed"
+    exit 1
+  fi
+  pass "keycloak ready" "$KC_IMAGE"
+  k port-forward deploy/keycloak "${KC_LOCAL_PORT}:8080" >"$WORKDIR/kc-pf.log" 2>&1 &
+  local kc_pid=$!
+  local i alice_json iss bob_json bad_json
+  for i in $(seq 1 60); do
+    if curl -sf --max-time 2 "http://127.0.0.1:${KC_LOCAL_PORT}/realms/mnemon" >/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+  alice_json=$(kc_password_grant mnemon-cli alice alice-test-password || true)
+  if ! echo "$alice_json" | jq -e '.access_token' >/dev/null; then
+    fail "alice password grant" "$(echo "$alice_json" | tr '\n' ' ' | head -c 240)"
+    kill "$kc_pid" 2>/dev/null || true
+    exit 1
+  fi
+  iss=$(jwt_claim "$(echo "$alice_json" | jq -r .access_token)" iss)
+  pass "keycloak token" "iss=$iss"
+  bob_json=$(kc_password_grant mnemon-cli bob bob-test-password || true)
+  bad_json=$(kc_password_grant mnemon-cli-no-aud alice alice-test-password || true)
+  if ! echo "$bob_json" | jq -e '.access_token' >/dev/null; then
+    fail "bob password grant" "$(echo "$bob_json" | tr '\n' ' ' | head -c 240)"
+    kill "$kc_pid" 2>/dev/null || true
+    exit 1
+  fi
+  if ! echo "$bad_json" | jq -e '.access_token' >/dev/null; then
+    fail "no-audience password grant" "$(echo "$bad_json" | tr '\n' ' ' | head -c 240)"
+    kill "$kc_pid" 2>/dev/null || true
+    exit 1
+  fi
+  kill "$kc_pid" 2>/dev/null || true
+  wait "$kc_pid" 2>/dev/null || true
+  install_chart \
+    --set server.tls.enabled=false \
+    --set persistence.enabled=false \
+    --set oidc.enabled=true \
+    --set "oidc.issuer=${iss}" \
+    --set oidc.audience=mnemon \
+    --set oidc.jwksUrl=http://keycloak:8080/realms/mnemon/protocol/openid-connect/certs \
+    --set oidc.allowClaim=groups \
+    --set oidc.allowValue=mnemon-users \
+    --set oidc.principalClaim=preferred_username
+  rm -f "$CA_FILE"
+  start_pf
+  probe_k8s 1 sqlite
+
+  local alice_tok
+  alice_tok=$(echo "$alice_json" | jq -r .access_token)
+  install_oidc_remote "$ALICE_DIR" alice "$alice_tok" "$iss"
+  local st rec
+  st=$(cli_capture "$ALICE_DIR" auth status)
+  assert_jq "alice oidc remote ok" "$st" '.remote_status' 'ok'
+  rec=$(remember "$ALICE_DIR" "alice oidc memory about widgets")
+  assert_contains "alice oidc remember" "$rec" "alice"
+  rec=$(cli_capture "$ALICE_DIR" recall "widgets" --limit 5)
+  assert_contains "alice oidc recall" "$rec" "alice oidc memory about widgets"
+
+  install_oidc_remote "$BOB_DIR" bob "$(echo "$bob_json" | jq -r .access_token)" "$iss"
+  assert_exit_fails "bob is not in mnemon-users" "$BOB_DIR" status
+  install_oidc_remote "$CAROL_DIR" alice "$(echo "$bad_json" | jq -r .access_token)" "$iss"
+  assert_exit_fails "token without mnemon audience" "$CAROL_DIR" status
+
+  step "revoke alice"
+  k exec deploy/mnemon -- mnemon-server user revoke --principal alice >/dev/null
+  assert_exit_fails "revoked alice token is rejected" "$ALICE_DIR" status
+  stop_pf
 }
 
 main "$@"

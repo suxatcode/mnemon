@@ -61,7 +61,23 @@ mnemon-server user revoke --database-url "$MNEMON_DATABASE_URL" --principal bob@
 
 Rotation is a flag day: new `jwt.key` → restart pods → re-issue everyone. Revoke is per-principal and does not rotate the key.
 
-**TODO (not in chart):** NetworkPolicy (Ingress/mesh only) and `readOnlyRootFilesystem: true` (add `emptyDir` at `/tmp`). ServiceMonitor, rate limit, OIDC: later.
+**OIDC (optional).** Invite JWTs stay the default. Set `oidc.enabled` to also accept RS256/ES256 **access tokens** from any OpenID provider. The token `aud` must be the API audience (not the CLI client id). ID tokens and opaque tokens are rejected. The access-token lifetime is the logout window: the IdP session ending does not revoke a token the gateway already accepted. `mnemon-server user revoke` does.
+
+Auto provision (`oidc.provision=auto`, the default) creates a `user` principal on first valid token, and it refuses to start unless `oidc.allowClaim` and `oidc.allowValue` name a group or role the token must carry. `provision=allowlist` admits only rows created with `mnemon-server user add`. A disabled principal is always rejected.
+
+```yaml
+oidc:
+  enabled: true
+  issuer: https://idp.example/realms/mnemon
+  audience: mnemon
+  jwksUrl: http://idp.internal/jwks   # optional, when the pod cannot fetch the public issuer
+  allowClaim: groups
+  allowValue: mnemon-users
+```
+
+`--oidc-jwks-url` is the in-cluster JWKS. Token `iss` stays the browser-facing issuer. Clients log in with `mnemon auth login --oidc` (authorization code + PKCE). See [Usage](USAGE.md).
+
+**TODO (not in chart):** NetworkPolicy (Ingress/mesh only) and `readOnlyRootFilesystem: true` (add `emptyDir` at `/tmp`). ServiceMonitor, rate limit.
 
 ## Release
 

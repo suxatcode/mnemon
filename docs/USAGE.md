@@ -51,6 +51,22 @@ mnemon setup --eject --target claude-code
 
 ---
 
+## Team login
+
+Invite files remain the default. When the gateway has OIDC enabled, a public client can log in with authorization code and PKCE. The IdP must put the **server audience** on a **JWT access token**. Opaque tokens are not supported. The CLI stores a refresh token locally and refreshes the access token when it is within a minute of expiry. The refresh token is not sent to the gateway.
+
+```bash
+mnemon auth login --oidc --default \
+  --issuer https://idp.example/realms/mnemon \
+  --client-id mnemon-cli \
+  --server https://mnemon.example.com \
+  --scope api://example/access \
+  --scope offline_access
+mnemon auth status
+```
+
+Open the printed URL if a browser does not start. Login always requests `openid` and `profile`. Repeat `--scope` for anything else: an API scope so the access token's `aud` is the resource server, and `offline_access` only when that IdP allows offline tokens. A refresh token is stored when the IdP returns one. Access tokens are team credentials: recall is team-visible, and IdP logout does not revoke a token until it expires or an operator runs `mnemon-server user revoke`.
+
 ## CLI Commands
 
 ### Core
