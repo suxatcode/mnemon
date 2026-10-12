@@ -382,3 +382,45 @@ func TestHelmTemplateModes(t *testing.T) {
 		t.Fatal("tls-off Service port must be named http")
 	}
 }
+
+func TestHelmOIDCIsOptIn(t *testing.T) {
+	def := helmTemplate(t)
+	if strings.Contains(def, "--oidc-issuer") {
+		t.Fatal("default render must not enable OIDC")
+	}
+	if !strings.Contains(def, "--jwt-key") {
+		t.Fatal("default render must still pass --jwt-key")
+	}
+	on := helmTemplate(t,
+		"--set", "oidc.enabled=true",
+		"--set", "oidc.issuer=https://idp.example/realms/mnemon",
+		"--set", "oidc.audience=mnemon",
+		"--set", "oidc.jwksUrl=http://idp.example/jwks",
+		"--set", "oidc.allowClaim=groups",
+		"--set", "oidc.allowValue=mnemon-users",
+	)
+	for _, want := range []string{
+		"--jwt-key",
+		"--oidc-issuer=https://idp.example/realms/mnemon",
+		"--oidc-audience=mnemon",
+		"--oidc-jwks-url=http://idp.example/jwks",
+		"--oidc-allow-claim=groups",
+		"--oidc-allow-value=mnemon-users",
+	} {
+		if !strings.Contains(on, want) {
+			t.Fatalf("oidc render missing %q", want)
+		}
+	}
+	allow := helmTemplate(t,
+		"--set", "oidc.enabled=true",
+		"--set", "oidc.issuer=https://idp.example/realms/mnemon",
+		"--set", "oidc.audience=mnemon",
+		"--set", "oidc.provision=allowlist",
+	)
+	if !strings.Contains(allow, "--oidc-provision=allowlist") {
+		t.Fatal("allowlist provision should be passed")
+	}
+	if strings.Contains(allow, "--oidc-allow-claim") {
+		t.Fatal("allowlist without a claim gate should not invent one")
+	}
+}

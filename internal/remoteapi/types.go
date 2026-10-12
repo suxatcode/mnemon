@@ -37,13 +37,17 @@ type AuthConfig struct {
 }
 
 type RemoteConfig struct {
-	Name       string `json:"name"`
-	Server     string `json:"server"`
-	Principal  string `json:"principal"`
-	TokenFile  string `json:"token_file"`
-	CAFile     string `json:"ca_file,omitempty"`
-	ServerName string `json:"server_name,omitempty"`
-	Workspace  string `json:"workspace,omitempty"`
+	Name        string `json:"name"`
+	Server      string `json:"server"`
+	Principal   string `json:"principal"`
+	TokenFile   string `json:"token_file"`
+	CAFile      string `json:"ca_file,omitempty"`
+	ServerName  string `json:"server_name,omitempty"`
+	Workspace   string `json:"workspace,omitempty"`
+	Auth        string `json:"auth,omitempty"`
+	Issuer      string `json:"issuer,omitempty"`
+	ClientID    string `json:"client_id,omitempty"`
+	RefreshFile string `json:"refresh_file,omitempty"`
 }
 
 type RememberRequest struct {
