@@ -2,6 +2,7 @@ package remoteserver
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -60,14 +61,14 @@ func TestOIDCAndInviteOnTheSameGateway(t *testing.T) {
 			var last error
 			for i := 0; i < 20; i++ {
 				resp, err := http.Get(authURL)
-				if err == nil {
+				if err != nil {
+					last = err
+				} else {
 					resp.Body.Close()
 					if resp.StatusCode < 400 {
 						return nil
 					}
-					last = err
-				} else {
-					last = err
+					last = fmt.Errorf("status %s", resp.Status)
 				}
 				time.Sleep(50 * time.Millisecond)
 			}

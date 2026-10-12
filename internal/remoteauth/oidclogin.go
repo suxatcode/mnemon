@@ -306,13 +306,15 @@ func FreshAccessToken(ctx context.Context, remote remoteapi.RemoteConfig) (strin
 	if !isJWT(tok.AccessToken) {
 		return "", fmt.Errorf("refreshed access token is not a JWT")
 	}
-	if err := writeSecret(remote.TokenFile, tok.AccessToken); err != nil {
-		return "", err
-	}
+	// Persist a rotated refresh token before the access token. Some IdPs
+	// invalidate the previous refresh token as soon as the new one is issued.
 	if tok.RefreshToken != "" && tok.RefreshToken != refresh {
 		if err := writeSecret(remote.RefreshFile, tok.RefreshToken); err != nil {
 			return "", err
 		}
+	}
+	if err := writeSecret(remote.TokenFile, tok.AccessToken); err != nil {
+		return "", err
 	}
 	return tok.AccessToken, nil
 }
